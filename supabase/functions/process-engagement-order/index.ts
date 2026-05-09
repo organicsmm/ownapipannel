@@ -420,6 +420,35 @@ serve(async (req) => {
           
           validatedEntries.forEach((e, i) => e.run_number = i + 1)
 
+          // SAFETY NET: If total scheduled qty < target, top up with extra runs
+          // This prevents under-delivery bugs where loop terminates early
+          {
+            const scheduledSum = validatedEntries.reduce((s, r) => s + r.quantity_to_send, 0)
+            const shortfall = totalTargetQty - scheduledSum
+            if (shortfall >= providerMin && validatedEntries.length > 0) {
+              const perRun = Math.max(providerMin, Math.min(maxBatchCap, Math.ceil(shortfall / Math.max(5, Math.ceil(shortfall / maxBatchCap)))))
+              const extraRuns = Math.max(1, Math.ceil(shortfall / perRun))
+              const lastTime = new Date(validatedEntries[validatedEntries.length - 1].scheduled_at).getTime()
+              let leftover = shortfall
+              for (let k = 0; k < extraRuns && leftover > 0; k++) {
+                const qty = (k === extraRuns - 1) ? leftover : Math.min(perRun, leftover)
+                if (qty <= 0) break
+                const t = new Date(lastTime + (k + 1) * (baseInterval * 60 * 1000) + (Math.random() * 2 - 1) * 60 * 1000)
+                validatedEntries.push({
+                  engagement_order_item_id: itemId,
+                  run_number: validatedEntries.length + 1,
+                  scheduled_at: t.toISOString(),
+                  quantity_to_send: qty,
+                  base_quantity: qty,
+                  status: 'pending'
+                })
+                leftover -= qty
+              }
+              console.log(`🛟 [${engType}] Top-up: scheduled ${scheduledSum}/${totalTargetQty}, added ${extraRuns} runs for shortfall ${shortfall}`)
+            }
+          }
+          validatedEntries.forEach((e, i) => e.run_number = i + 1)
+
           if (validatedEntries.length > 0) {
             const { error: schedErr } = await supabase.from('organic_run_schedule').insert(validatedEntries)
             if (schedErr) {
