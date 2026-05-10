@@ -322,6 +322,41 @@ Deno.serve(async (req) => {
           await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
 
         } else if (providerStatus === 'partial') {
+          // SCAM GUARD: if provider says "Partial" but delivered 0 (remains == full qty),
+          // treat as a failed delivery and retry on a backup provider instead of
+          // silently marking it complete.
+          const deliveredQty = run.quantity_to_send - remains
+          if (deliveredQty <= 0) {
+            const orderStatus = run.engagement_order_item?.engagement_order?.status
+            const itemStatus = run.engagement_order_item?.status
+            if (orderStatus === 'cancelled' || itemStatus === 'cancelled') {
+              await supabase.from('organic_run_schedule').update({
+                ...trackingUpdate,
+                status: 'cancelled',
+                completed_at: new Date().toISOString(),
+                error_message: 'Order cancelled by user'
+              }).eq('id', run.id)
+              continue
+            }
+            const currentRetryCount = run.retry_count || 0
+            if (currentRetryCount < 15) {
+              const triedSet = new Set<string>(
+                Array.isArray(run.provider_response?.tried_providers) ? run.provider_response.tried_providers : []
+              )
+              if (run.provider_account_id) triedSet.add(run.provider_account_id)
+              const mergedResp = { ...(trackingUpdate.provider_response || {}), tried_providers: Array.from(triedSet) }
+              await supabase.from('organic_run_schedule').update({
+                ...trackingUpdate,
+                provider_response: mergedResp,
+                status: 'failed',
+                completed_at: new Date().toISOString(),
+                error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains}/${run.quantity_to_send})`
+              }).eq('id', run.id)
+              failed++
+              continue
+            }
+            // fall through to mark partial-completed if max retries exceeded
+          }
           await supabase.from('organic_run_schedule').update({
             ...trackingUpdate,
             status: 'completed',
