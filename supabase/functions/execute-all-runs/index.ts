@@ -1425,10 +1425,23 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         const isPendingTooLong = startedAt < twoMinutesAgo && stuckRun.provider_status === 'Pending'
         
         if (isTerminal || isStuckWithoutStatus || isInProgressTooLong || isPendingTooLong) {
-          await supabase.from('organic_run_schedule').update({
-            status: 'completed', completed_at: new Date().toISOString(),
-            error_message: `Auto-completed (status: ${stuckRun.provider_status || 'unknown'})`,
-          }).eq('id', stuckRun.id)
+          // SCAM GUARD: detect 0-delivered fake completions and retry instead
+          const qty = stuckRun.quantity_to_send || 0
+          const remains = typeof stuckRun.provider_remains === 'number' ? stuckRun.provider_remains : null
+          const startCount = typeof stuckRun.provider_start_count === 'number' ? stuckRun.provider_start_count : null
+          const deliveredZero = remains !== null && qty > 0 && remains >= qty && (startCount === null || startCount === 0)
+          const retryCount = stuckRun.retry_count || 0
+          if (deliveredZero && !isTerminal && retryCount < 15) {
+            await supabase.from('organic_run_schedule').update({
+              status: 'failed', completed_at: new Date().toISOString(),
+              error_message: `Auto-retry: provider ${stuckRun.provider_status || 'unknown'} with 0 delivered (remains=${remains}/${qty})`,
+            }).eq('id', stuckRun.id)
+          } else {
+            await supabase.from('organic_run_schedule').update({
+              status: 'completed', completed_at: new Date().toISOString(),
+              error_message: `Auto-completed (status: ${stuckRun.provider_status || 'unknown'})`,
+            }).eq('id', stuckRun.id)
+          }
         } else {
           const runAge = Math.round((Date.now() - startedAt.getTime()) / 1000)
           if (runAge < 60) { skipped++; continue }
