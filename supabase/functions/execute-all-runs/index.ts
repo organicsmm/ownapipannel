@@ -989,13 +989,27 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           const runAge = Math.round((Date.now() - startedAt.getTime()) / 1000)
           
           if (isTerminal || hasNoRemains) {
-            console.log(`🔄 Auto-completing run #${stuckRun.run_number} (${hasNoRemains ? 'no remains left' : `terminal: ${stuckRun.provider_status}`})`)
-            await supabase.from('organic_run_schedule').update({
-              status: 'completed', completed_at: new Date().toISOString(),
-              error_message: hasNoRemains
-                ? `Auto-completed (provider remains reached 0)`
-                : `Auto-completed (status: ${stuckRun.provider_status})`,
-            }).eq('id', stuckRun.id)
+            // SCAM GUARD: terminal status but 0 actually delivered → retry instead of complete
+            const qty = stuckRun.quantity_to_send || 0
+            const remains = typeof stuckRun.provider_remains === 'number' ? stuckRun.provider_remains : null
+            const startCount = typeof stuckRun.provider_start_count === 'number' ? stuckRun.provider_start_count : null
+            const deliveredZero = !hasNoRemains && remains !== null && qty > 0 && remains >= qty && (startCount === null || startCount === 0)
+            const retryCount = stuckRun.retry_count || 0
+            if (deliveredZero && retryCount < 15) {
+              console.log(`⚠️ Auto-retry run #${stuckRun.run_number}: provider ${stuckRun.provider_status} with 0 delivered`)
+              await supabase.from('organic_run_schedule').update({
+                status: 'failed', completed_at: new Date().toISOString(),
+                error_message: `Auto-retry: provider ${stuckRun.provider_status} with 0 delivered (remains=${remains}/${qty})`,
+              }).eq('id', stuckRun.id)
+            } else {
+              console.log(`🔄 Auto-completing run #${stuckRun.run_number} (${hasNoRemains ? 'no remains left' : `terminal: ${stuckRun.provider_status}`})`)
+              await supabase.from('organic_run_schedule').update({
+                status: 'completed', completed_at: new Date().toISOString(),
+                error_message: hasNoRemains
+                  ? `Auto-completed (provider remains reached 0)`
+                  : `Auto-completed (status: ${stuckRun.provider_status})`,
+              }).eq('id', stuckRun.id)
+            }
           } else if (stuckRun.provider_account_id) {
             if (!stuckRun.provider_order_id && runAge > 60) {
               await supabase.from('organic_run_schedule').update({
