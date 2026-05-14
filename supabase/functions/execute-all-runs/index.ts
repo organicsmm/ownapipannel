@@ -1124,39 +1124,8 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
 
       console.log(`🔄 Run #${run.run_number}: ${quantityToSend} ${item.engagement_type}, trying ${accountsToTry.length} accounts`)
 
-      // Claim run ONCE before provider failover loop.
-      // Earlier this happened inside the provider loop, so after the first provider
-      // was marked as started, the second provider could never acquire the lock.
       const currentStatus = isRetry ? 'failed' : 'pending'
-      const { error: initialClaimError, locked: initialLockAcquired } = await claimRunLock({
-        supabase,
-        runId: run.id,
-        expectedStatus: currentStatus,
-        updates: {
-          status: 'started',
-          started_at: new Date().toISOString(),
-          error_message: 'Trying provider failover...',
-          retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
-          provider_order_id: null,
-          provider_status: null,
-          provider_response: null,
-          provider_account_id: null,
-          provider_account_name: null,
-        },
-      })
-
-      if (initialClaimError) {
-        console.error(`❌ Failed to claim run lock for ${run.id}:`, initialClaimError)
-        failed++
-        continue
-      }
-
-      if (!initialLockAcquired) {
-        console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
-        skipped++
-        continue
-      }
-
+      let runClaimed = false
       const triedProviderIds: string[] = []
 
       // Try each account
@@ -1219,15 +1188,51 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         }
         
         triedProviderIds.push(selectedAccount.id)
-        await supabase.from('organic_run_schedule').update({
-          error_message: `Trying ${selectedAccount.name}...`,
-          provider_account_id: selectedAccount.id,
-          provider_account_name: selectedAccount.name,
-          provider_order_id: null,
-          provider_status: null,
-          provider_response: null,
-          last_status_check: new Date().toISOString(),
-        }).eq('id', run.id).eq('status', 'started')
+
+        if (!runClaimed) {
+          const { error: claimError, locked: lockAcquired } = await claimRunLock({
+            supabase,
+            runId: run.id,
+            expectedStatus: currentStatus,
+            updates: {
+              status: 'started',
+              started_at: new Date().toISOString(),
+              error_message: `Trying ${selectedAccount.name}...`,
+              retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
+              provider_order_id: null,
+              provider_status: null,
+              provider_response: null,
+              provider_account_id: selectedAccount.id,
+              provider_account_name: selectedAccount.name,
+              last_status_check: new Date().toISOString(),
+            },
+          })
+
+          if (claimError) {
+            console.error(`❌ Failed to claim run lock for ${run.id}:`, claimError)
+            lastError = `Run claim failed: ${claimError.message || 'unknown error'}`
+            break
+          }
+
+          if (!lockAcquired) {
+            console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
+            skipped++
+            lastError = null
+            break
+          }
+
+          runClaimed = true
+        } else {
+          await supabase.from('organic_run_schedule').update({
+            error_message: `Trying ${selectedAccount.name}...`,
+            provider_account_id: selectedAccount.id,
+            provider_account_name: selectedAccount.name,
+            provider_order_id: null,
+            provider_status: null,
+            provider_response: null,
+            last_status_check: new Date().toISOString(),
+          }).eq('id', run.id).eq('status', 'started')
+        }
 
         try {
           const formData = new URLSearchParams()
@@ -1386,7 +1391,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         if (providerIsTerminal) {
           await updateEngagementOrderStatus(supabase, item.engagement_order_id, item.id)
         }
-      } else {
+      } else if (lastError !== null) {
         const retryCount = (run.retry_count || 0) + 1
         const lastErr = (lastError || '').toLowerCase()
         const isActiveOrderError = lastErr.includes('active order') || lastErr.includes('wait until order') || 
