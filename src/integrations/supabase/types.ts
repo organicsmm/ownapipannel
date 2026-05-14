@@ -1141,6 +1141,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_maintenance_mode: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

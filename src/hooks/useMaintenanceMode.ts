@@ -8,13 +8,9 @@ export function useMaintenanceMode() {
   const { data: isMaintenanceMode = false } = useQuery({
     queryKey: ['maintenance-mode'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('platform_settings')
-        .select('maintenance_mode')
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('is_maintenance_mode');
       if (error) return false;
-      return data?.maintenance_mode ?? false;
+      return data ?? false;
     },
     staleTime: 60000, // Cache for 60s - realtime handles instant updates
     gcTime: 5 * 60 * 1000,
