@@ -301,6 +301,11 @@ const isTerminalProviderStatus = (status?: string | null) => {
   return ['completed', 'complete', 'partial', 'refunded', 'canceled', 'cancelled', 'error', 'failed', 'success', 'refund', 'canscelled'].includes(normalized)
 }
 
+const isActiveProviderStatus = (status?: string | null) => {
+  const normalized = (status || '').toLowerCase().trim()
+  return ['pending', 'in progress', 'processing', 'processing order', 'inprogress', 'awaiting'].includes(normalized)
+}
+
 const isFailedProviderStatus = (status?: string | null) => {
   const normalized = (status || '').toLowerCase().trim()
   return ['refunded', 'canceled', 'cancelled', 'error', 'failed', 'refund', 'canscelled'].includes(normalized)
@@ -632,9 +637,13 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           const remains = typeof stuck.provider_remains === 'number' ? stuck.provider_remains : null
           const startCount = typeof stuck.provider_start_count === 'number' ? stuck.provider_start_count : null
           const deliveredZero = remains !== null && qty > 0 && remains >= qty && (startCount === null || startCount === 0)
-          const terminalStatuses = ['Completed', 'Complete', 'Partial', 'Refunded', 'Canceled', 'Cancelled', 'Error', 'Failed', 'Success']
-          const isTerminal = stuck.provider_status && terminalStatuses.includes(stuck.provider_status)
+          const isTerminal = isTerminalProviderStatus(stuck.provider_status)
+          const isActive = isActiveProviderStatus(stuck.provider_status)
           const retryCount = stuck.retry_count || 0
+
+          if (deliveredZero && isActive && ageMin < 45) {
+            return null
+          }
 
           if (deliveredZero && !isTerminal && retryCount < 15) {
             return supabase.from('organic_run_schedule').update({
@@ -642,6 +651,11 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
               error_message: `Auto-retry after ${ageMin}min: provider returned ${stuck.provider_status || 'unknown'} with 0 delivered (remains=${remains}/${qty})`,
             }).eq('id', stuck.id)
           }
+
+          if (!isTerminal && isActive) {
+            return null
+          }
+
           return supabase.from('organic_run_schedule').update({
             status: 'completed', completed_at: new Date().toISOString(),
             provider_status: stuck.provider_status || 'Stale',
@@ -649,7 +663,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           }).eq('id', stuck.id)
         }
       })
-      await Promise.all(cleanupPromises)
+      await Promise.all(cleanupPromises.filter(Boolean))
       console.log(`✅ Cleaned ${globalStuckRuns.length} stuck runs`)
     }
 
@@ -698,7 +712,12 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
       return true
     })
 
-    const retryRunsLimitedPerItem = activeFailedRuns.filter((run: any) => {
+    const retryableFailedRuns = activeFailedRuns.filter((run: any) => {
+      if (!run.provider_order_id) return true
+      return isTerminalProviderStatus(run.provider_status)
+    })
+
+    const retryRunsLimitedPerItem = retryableFailedRuns.filter((run: any) => {
       const itemId = run.engagement_order_item_id
       const count = itemRunCount.get(itemId) || 0
       if (count < MAX_CONCURRENT_PER_ITEM) {
