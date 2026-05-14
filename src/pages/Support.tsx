@@ -48,6 +48,7 @@ import {
   Crown,
   ChevronDown
 } from "lucide-react";
+import { PageMeta } from "@/components/seo/PageMeta";
 import { format } from "date-fns";
 
 const CATEGORIES = [
@@ -186,6 +187,16 @@ export default function Support() {
 
   return (
     <DashboardLayout>
+      <PageMeta
+        title="Support & FAQ — OrganicSMM"
+        description="OrganicSMM support: open tickets, browse FAQs about delivery times, payments, refunds and Organic Mode. We respond within 24 hours."
+        canonicalPath="/support"
+        breadcrumbs={[
+          { name: 'Home', path: '/' },
+          { name: 'Support', path: '/support' },
+        ]}
+        faqItems={FAQ_ITEMS.map((f) => ({ question: f.question, answer: f.answer }))}
+      />
       <div className="space-y-6">
         {/* Header */}
         <div className="relative overflow-hidden rounded-2xl glass-card p-6 sm:p-8">
