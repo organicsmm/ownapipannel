@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
       .or(
         'status.eq.started,' +
         'and(status.eq.completed,error_message.ilike.%Auto-completed%,provider_status.in.(Pending,In progress,Processing,Inprogress,Awaiting)),' +
-        'and(status.eq.completed,provider_status.not.in.(Completed,Complete,Partial,Refunded,Canceled,Cancelled,Error,Failed,Success,Refund,Canscelled))'
+        'and(status.eq.completed,provider_status.not.in.(Completed,Complete,Partial,Refunded,Canceled,Cancelled,Error,Failed,Success,Refund,Canscelled)),' +
+        'and(status.eq.failed,provider_status.in.(Pending,In progress,Processing,Inprogress,Awaiting))'
       )
       .not('provider_order_id', 'is', null)
       .not('engagement_order_item_id', 'is', null)
@@ -263,16 +264,6 @@ Deno.serve(async (req) => {
         // 1. If provider returns a terminal status, always complete
         // 2. If stuck in a non-terminal status for 10+ minutes, auto-complete to unblock
         // 3. If "started" for 10+ minutes but NO provider status at all, auto-complete
-        const terminalStatuses = ['completed', 'complete', 'partial', 'refunded', 'canceled', 'cancelled', 'error', 'failed', 'success', 'refund', 'canscelled']
-        const isProviderTerminal = providerStatus && terminalStatuses.includes(providerStatus)
-        const isStatusStuck = !isProviderTerminal && (
-          providerStatus === 'pending' || 
-          providerStatus === 'in progress' || 
-          providerStatus === 'processing' || 
-          providerStatus === 'processing order' ||
-          !providerStatus // NULL status but still started
-        )
-
         // Always update provider tracking data
         const trackingUpdate: any = {
           provider_status: result.status,
@@ -473,7 +464,8 @@ Deno.serve(async (req) => {
       .or(
         'status.eq.started,' +
         'and(status.eq.completed,error_message.ilike.%Auto-completed%,provider_status.in.(Pending,In progress,Processing,Inprogress,Awaiting)),' +
-        'and(status.eq.completed,provider_status.not.in.(Completed,Complete,Partial,Refunded,Canceled,Cancelled,Error,Failed,Success,Refund,Canscelled))'
+        'and(status.eq.completed,provider_status.not.in.(Completed,Complete,Partial,Refunded,Canceled,Cancelled,Error,Failed,Success,Refund,Canscelled)),' +
+        'and(status.eq.failed,provider_status.in.(Pending,In progress,Processing,Inprogress,Awaiting))'
       )
       .not('provider_order_id', 'is', null)
       .not('order_id', 'is', null)
@@ -565,11 +557,6 @@ Deno.serve(async (req) => {
           const startCount = parseInt(result.start_count) || null
           const remains = parseInt(result.remains) || 0
           const charge = parseFloat(result.charge) || null
-
-          // Check if run is stuck for 10+ minutes (reduced from 30 for faster flow)
-          const startedAt = new Date(run.started_at || run.scheduled_at)
-          const ageMinutes = Math.round((Date.now() - startedAt.getTime()) / 60000)
-          const isStuckTooLong = ageMinutes >= 10 && (providerStatus === 'in progress' || providerStatus === 'pending' || providerStatus === 'processing')
 
           // Always update tracking data
           const trackingUpdate: any = {
