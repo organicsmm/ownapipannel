@@ -1124,6 +1124,41 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
 
       console.log(`🔄 Run #${run.run_number}: ${quantityToSend} ${item.engagement_type}, trying ${accountsToTry.length} accounts`)
 
+      // Claim run ONCE before provider failover loop.
+      // Earlier this happened inside the provider loop, so after the first provider
+      // was marked as started, the second provider could never acquire the lock.
+      const currentStatus = isRetry ? 'failed' : 'pending'
+      const { error: initialClaimError, locked: initialLockAcquired } = await claimRunLock({
+        supabase,
+        runId: run.id,
+        expectedStatus: currentStatus,
+        updates: {
+          status: 'started',
+          started_at: new Date().toISOString(),
+          error_message: 'Trying provider failover...',
+          retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
+          provider_order_id: null,
+          provider_status: null,
+          provider_response: null,
+          provider_account_id: null,
+          provider_account_name: null,
+        },
+      })
+
+      if (initialClaimError) {
+        console.error(`❌ Failed to claim run lock for ${run.id}:`, initialClaimError)
+        failed++
+        continue
+      }
+
+      if (!initialLockAcquired) {
+        console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
+        skipped++
+        continue
+      }
+
+      const triedProviderIds: string[] = []
+
       // Try each account
       let success = false
       let lastError: string | null = null
@@ -1183,32 +1218,16 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           continue
         }
         
-        // Atomic lock
-        const currentStatus = isRetry ? 'failed' : 'pending'
-        const { error: updateError, locked: lockAcquired } = await claimRunLock({
-          supabase,
-          runId: run.id,
-          expectedStatus: currentStatus,
-          updates: {
-            status: 'started', started_at: new Date().toISOString(),
-            error_message: `Trying ${selectedAccount.name}...`,
-            retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
-            provider_order_id: null, provider_status: null, provider_response: null,
-            provider_account_id: selectedAccount.id,
-            provider_account_name: selectedAccount.name,
-          },
-        })
-
-        if (updateError) {
-          console.error(`❌ Failed to claim run lock for ${run.id}:`, updateError)
-          break
-        }
-
-        if (!lockAcquired) {
-          console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
-          skipped++
-          break
-        }
+        triedProviderIds.push(selectedAccount.id)
+        await supabase.from('organic_run_schedule').update({
+          error_message: `Trying ${selectedAccount.name}...`,
+          provider_account_id: selectedAccount.id,
+          provider_account_name: selectedAccount.name,
+          provider_order_id: null,
+          provider_status: null,
+          provider_response: null,
+          last_status_check: new Date().toISOString(),
+        }).eq('id', run.id).eq('status', 'started')
 
         try {
           const formData = new URLSearchParams()
@@ -1380,7 +1399,14 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           status: 'pending', started_at: null,
           scheduled_at: newScheduledAt,
           error_message: `[Auto-retry #${retryCount}] All ${accountsToTry.length} accounts busy: ${lastError}`,
-          provider_response: providerResult, provider_account_id: null,
+          provider_response: {
+            ...(providerResult || {}),
+            tried_providers: triedProviderIds,
+          },
+          provider_account_id: null,
+          provider_account_name: null,
+          provider_order_id: null,
+          provider_status: null,
           retry_count: retryCount, last_status_check: new Date().toISOString(),
         }).eq('id', run.id)
         skipped++
