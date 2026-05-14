@@ -1124,6 +1124,10 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
 
       console.log(`🔄 Run #${run.run_number}: ${quantityToSend} ${item.engagement_type}, trying ${accountsToTry.length} accounts`)
 
+      const currentStatus = isRetry ? 'failed' : 'pending'
+      let runClaimed = false
+      const triedProviderIds: string[] = []
+
       // Try each account
       let success = false
       let lastError: string | null = null
@@ -1183,31 +1187,51 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           continue
         }
         
-        // Atomic lock
-        const currentStatus = isRetry ? 'failed' : 'pending'
-        const { error: updateError, locked: lockAcquired } = await claimRunLock({
-          supabase,
-          runId: run.id,
-          expectedStatus: currentStatus,
-          updates: {
-            status: 'started', started_at: new Date().toISOString(),
+        triedProviderIds.push(selectedAccount.id)
+
+        if (!runClaimed) {
+          const { error: claimError, locked: lockAcquired } = await claimRunLock({
+            supabase,
+            runId: run.id,
+            expectedStatus: currentStatus,
+            updates: {
+              status: 'started',
+              started_at: new Date().toISOString(),
+              error_message: `Trying ${selectedAccount.name}...`,
+              retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
+              provider_order_id: null,
+              provider_status: null,
+              provider_response: null,
+              provider_account_id: selectedAccount.id,
+              provider_account_name: selectedAccount.name,
+              last_status_check: new Date().toISOString(),
+            },
+          })
+
+          if (claimError) {
+            console.error(`❌ Failed to claim run lock for ${run.id}:`, claimError)
+            lastError = `Run claim failed: ${claimError.message || 'unknown error'}`
+            break
+          }
+
+          if (!lockAcquired) {
+            console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
+            skipped++
+            lastError = null
+            break
+          }
+
+          runClaimed = true
+        } else {
+          await supabase.from('organic_run_schedule').update({
             error_message: `Trying ${selectedAccount.name}...`,
-            retry_count: (run.retry_count || 0) + (isRetry ? 1 : 0),
-            provider_order_id: null, provider_status: null, provider_response: null,
             provider_account_id: selectedAccount.id,
             provider_account_name: selectedAccount.name,
-          },
-        })
-
-        if (updateError) {
-          console.error(`❌ Failed to claim run lock for ${run.id}:`, updateError)
-          break
-        }
-
-        if (!lockAcquired) {
-          console.log(`⏭️ Run #${run.run_number} already claimed by another execution, skipping duplicate send`)
-          skipped++
-          break
+            provider_order_id: null,
+            provider_status: null,
+            provider_response: null,
+            last_status_check: new Date().toISOString(),
+          }).eq('id', run.id).eq('status', 'started')
         }
 
         try {
@@ -1367,7 +1391,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         if (providerIsTerminal) {
           await updateEngagementOrderStatus(supabase, item.engagement_order_id, item.id)
         }
-      } else {
+      } else if (lastError !== null) {
         const retryCount = (run.retry_count || 0) + 1
         const lastErr = (lastError || '').toLowerCase()
         const isActiveOrderError = lastErr.includes('active order') || lastErr.includes('wait until order') || 
@@ -1380,7 +1404,14 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           status: 'pending', started_at: null,
           scheduled_at: newScheduledAt,
           error_message: `[Auto-retry #${retryCount}] All ${accountsToTry.length} accounts busy: ${lastError}`,
-          provider_response: providerResult, provider_account_id: null,
+          provider_response: {
+            ...(providerResult || {}),
+            tried_providers: triedProviderIds,
+          },
+          provider_account_id: null,
+          provider_account_name: null,
+          provider_order_id: null,
+          provider_status: null,
           retry_count: retryCount, last_status_check: new Date().toISOString(),
         }).eq('id', run.id)
         skipped++
