@@ -6,6 +6,7 @@ import { Search, Zap, Star, Clock, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useServices } from '@/hooks/useServices';
 import { useCurrency } from '@/hooks/useCurrency';
+import { PageMeta } from '@/components/seo/PageMeta';
 
 const categories = [
   'All',
@@ -51,6 +52,15 @@ export default function Services() {
 
   return (
     <DashboardLayout>
+      <PageMeta
+        title="Services & Pricing — OrganicSMM"
+        description="Browse OrganicSMM services: Instagram, YouTube, TikTok and Twitter/X engagement with transparent pricing and natural delivery."
+        canonicalPath="/services"
+        breadcrumbs={[
+          { name: 'Home', path: '/' },
+          { name: 'Services', path: '/services' },
+        ]}
+      />
       <div className="space-y-8">
         {/* Header */}
         <div>

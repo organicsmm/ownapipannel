@@ -5,18 +5,25 @@ export interface BreadcrumbItem {
   path: string; // path relative to BASE_URL, e.g. "/services"
 }
 
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 interface PageMetaProps {
   title: string;
   description?: string;
   canonicalPath?: string;
   noIndex?: boolean;
   breadcrumbs?: BreadcrumbItem[];
+  faqItems?: FaqItem[];
 }
 
 const DEFAULT_DESCRIPTION = "OrganicSMM — World's first AI-organic SMM panel. Real Instagram, YouTube & TikTok engagement with natural delivery. 50,000+ orders, zero bans, 100% safe.";
 const SITE_NAME = 'OrganicSMM';
 const BASE_URL = 'https://organicsmm.online';
 const BREADCRUMB_SCRIPT_ID = 'breadcrumb-jsonld';
+const FAQ_SCRIPT_ID = 'faq-page-jsonld';
 
 export function PageMeta({
   title,
@@ -24,12 +31,16 @@ export function PageMeta({
   canonicalPath,
   noIndex = false,
   breadcrumbs,
+  faqItems,
 }: PageMetaProps) {
   useEffect(() => {
     // Set title
+    const hasBrand = title.toLowerCase().includes(SITE_NAME.toLowerCase());
     const fullTitle = title === 'Home'
-      ? `${SITE_NAME} - Smart Automation Console`
-      : `${title} | ${SITE_NAME}`;
+      ? `${SITE_NAME} — Organic Social Media Growth Panel`
+      : hasBrand
+        ? title
+        : `${title} | ${SITE_NAME}`;
     document.title = fullTitle;
 
     // Update meta description
@@ -48,6 +59,13 @@ export function PageMeta({
     const ogDescription = document.querySelector('meta[property="og:description"]');
     if (ogDescription) {
       ogDescription.setAttribute('content', description);
+    }
+
+    // Update OG URL to self-reference current page
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) {
+      const path = canonicalPath ?? (typeof window !== 'undefined' ? window.location.pathname : '/');
+      ogUrl.setAttribute('content', `${BASE_URL}${path}`);
     }
 
     // Handle canonical URL
@@ -95,14 +113,33 @@ export function PageMeta({
       document.head.appendChild(script);
     }
 
+    // Handle FAQPage JSON-LD
+    document.getElementById(FAQ_SCRIPT_ID)?.remove();
+    if (faqItems && faqItems.length > 0) {
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.id = FAQ_SCRIPT_ID;
+      script.text = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqItems.map((f) => ({
+          '@type': 'Question',
+          name: f.question,
+          acceptedAnswer: { '@type': 'Answer', text: f.answer },
+        })),
+      });
+      document.head.appendChild(script);
+    }
+
     // Cleanup on unmount
     return () => {
       if (robotsMeta && noIndex) {
         robotsMeta.remove();
       }
       document.getElementById(BREADCRUMB_SCRIPT_ID)?.remove();
+      document.getElementById(FAQ_SCRIPT_ID)?.remove();
     };
-  }, [title, description, canonicalPath, noIndex, breadcrumbs]);
+  }, [title, description, canonicalPath, noIndex, breadcrumbs, faqItems]);
 
   return null;
 }
