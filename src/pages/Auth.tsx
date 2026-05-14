@@ -8,6 +8,7 @@ import { Mail, Lock, User, Loader2, ArrowLeft, Shield, Zap, Eye, EyeOff, ArrowRi
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import logo from '@/assets/logo.jpg';
+import { PageMeta } from '@/components/seo/PageMeta';
 
 
 const loginSchema = z.object({
@@ -95,6 +96,11 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12" style={{ background: 'linear-gradient(180deg, #fff 0%, #f0fdf4 50%, #dcfce7 100%)' }}>
+      <PageMeta
+        title={isLogin ? 'Sign in — OrganicSMM' : 'Create your account — OrganicSMM'}
+        description="Sign in or create your free OrganicSMM account to launch organic Instagram, YouTube and TikTok growth campaigns. No credit card required."
+        canonicalPath="/auth"
+      />
       <div className="w-full max-w-[400px]">
           {/* Logo */}
           <div className="flex items-center justify-center gap-2.5 mb-10">
