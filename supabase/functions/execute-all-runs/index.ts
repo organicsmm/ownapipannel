@@ -1062,15 +1062,23 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
       // Default provider fallback
       let defaultProvider: ProviderAccount | null = null
       if (item.service.provider_id) {
-        const { data: provider } = await supabase
-          .from('providers').select('*')
-          .eq('id', item.service.provider_id).maybeSingle()
-        
-        if (provider && isValidHttpUrl(provider.api_url)) {
+        // FIX: provider_account_id column is UUID. Resolve text provider_id → matching
+        // provider_accounts row (UUID). If none exists, skip the fallback to avoid
+        // "invalid input syntax for type uuid" errors that block all runs.
+        const { data: acct } = await supabase
+          .from('provider_accounts').select('*')
+          .eq('provider_id', item.service.provider_id)
+          .eq('is_active', true)
+          .order('priority', { ascending: false })
+          .limit(1).maybeSingle()
+
+        if (acct && isValidHttpUrl(acct.api_url) &&
+            !busyAccountIds.includes(acct.id) &&
+            !availableAccounts.some(a => a.account.id === acct.id)) {
           defaultProvider = {
-            id: provider.id, provider_id: provider.id, name: provider.name,
-            api_key: provider.api_key, api_url: provider.api_url,
-            priority: 999, is_active: provider.is_active, last_used_at: null
+            id: acct.id, provider_id: acct.provider_id, name: acct.name,
+            api_key: acct.api_key, api_url: acct.api_url,
+            priority: 999, is_active: acct.is_active, last_used_at: acct.last_used_at
           }
         }
       }
