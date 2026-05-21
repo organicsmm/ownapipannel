@@ -812,6 +812,45 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         continue
       }
 
+      // 🛡️ OVER-DELIVERY GUARD: Ensure cumulative sent quantity never exceeds item.quantity
+      // Provider over-delivery is normal (~10-30%), but our scheduled sum must not exceed ordered.
+      try {
+        const orderedQty = Number(item.quantity || 0)
+        if (orderedQty > 0) {
+          const { data: sentRows } = await supabase
+            .from('organic_run_schedule')
+            .select('quantity_to_send,status')
+            .eq('engagement_order_item_id', item.id)
+            .in('status', ['completed', 'started'])
+          const alreadySent = (sentRows || []).reduce(
+            (s: number, r: any) => s + Number(r.quantity_to_send || 0), 0)
+          const remaining = orderedQty - alreadySent
+          if (remaining <= 0) {
+            // Already met or exceeded ordered quantity — cancel all remaining pending runs
+            await supabase.from('organic_run_schedule').update({
+              status: 'cancelled',
+              error_message: `Item already fulfilled (${alreadySent}/${orderedQty}) — preventing over-delivery`,
+              completed_at: new Date().toISOString(),
+            }).eq('engagement_order_item_id', item.id).eq('status', 'pending')
+            await supabase.from('engagement_order_items').update({
+              status: 'completed', updated_at: new Date().toISOString(),
+            }).eq('id', item.id).neq('status', 'completed')
+            skipped++
+            console.log(`🛡️ Item ${item.id} already fulfilled (${alreadySent}/${orderedQty}), cancelling remaining pending runs`)
+            continue
+          }
+          if (run.quantity_to_send > remaining) {
+            console.log(`🛡️ Capping run #${run.run_number} qty ${run.quantity_to_send} → ${remaining} (sent ${alreadySent}/${orderedQty})`)
+            await supabase.from('organic_run_schedule').update({
+              quantity_to_send: remaining,
+            }).eq('id', run.id)
+            run.quantity_to_send = remaining
+          }
+        }
+      } catch (capErr) {
+        console.error('Over-delivery guard error:', capErr)
+      }
+
       if (!item.service) {
         // FALLBACK: Try bundle
         const bundleId = item.engagement_order?.bundle_id
