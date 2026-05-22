@@ -1175,6 +1175,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         if (min <= 0) return candidateMin
         return Math.min(min, candidateMin)
       }, 0)
+      let effectiveQty = originalQty
       let quantityToSend = originalQty
 
       if (smallestAccountMin > 0 && originalQty < smallestAccountMin) {
@@ -1209,6 +1210,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
             last_status_check: new Date().toISOString(),
           }).in('id', runsToMerge)
 
+          effectiveQty = combinedQty
           quantityToSend = combinedQty
           run.quantity_to_send = combinedQty
           run.base_quantity = combinedQty
@@ -1227,7 +1229,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         }
       }
 
-      console.log(`🔄 Run #${run.run_number}: ${quantityToSend} ${item.engagement_type}, trying ${accountsToTry.length} accounts`)
+      console.log(`🔄 Run #${run.run_number}: ${effectiveQty} ${item.engagement_type}, trying ${accountsToTry.length} accounts`)
 
       const currentStatus = isRetry ? 'failed' : 'pending'
       let runClaimed = false
@@ -1249,12 +1251,12 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         // NEVER boost quantity above what was scheduled — that causes over-delivery
         // (e.g. scheduled 112 views but provider min is 500 → user sees 500+ delivered).
         // Instead, skip providers whose min exceeds the scheduled qty and try the next one.
-        if (accountMinQty && accountMinQty > originalQty) {
-          lastError = `Provider ${selectedAccount.name} min ${accountMinQty} > scheduled ${originalQty}, skipping to avoid over-delivery`
+        if (accountMinQty && accountMinQty > effectiveQty) {
+          lastError = `Provider ${selectedAccount.name} min ${accountMinQty} > scheduled ${effectiveQty}, skipping to avoid over-delivery`
           console.log(`⏭️ ${lastError}`)
           continue
         }
-        quantityToSend = originalQty
+        quantityToSend = effectiveQty
         // PRE-CHECK: Cancel check
         {
           const { data: freshItem } = await supabase
