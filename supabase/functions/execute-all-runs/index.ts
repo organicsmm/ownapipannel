@@ -1159,13 +1159,14 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         continue
       }
 
-      // Quantity handling — prefer providers whose minimum fits this run.
-      // If none fit, merge this run with the next pending runs of the SAME item so
-      // shares/saves small batches can still go out instead of looping forever.
+      // Quantity handling — pick the LOWEST-min provider first so small runs aren't rejected.
+      // If every provider minimum is still above the scheduled qty, merge with future
+      // pending runs of the same item so shares/saves do not get stuck forever.
       const originalQty = run.quantity_to_send
+      let effectiveQty = originalQty
       accountsToTry.sort((a, b) => {
-        const aFits = (a.minQuantity || 0) <= originalQty ? 0 : 1
-        const bFits = (b.minQuantity || 0) <= originalQty ? 0 : 1
+        const aFits = (a.minQuantity || 0) <= effectiveQty ? 0 : 1
+        const bFits = (b.minQuantity || 0) <= effectiveQty ? 0 : 1
         if (aFits !== bFits) return aFits - bFits
         return (a.minQuantity || 0) - (b.minQuantity || 0)
       })
@@ -1175,19 +1176,18 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         if (min <= 0) return candidateMin
         return Math.min(min, candidateMin)
       }, 0)
-      let effectiveQty = originalQty
-      let quantityToSend = originalQty
+      let quantityToSend = effectiveQty
 
-      if (smallestAccountMin > 0 && originalQty < smallestAccountMin) {
+      if (smallestAccountMin > 0 && effectiveQty < smallestAccountMin) {
         const { data: futurePendingRuns } = await supabase
           .from('organic_run_schedule')
-          .select('id, quantity_to_send')
+          .select('id, run_number, quantity_to_send')
           .eq('engagement_order_item_id', item.id)
           .eq('status', 'pending')
           .gt('run_number', run.run_number)
           .order('run_number', { ascending: true })
 
-        let combinedQty = originalQty
+        let combinedQty = effectiveQty
         const runsToMerge: string[] = []
         for (const pendingRun of futurePendingRuns || []) {
           combinedQty += Number(pendingRun.quantity_to_send || 0)
@@ -1214,6 +1214,12 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
           quantityToSend = combinedQty
           run.quantity_to_send = combinedQty
           run.base_quantity = combinedQty
+          accountsToTry.sort((a, b) => {
+            const aFits = (a.minQuantity || 0) <= effectiveQty ? 0 : 1
+            const bFits = (b.minQuantity || 0) <= effectiveQty ? 0 : 1
+            if (aFits !== bFits) return aFits - bFits
+            return (a.minQuantity || 0) - (b.minQuantity || 0)
+          })
           console.log(`🧩 Run #${run.run_number} merged to ${combinedQty} for ${item.engagement_type} to satisfy provider min ${smallestAccountMin}`)
         } else {
           const postponeUntil = new Date(Date.now() + ACTIVE_ORDER_RETRY_MS).toISOString()
