@@ -727,7 +727,23 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
       return false
     })
 
-    const allEngagementRuns = [...pendingRunsLimitedPerItem, ...retryRunsLimitedPerItem]
+    const isDeprioritizedBusyRun = (run: any) => {
+      const message = (run.error_message || '').toLowerCase()
+      return message.includes('[postponed] all providers busy') ||
+        message.includes('[batch postponed]') ||
+        message.includes('[waiting for merge]') ||
+        message.includes('active order on link')
+    }
+
+    const allEngagementRuns = [...pendingRunsLimitedPerItem, ...retryRunsLimitedPerItem].sort((a: any, b: any) => {
+      const aBusy = isDeprioritizedBusyRun(a) ? 1 : 0
+      const bBusy = isDeprioritizedBusyRun(b) ? 1 : 0
+      if (aBusy !== bBusy) return aBusy - bBusy
+
+      const aTime = new Date(a.scheduled_at || 0).getTime()
+      const bTime = new Date(b.scheduled_at || 0).getTime()
+      return aTime - bTime
+    })
     console.log(`Processing ${allEngagementRuns.length} runs (${pendingRunsLimitedPerItem.length} pending + ${retryRunsLimitedPerItem.length} retry), total overdue in DB: check query`)
 
     // PRE-BUILD busy account lookup for recently busy runs (link → Set<accountId>)
