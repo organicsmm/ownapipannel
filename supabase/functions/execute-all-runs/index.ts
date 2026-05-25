@@ -596,6 +596,7 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
         .lte('scheduled_at', nowWithBuffer)
         .not('engagement_order_item.status', 'in', '("paused","cancelled")')
         .not('engagement_order_item.engagement_order.status', 'in', '("paused","cancelled")')
+        .order('last_status_check', { ascending: true, nullsFirst: true })
         .order('scheduled_at', { ascending: true })
         .limit(1000),
       // 4. Failed engagement runs for retry
