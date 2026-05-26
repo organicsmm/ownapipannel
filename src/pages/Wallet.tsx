@@ -3,10 +3,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useWallet } from '@/hooks/useWallet';
 import { useTransactions, type TransactionFilter } from '@/hooks/useTransactions';
 import { useCurrency } from '@/hooks/useCurrency';
-import InlineDepositCard from '@/components/wallet/InlineDepositCard';
 import RazorpayDepositCard from '@/components/wallet/RazorpayDepositCard';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
   Wallet as WalletIcon,
@@ -91,34 +89,8 @@ export default function Wallet() {
           </div>
         </div>
 
-        {/* Deposit Section */}
-        <Tabs defaultValue="upi" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 h-12 p-1 rounded-2xl" style={{ background: 'rgba(0,0,0,.03)', border: '1px solid rgba(0,0,0,.06)' }}>
-            <TabsTrigger
-              value="upi"
-              className="rounded-xl font-semibold text-[12px] data-[state=active]:text-white transition-all duration-300"
-              style={{ }}
-            >
-              <IndianRupee className="h-3.5 w-3.5 mr-2" />
-              UPI / Cards
-            </TabsTrigger>
-            <TabsTrigger
-              value="usdt"
-              className="rounded-xl font-semibold text-[12px] data-[state=active]:bg-blue-500 data-[state=active]:text-white transition-all duration-300"
-            >
-              <Zap className="h-3.5 w-3.5 mr-2" />
-              USDT (BEP20)
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="upi" className="mt-0 focus-visible:outline-none">
-            <RazorpayDepositCard />
-          </TabsContent>
-
-          <TabsContent value="usdt" className="mt-0 focus-visible:outline-none">
-            <InlineDepositCard />
-          </TabsContent>
-        </Tabs>
+        {/* Deposit Section — UPI / Cards only (USDT removed for security) */}
+        <RazorpayDepositCard />
 
         {/* Transaction History */}
         <div className="rounded-2xl p-6" style={{ background: 'white', border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 2px 12px rgba(0,0,0,.04)' }}>
