@@ -830,34 +830,49 @@ async function processAllRuns(supabase: any, executionId: string, startTime: num
       }
 
       // 🛡️ OVER-DELIVERY GUARD: Ensure cumulative sent quantity never exceeds item.quantity
-      // Provider over-delivery is normal (~10-30%), but our scheduled sum must not exceed ordered.
+      // Tracks BOTH what we asked AND what the platform actually shows delivered
+      // (via provider_start_count deltas) so panel over-delivery also counts toward target.
       try {
         const orderedQty = Number(item.quantity || 0)
         if (orderedQty > 0) {
           const { data: sentRows } = await supabase
             .from('organic_run_schedule')
-            .select('quantity_to_send,status')
+            .select('quantity_to_send,status,provider_start_count,run_number')
             .eq('engagement_order_item_id', item.id)
             .in('status', ['completed', 'started'])
-          const alreadySent = (sentRows || []).reduce(
+          const askedSent = (sentRows || []).reduce(
             (s: number, r: any) => s + Number(r.quantity_to_send || 0), 0)
+
+          // Compute REAL platform delivery from start_count deltas
+          const startCounts = (sentRows || [])
+            .map((r: any) => Number(r.provider_start_count))
+            .filter((n: number) => Number.isFinite(n) && n > 0)
+          let actualDelivered = 0
+          if (startCounts.length > 0 && Number.isFinite(Number(run.provider_start_count)) && Number(run.provider_start_count) > 0) {
+            const firstSC = Math.min(...startCounts)
+            const currentSC = Number(run.provider_start_count)
+            actualDelivered = Math.max(0, currentSC - firstSC)
+          }
+
+          // Use the larger of the two so panel over-delivery counts
+          const alreadySent = Math.max(askedSent, actualDelivered)
           const remaining = orderedQty - alreadySent
           if (remaining <= 0) {
-            // Already met or exceeded ordered quantity — cancel all remaining pending runs
+            // Target met (or exceeded via over-delivery) — cancel ALL remaining pending runs
             await supabase.from('organic_run_schedule').update({
               status: 'cancelled',
-              error_message: `Item already fulfilled (${alreadySent}/${orderedQty}) — preventing over-delivery`,
+              error_message: `Target met (asked=${askedSent}, actual=${actualDelivered}, target=${orderedQty}) — cancelling remaining runs`,
               completed_at: new Date().toISOString(),
             }).eq('engagement_order_item_id', item.id).eq('status', 'pending')
             await supabase.from('engagement_order_items').update({
               status: 'completed', updated_at: new Date().toISOString(),
             }).eq('id', item.id).neq('status', 'completed')
             skipped++
-            console.log(`🛡️ Item ${item.id} already fulfilled (${alreadySent}/${orderedQty}), cancelling remaining pending runs`)
+            console.log(`🛡️ Item ${item.id} target met — asked=${askedSent}, actual=${actualDelivered}, target=${orderedQty}. Cancelling remaining.`)
             continue
           }
           if (run.quantity_to_send > remaining) {
-            console.log(`🛡️ Capping run #${run.run_number} qty ${run.quantity_to_send} → ${remaining} (sent ${alreadySent}/${orderedQty})`)
+            console.log(`🛡️ Capping run #${run.run_number} qty ${run.quantity_to_send} → ${remaining} (asked=${askedSent}, actual=${actualDelivered}, target=${orderedQty})`)
             await supabase.from('organic_run_schedule').update({
               quantity_to_send: remaining,
             }).eq('id', run.id)
