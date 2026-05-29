@@ -48,6 +48,7 @@ import { TypeHistoryCard } from "@/components/engagement/TypeHistoryCard";
 import { PerTypeBreakdown } from "@/components/engagement/PerTypeBreakdown";
 import { EditRunDialog } from "@/components/engagement/EditRunDialog";
 import { OrderProgressChart } from "@/components/engagement/OrderProgressChart";
+import { LiveBotMonitor } from "@/components/engagement/LiveBotMonitor";
 
 const ENGAGEMENT_ICONS = {
   views: { icon: Eye, label: "Views", emoji: "👁️" },
