@@ -36,8 +36,6 @@ import { toast } from 'sonner';
 export default function Admin() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const [markupInput, setMarkupInput] = useState<string>('');
-  const [markupLoaded, setMarkupLoaded] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceLoaded, setMaintenanceLoaded] = useState(false);
 
@@ -52,38 +50,12 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    if (dashboardStats && !markupLoaded) {
-      setMarkupInput(String(dashboardStats.markup ?? 0));
-      setMarkupLoaded(true);
-    }
     if (dashboardStats && !maintenanceLoaded) {
       setMaintenanceMode(Boolean(dashboardStats.maintenance_mode));
       setMaintenanceLoaded(true);
     }
-  }, [dashboardStats, markupLoaded, maintenanceLoaded]);
+  }, [dashboardStats, maintenanceLoaded]);
 
-  // Save markup mutation
-  const saveMarkupMutation = useMutation({
-    mutationFn: async (percent: number) => {
-      // Update all rows (only 1 row exists)
-      const { data: existing } = await supabase.from('platform_settings').select('id').limit(1).maybeSingle();
-      if (!existing) throw new Error('No platform settings found');
-      const { error } = await supabase
-        .from('platform_settings')
-        .update({ global_markup_percent: percent, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Global markup updated successfully!');
-      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['platform-settings-markup'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      // Clear localStorage services cache so markup reflects immediately
-      localStorage.removeItem('boostlypro_services_cache');
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
 
   // Maintenance mode toggle mutation
   const toggleMaintenanceMutation = useMutation({
