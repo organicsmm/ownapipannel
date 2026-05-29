@@ -658,24 +658,8 @@ export default function EngagementOrder() {
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto px-2 sm:px-6 lg:px-8 space-y-3 sm:space-y-6 pb-8">
-        {/* Header with gradient - Compact on mobile */}
-        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl p-2.5 sm:p-4 lg:p-5 bg-card border border-border" style={{ backgroundImage: 'radial-gradient(800px 300px at 50% -20%, hsl(var(--primary) / 0.18), transparent 60%)', boxShadow: '0 30px 80px -40px hsl(var(--primary) / 0.35), inset 0 1px 0 hsl(var(--primary) / 0.08)' }}>
-          <div className="relative z-10 text-center">
-            <div className="inline-flex items-center gap-2 mb-1.5">
-              <div className="w-7 h-7 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,.2)', backdropFilter: 'blur(8px)' }}>
-                <Rocket className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-white" />
-              </div>
-            </div>
-            <h1 className="text-sm sm:text-xl lg:text-2xl font-bold text-white mb-0.5 tracking-tight">
-              Organic Full Engagement
-            </h1>
-            <p className="text-[10px] sm:text-sm max-w-lg mx-auto leading-snug" style={{ color: 'rgba(255,255,255,.7)' }}>
-              One link → All engagement types with organic settings
-            </p>
-          </div>
-          <div className="absolute top-0 right-0 w-32 sm:w-48 h-32 sm:h-48 bg-gradient-to-bl from-white/10 to-transparent rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-24 sm:w-36 h-24 sm:h-36 bg-gradient-to-tr from-white/10 to-transparent rounded-full blur-3xl" />
-        </div>
+        {/* Header removed per request */}
+
 
         {/* AI Automation Toggles */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-6">
