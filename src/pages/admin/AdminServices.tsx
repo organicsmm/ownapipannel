@@ -254,132 +254,14 @@ export default function AdminServices() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>
-              <h1 className="text-3xl font-bold mb-1">Manage Services</h1>
-              <p className="text-muted-foreground">Add, edit and manage your services</p>
+              <h1 className="text-3xl font-bold mb-1">Pricing</h1>
+              <p className="text-muted-foreground">Per-1K rate for each category — user panel automatically updates.</p>
             </div>
-          </div>
-          <div className="flex gap-2">
-            {/* Sync Prices button removed — admin sets per-1K price manually.
-                Provider rate fetch sirf reference/import ke time hota hai. */}
-
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => setShowImportDialog(true)}
-            >
-              <Download className="h-4 w-4" />
-              Import from Provider
-            </Button>
-            <Dialog open={showAddService} onOpenChange={setShowAddService}>
-              <DialogTrigger asChild>
-                <Button variant="gradient" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Service
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="glass-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Add New Service</DialogTitle>
-                </DialogHeader>
-                <ServiceForm
-                  formData={formData}
-                  setFormData={setFormData}
-                  onSubmit={() => addServiceMutation.mutate()}
-                  isLoading={addServiceMutation.isPending}
-                  categories={categories}
-                />
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 
         {/* Category Pricing — single source of truth for prices */}
         <CategoryPricingCard />
-
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search services..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 input-glass"
-          />
-        </div>
-
-        {/* Services Table */}
-        <div className="glass-card overflow-hidden">
-          {isLoading ? (
-            <div className="p-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-            </div>
-          ) : filteredServices && filteredServices.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-secondary/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Service</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Category</th>
-                    
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Min/Max</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredServices.map((service) => (
-                    <tr key={service.id} className="hover:bg-secondary/20 transition-colors">
-                      <td className="px-4 py-4">
-                        <div>
-                          <p className="font-medium">{service.name}</p>
-                          <p className="text-xs text-muted-foreground">ID: {service.provider_service_id}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-muted-foreground">{service.category}</td>
-                      <td className="px-4 py-4 text-sm text-muted-foreground">
-                        {service.min_quantity.toLocaleString()} / {service.max_quantity.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4">
-                        <Switch
-                          checked={service.is_active || false}
-                          onCheckedChange={() => toggleServiceMutation.mutate({ id: service.id, is_active: service.is_active || false })}
-                        />
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(service)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this service?')) {
-                                deleteServiceMutation.mutate(service.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-12 text-center">
-              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No services found</p>
-            </div>
-          )}
-        </div>
 
         {/* Edit Dialog */}
         <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
