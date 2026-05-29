@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 
-const RAZORPAY_PAGE_URL = "https://razorpay.me/@organicsmm";
 const TELEGRAM_SUPPORT = "https://t.me/whopcampaign";
 
 export default function RazorpayDepositCard() {
@@ -21,11 +20,8 @@ export default function RazorpayDepositCard() {
   const { rates } = useCurrency();
   const [inrAmount, setInrAmount] = useState('');
   const [usdCredit, setUsdCredit] = useState<number>(0);
-  const [paymentId, setPaymentId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [screenshot, setScreenshot] = useState<File | null>(null);
-  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
-  const [step, setStep] = useState<'amount' | 'pay_and_submit' | 'done'>('amount');
+  const [step, setStep] = useState<'amount' | 'checkout' | 'done'>('amount');
 
   useEffect(() => {
     const val = parseFloat(inrAmount);
@@ -37,78 +33,152 @@ export default function RazorpayDepositCard() {
     }
   }, [inrAmount, rates]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setScreenshot(file);
-      const reader = new FileReader();
-      reader.onload = (ev) => setScreenshotPreview(ev.target?.result as string);
-      reader.readAsDataURL(file);
+  const inrRate = rates['INR'] || 83.5;
+  const minimumAmount = 30;
+  const amountNumber = Number(inrAmount || 0);
+  const isAmountValid = Number.isFinite(amountNumber) && amountNumber >= minimumAmount;
+
+  const checkoutLabel = useMemo(() => {
+    if (!isAmountValid) return 'Pay securely';
+    return `Pay ₹${Math.round(amountNumber)}`;
+  }, [amountNumber, isAmountValid]);
+
+  const loadRazorpayScript = async () => {
+    if (typeof window === 'undefined') {
+      throw new Error('Payment checkout is only available in the browser.');
     }
+
+    if ((window as Window & { Razorpay?: unknown }).Razorpay) {
+      return true;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const existingScript = document.querySelector('script[data-razorpay-checkout="true"]') as HTMLScriptElement | null;
+
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(), { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Unable to load Razorpay checkout.')), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.razorpayCheckout = 'true';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Unable to load Razorpay checkout.'));
+      document.body.appendChild(script);
+    });
+
+    return true;
   };
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: `${label} Copied`, description: `Copied to clipboard` });
+  const handlePaymentSuccess = async (paymentId: string) => {
+    const { data, error } = await supabase.functions.invoke('verify-razorpay-deposit', {
+      body: {
+        paymentId,
+        claimedUsdAmount: usdCredit,
+        inrAmount: amountNumber,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Payment verification failed.');
+    }
+
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    setStep('done');
+    toast({
+      title: 'Deposit added',
+      description: data?.message || `₹${amountNumber} payment successful. Wallet updated automatically.`,
+    });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['wallet'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['profile'] }),
+    ]);
   };
 
-  const handleSubmitProof = async () => {
-    if (!inrAmount || Number(inrAmount) < 30) {
+  const handleStartCheckout = async () => {
+    if (!isAmountValid) {
       toast({ title: 'Invalid amount', description: 'Minimum deposit is ₹30', variant: 'destructive' });
       return;
     }
-    if (!paymentId.trim() || paymentId.length < 8) {
-      toast({ title: 'Invalid UTR', description: 'Please enter a valid Transaction ID/UTR', variant: 'destructive' });
+
+    if (!user || !profile) {
+      toast({ title: 'Login required', description: 'Please sign in again and retry the payment.', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
+
     try {
-      let screenshotUrl: string | null = null;
-      if (screenshot) {
-        const ext = screenshot.name.split('.').pop() || 'jpg';
-        const path = `${user?.id}/${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('deposit-screenshots')
-          .upload(path, screenshot, { upsert: true });
-        if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage.from('deposit-screenshots').getPublicUrl(path);
-        screenshotUrl = urlData.publicUrl;
+      await loadRazorpayScript();
+
+      const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!key) {
+        throw new Error('Razorpay public key is not configured.');
       }
 
-      const userId = user?.id || profile?.user_id;
-      if (!userId) throw new Error('Session expired. Please refresh.');
+      const razorpay = (window as Window & { Razorpay?: new (options: Record<string, unknown>) => { open: () => void } }).Razorpay;
+      if (!razorpay) {
+        throw new Error('Razorpay checkout is unavailable right now.');
+      }
 
-      const { error: dbErr } = await supabase.from('transactions').insert({
-        user_id: userId,
-        type: 'deposit',
-        amount: usdCredit,
-        balance_after: 0,
-        status: 'pending',
-        payment_method: 'razorpay_manual',
-        payment_reference: paymentId,
-        description: JSON.stringify({ inr_amount: inrAmount, screenshot_url: screenshotUrl, type: 'razorpay_manual' }),
-      });
-      if (dbErr) throw dbErr;
-
-      const userName = profile?.full_name || 'Unknown';
-      const userEmail = profile?.email || user?.email || 'N/A';
-      const tgMessage = `🔥 <b>NEW DEPOSIT REQUEST</b>\n\n👤 Name: ${userName}\n📧 Email: ${userEmail}\n💰 Amount: ₹${inrAmount} (~$${usdCredit})\n🔑 UTR: <code>${paymentId}</code>`;
-      supabase.functions.invoke('send-telegram-notification', {
-        body: {
-          message: tgMessage,
-          photo_url: screenshotUrl,
+      const instance = new razorpay({
+        key,
+        amount: Math.round(amountNumber * 100),
+        currency: 'INR',
+        name: 'Organic SMM Pro',
+        description: `Wallet deposit for ${profile.email || user.email || 'your account'}`,
+        image: '/favicon.ico',
+        prefill: {
+          name: profile.full_name || '',
+          email: profile.email || user.email || '',
         },
-      }).catch(console.error);
+        notes: {
+          user_id: user.id,
+          user_email: profile.email || user.email || '',
+          deposit_type: 'wallet_topup',
+          inr_amount: String(amountNumber),
+          usd_amount: usdCredit.toFixed(2),
+        },
+        theme: {
+          color: '#16a34a',
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+          },
+          escape: true,
+          backdropclose: false,
+        },
+        handler: async (response: { razorpay_payment_id?: string }) => {
+          if (!response?.razorpay_payment_id) {
+            setLoading(false);
+            toast({ title: 'Payment not completed', description: 'No payment reference received from Razorpay.', variant: 'destructive' });
+            return;
+          }
 
-      setStep('done');
-      toast({ title: 'Submitted!', description: 'Our team will verify shortly.' });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+          try {
+            await handlePaymentSuccess(response.razorpay_payment_id);
+          } catch (err: any) {
+            toast({ title: 'Verification failed', description: err.message || 'Payment captured but wallet credit failed.', variant: 'destructive' });
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      instance.open();
+      setStep('checkout');
     } catch (err: any) {
-      toast({ title: 'Failed', description: err.message, variant: 'destructive' });
-    } finally {
       setLoading(false);
+      toast({ title: 'Checkout failed', description: err.message || 'Could not start Razorpay checkout.', variant: 'destructive' });
     }
   };
 
@@ -137,19 +207,23 @@ export default function RazorpayDepositCard() {
         {/* STEP 1: Amount */}
         {step === 'amount' && (
           <div className="p-5 space-y-5">
-            <div>
-              <p className="text-[11px] font-semibold mb-3" style={{ color: '#888' }}>Quick Amount</p>
+            <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-background flex items-center justify-center border border-border text-primary">
+                  <QrCode className="h-5 w-5" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Same page pe Razorpay popup khulega</p>
+                  <p className="text-xs text-muted-foreground">UPI, QR, card ya netbanking se payment complete hote hi wallet auto credit ho jayega.</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-2">
-                {[500, 1000, 2500].map(amt => (
+                {[500, 1000, 2500].map((amt) => (
                   <button
                     key={amt}
                     onClick={() => setInrAmount(String(amt))}
-                    className="py-3 rounded-xl text-[14px] font-bold transition-all"
-                    style={{
-                      background: inrAmount === String(amt) ? '#16a34a' : 'rgba(0,0,0,.02)',
-                      color: inrAmount === String(amt) ? 'white' : '#555',
-                      border: `1px solid ${inrAmount === String(amt) ? '#16a34a' : 'rgba(0,0,0,.06)'}`,
-                    }}
+                    className={`h-11 rounded-xl border text-sm font-bold transition-all ${inrAmount === String(amt) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-foreground hover:border-primary/40'}`}
                   >
                     ₹{amt}
                   </button>
@@ -158,137 +232,108 @@ export default function RazorpayDepositCard() {
             </div>
 
             <div>
-              <p className="text-[11px] font-semibold mb-2" style={{ color: '#888' }}>Manual Amount (INR)</p>
+              <p className="text-[11px] font-semibold mb-2 text-muted-foreground">Amount (INR)</p>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-bold" style={{ color: '#16a34a' }}>₹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-bold text-primary">₹</span>
                 <Input
                   type="number"
+                  min={minimumAmount}
+                  step="1"
                   value={inrAmount}
                   onChange={(e) => setInrAmount(e.target.value)}
                   placeholder="0.00"
-                  className="h-14 pl-10 rounded-xl text-xl font-bold"
-                  style={{ background: 'rgba(0,0,0,.02)', border: '1px solid rgba(0,0,0,.08)', color: '#1a1a2e' }}
+                  className="h-14 pl-10 rounded-xl text-xl font-bold border-border bg-muted/30 text-foreground"
                 />
                 {usdCredit > 0 && (
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-bold" style={{ color: '#10b981' }}>
-                    ≈ ${usdCredit}
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-primary">
+                    ≈ ${usdCredit.toFixed(2)}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] mt-2 text-center" style={{ color: '#bbb' }}>
-                Min: ₹30 • 1 USD ≈ ₹{rates['INR'] || 83.5}
+              <p className="text-[10px] mt-2 text-center text-muted-foreground">
+                Min: ₹{minimumAmount} • 1 USD ≈ ₹{inrRate}
               </p>
             </div>
 
+            <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">You pay</span>
+                <span className="font-semibold text-foreground">₹{amountNumber > 0 ? amountNumber.toFixed(0) : '0'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Wallet credit</span>
+                <span className="font-semibold text-primary">${usdCredit.toFixed(2)}</span>
+              </div>
+            </div>
+
             <Button
-              onClick={() => setStep('pay_and_submit')}
-              disabled={!inrAmount || Number(inrAmount) < 30}
-              className="w-full h-13 rounded-xl text-[14px] font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 4px 16px rgba(22, 163, 74,.3)' }}
+              onClick={handleStartCheckout}
+              disabled={loading || !isAmountValid}
+              className="w-full h-13 rounded-xl text-[14px] font-bold"
             >
-              Pay ₹{inrAmount || '0'} <ArrowRight className="h-4 w-4 ml-2" />
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Starting checkout...
+                </>
+              ) : (
+                <>
+                  {checkoutLabel} <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
             </Button>
           </div>
         )}
 
-        {/* STEP 2: Payment & Submit */}
-        {step === 'pay_and_submit' && (
+        {/* STEP 2: Checkout */}
+        {step === 'checkout' && (
           <div className="p-5 space-y-5">
-            {/* Pay instruction */}
-            <div className="rounded-xl p-4" style={{ background: 'rgba(22, 163, 74,.04)', border: '1px solid rgba(22, 163, 74,.1)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full text-[11px] font-bold text-white flex items-center justify-center" style={{ background: '#16a34a' }}>1</span>
-                  <span className="text-[13px] font-bold" style={{ color: '#1a1a2e' }}>Pay ₹{inrAmount}</span>
+            <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Checkout popup open ho chuka hai</p>
+                  <p className="text-xs text-muted-foreground">Payment isi page ke upar Razorpay modal me complete hoga. Success ke baad wallet instantly update ho jayega.</p>
                 </div>
               </div>
 
-              <p className="text-[12px] mb-3 leading-relaxed" style={{ color: '#666' }}>
-                Niche link pe click karo aur <strong>Paytm, Google Pay, PhonePe, WhatsApp Pay</strong> ya UPI se payment karo.
-              </p>
-
-              <Button
-                onClick={() => window.open(RAZORPAY_PAGE_URL, '_blank')}
-                className="w-full h-12 rounded-xl text-[13px] font-bold text-white mb-2"
-                style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 4px 14px rgba(22, 163, 74,.3)' }}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" /> Pay Now — ₹{inrAmount}
-              </Button>
-
-              <button
-                onClick={() => copyToClipboard(RAZORPAY_PAGE_URL, 'Payment Link')}
-                className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg text-[11px] font-medium transition-colors"
-                style={{ color: '#999', border: '1px solid rgba(0,0,0,.06)' }}
-              >
-                <Copy className="h-3 w-3" /> Copy Payment Link
-              </button>
-
-              <div className="mt-3 p-2.5 rounded-lg" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)' }}>
-                <p className="text-[10px] font-medium" style={{ color: '#d97706' }}>
-                  ⚠️ Payment ke baad <strong>12-Digit UTR ID</strong> copy karo aur niche paste karo.
-                </p>
-              </div>
-            </div>
-
-            {/* Submit proof */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full text-[11px] font-bold text-white flex items-center justify-center" style={{ background: '#10b981' }}>2</span>
-                <span className="text-[13px] font-bold" style={{ color: '#1a1a2e' }}>Submit Proof</span>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-medium mb-1.5" style={{ color: '#888' }}>Transaction ID / UTR *</p>
-                <Input
-                  placeholder="Enter 12-digit UTR"
-                  value={paymentId}
-                  onChange={(e) => setPaymentId(e.target.value)}
-                  className="h-12 rounded-xl text-[14px] font-medium"
-                  style={{ background: 'rgba(0,0,0,.02)', border: '1px solid rgba(0,0,0,.08)', color: '#1a1a2e' }}
-                />
-              </div>
-
-              <div>
-                <p className="text-[11px] font-medium mb-1.5" style={{ color: '#888' }}>Screenshot (Optional)</p>
-                <div className="relative h-24 rounded-xl flex items-center justify-center overflow-hidden" style={{ border: '2px dashed rgba(0,0,0,.08)', background: 'rgba(0,0,0,.01)' }}>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
-                  />
-                  {screenshotPreview ? (
-                    <div className="flex items-center gap-3 px-4">
-                      <img src={screenshotPreview} alt="Proof" className="w-14 h-14 rounded-lg object-cover" style={{ border: '2px solid #10b981' }} />
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold truncate" style={{ color: '#10b981' }}>{screenshot?.name}</p>
-                        <p className="text-[10px]" style={{ color: '#bbb' }}>Ready to upload</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1">
-                      <ImagePlus className="h-5 w-5" style={{ color: '#ccc' }} />
-                      <span className="text-[10px] font-medium" style={{ color: '#bbb' }}>Upload Screenshot</span>
-                    </div>
-                  )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <p className="text-[11px] text-muted-foreground">Amount</p>
+                  <p className="text-lg font-bold text-foreground">₹{amountNumber.toFixed(0)}</p>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <p className="text-[11px] text-muted-foreground">Auto credit</p>
+                  <p className="text-lg font-bold text-primary">${usdCredit.toFixed(2)}</p>
                 </div>
               </div>
-
-              <Button
-                onClick={handleSubmitProof}
-                disabled={loading || !paymentId.trim()}
-                className="w-full h-12 rounded-xl text-[13px] font-bold text-white"
-                style={{ background: '#10b981' }}
-              >
-                {loading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing...</>
-                ) : (
-                  <><ShieldCheck className="h-4 w-4 mr-2" /> Verify Deposit</>
-                )}
-              </Button>
             </div>
 
-            <button onClick={() => setStep('amount')} className="text-[11px] font-medium flex items-center gap-1 mx-auto" style={{ color: '#bbb' }}>
+            <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-foreground">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <p className="text-sm font-semibold">Manual proof ki zarurat nahi hai</p>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">Agar popup close ho gaya ho to dubara checkout start kar sakte ho. Same successful Razorpay payment ko backend duplicate credit nahi karega.</p>
+            </div>
+
+            <Button
+              onClick={handleStartCheckout}
+              disabled={loading}
+              variant="outline"
+              className="w-full h-12 rounded-xl"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting for payment...
+                </>
+              ) : (
+                <>
+                  Re-open checkout <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
+
+            <button onClick={() => setStep('amount')} className="text-[11px] font-medium flex items-center gap-1 mx-auto text-muted-foreground">
               <ArrowLeft className="h-3 w-3" /> Back
             </button>
           </div>
