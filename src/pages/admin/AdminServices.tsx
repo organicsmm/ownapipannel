@@ -30,7 +30,6 @@ import {
   Loader2,
   ArrowLeft,
   Download,
-  RefreshCw,
 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -44,7 +43,7 @@ export default function AdminServices() {
   const [showAddService, setShowAddService] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [isSyncingPrices, setIsSyncingPrices] = useState(false);
+  
   const [formData, setFormData] = useState({
     provider_service_id: '',
     name: '',
