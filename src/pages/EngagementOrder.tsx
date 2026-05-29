@@ -767,6 +767,15 @@ export default function EngagementOrder() {
           />
         )}
 
+        {/* Live Botting % + Quality + Geo + Activity Monitor */}
+        {activeEngagementTypes.length > 0 && (
+          <LiveBotMonitor
+            engagements={engagements as Record<EngagementType, EngagementConfig>}
+            platform={platform}
+            baseQuantity={baseQuantity}
+          />
+        )}
+
         {/* Delivery Timeline Preview - Detailed schedule */}
         {activeEngagementTypes.length > 0 && (
           <DeliveryPreview
