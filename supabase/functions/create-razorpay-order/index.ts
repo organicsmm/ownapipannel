@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
 
     const order = await rpResponse.json();
     if (!rpResponse.ok) {
-      return new Response(JSON.stringify({ error: order?.error?.description || "Could not create Razorpay order." }), {
+      console.error("Razorpay order create failed:", rpResponse.status, JSON.stringify(order));
+      return new Response(JSON.stringify({ error: order?.error?.description || order?.error?.reason || "Could not create Razorpay order.", details: order }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
