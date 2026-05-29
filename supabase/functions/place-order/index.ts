@@ -35,13 +35,39 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { orderData, totalPrice, runs } = body;
+    const { orderData, totalPrice: clientTotalPrice, runs } = body;
 
-    if (!orderData || !totalPrice || totalPrice <= 0) {
+    if (!orderData || !clientTotalPrice || clientTotalPrice <= 0) {
       return new Response(JSON.stringify({ error: "Invalid order data" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ─── Server-side price recompute using category_pricing (source of truth) ──
+    let totalPrice = clientTotalPrice;
+    try {
+      if (orderData.service_id && orderData.quantity) {
+        const { data: svc } = await supabaseAdmin
+          .from("services")
+          .select("category, price")
+          .eq("id", orderData.service_id)
+          .single();
+        if (svc) {
+          const { data: cp } = await supabaseAdmin
+            .from("category_pricing")
+            .select("price_per_1k")
+            .eq("category", svc.category)
+            .maybeSingle();
+          const effectivePer1k = cp && Number(cp.price_per_1k) > 0
+            ? Number(cp.price_per_1k)
+            : Number(svc.price);
+          totalPrice = (Number(orderData.quantity) / 1000) * effectivePer1k;
+          orderData.price = totalPrice;
+        }
+      }
+    } catch (e) {
+      console.error("Price recompute failed, using client price:", e);
     }
 
     // 1. Get wallet and check balance
