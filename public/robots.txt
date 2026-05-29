@@ -1,5 +1,5 @@
-# OrganicSMM — robots.txt
-# Site:    https://organicsmm.online
+# Voting Pro — robots.txt
+# Site:    https://votingpro.online
 # Updated: 2026-05-05
 
 # ───────────────────────────── Default rule ─────────────────────────────
@@ -98,5 +98,5 @@ User-agent: DotBot
 Disallow: /
 
 # ───────────────────────────── Sitemap & host ─────────────────────────────
-Sitemap: https://organicsmm.online/sitemap.xml
-Host: https://organicsmm.online
+Sitemap: https://votingpro.online/sitemap.xml
+Host: https://votingpro.online

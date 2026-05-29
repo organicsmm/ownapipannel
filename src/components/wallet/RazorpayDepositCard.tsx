@@ -129,7 +129,7 @@ export default function RazorpayDepositCard() {
         amount: data.amount,
         currency: data.currency || 'INR',
         order_id: data.orderId,
-        name: 'Organic SMM Pro',
+        name: 'Voting Pro Pro',
         description: `Wallet deposit for ${profile?.email || user.email || 'your account'}`,
         image: '/favicon.ico',
         prefill: {
