@@ -25,19 +25,15 @@ import {
   CreditCard,
   MessageCircle,
   Globe,
-  Percent,
-  Save,
   Loader2,
-  TrendingDown,
 } from 'lucide-react';
+
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function Admin() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const [markupInput, setMarkupInput] = useState<string>('');
-  const [markupLoaded, setMarkupLoaded] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceLoaded, setMaintenanceLoaded] = useState(false);
 
@@ -52,38 +48,12 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    if (dashboardStats && !markupLoaded) {
-      setMarkupInput(String(dashboardStats.markup ?? 0));
-      setMarkupLoaded(true);
-    }
     if (dashboardStats && !maintenanceLoaded) {
       setMaintenanceMode(Boolean(dashboardStats.maintenance_mode));
       setMaintenanceLoaded(true);
     }
-  }, [dashboardStats, markupLoaded, maintenanceLoaded]);
+  }, [dashboardStats, maintenanceLoaded]);
 
-  // Save markup mutation
-  const saveMarkupMutation = useMutation({
-    mutationFn: async (percent: number) => {
-      // Update all rows (only 1 row exists)
-      const { data: existing } = await supabase.from('platform_settings').select('id').limit(1).maybeSingle();
-      if (!existing) throw new Error('No platform settings found');
-      const { error } = await supabase
-        .from('platform_settings')
-        .update({ global_markup_percent: percent, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Global markup updated successfully!');
-      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['platform-settings-markup'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      // Clear localStorage services cache so markup reflects immediately
-      localStorage.removeItem('boostlypro_services_cache');
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
 
   // Maintenance mode toggle mutation
   const toggleMaintenanceMutation = useMutation({
@@ -200,67 +170,8 @@ export default function Admin() {
           </Card>
         </div>
 
-        {/* Global Markup Control */}
-        <Card className="glass-card border-2 border-primary/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
-          <CardContent className="p-5 sm:p-6 relative">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-xl shadow-primary/20 shrink-0">
-                  <Percent className="h-7 w-7 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">Global Price Markup</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Provider rate ke upar ya niche % set karo — sabhi services pe apply hoga
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={markupInput}
-                    onChange={(e) => setMarkupInput(e.target.value)}
-                    className="w-28 h-12 text-center text-lg font-bold input-glass pr-8"
-                    placeholder="0"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">%</span>
-                </div>
-                <Button
-                  onClick={() => saveMarkupMutation.mutate(parseFloat(markupInput) || 0)}
-                  disabled={saveMarkupMutation.isPending}
-                  className="h-12 px-5"
-                  variant="gradient"
-                >
-                  {saveMarkupMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-            {markupInput && parseFloat(markupInput) !== 0 && (
-              <div className="mt-3 flex items-center gap-2 text-sm">
-                {parseFloat(markupInput) > 0 ? (
-                  <>
-                    <TrendingUp className="h-4 w-4 text-success" />
-                    <span className="text-success font-medium">+{markupInput}% — Prices provider rate se zyada dikhenge</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingDown className="h-4 w-4 text-destructive" />
-                    <span className="text-destructive font-medium">{markupInput}% — Prices provider rate se kam dikhenge</span>
-                  </>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Global markup system REMOVED — admin sets the final per-1K price
+            directly on each service in Admin → Services. Real-time updates. */}
 
         {/* Maintenance Mode Toggle */}
         <Card className={`glass-card border-2 relative overflow-hidden transition-all ${maintenanceMode ? 'border-destructive/50 bg-destructive/5' : 'border-border'}`}>

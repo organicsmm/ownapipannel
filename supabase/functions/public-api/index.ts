@@ -72,13 +72,8 @@ serve(async (req) => {
 
         console.log(`[public-api] action="${action}" auth="key"`)
 
-        // ── Fetch global markup for pricing ──────────────────────────────────
-        const { data: settings } = await supabase
-            .from('platform_settings')
-            .select('global_markup_percent')
-            .eq('id', 'global')
-            .maybeSingle()
-        const markupMultiplier = 1 + ((settings?.global_markup_percent ?? 0) / 100)
+        // Global markup REMOVED — services.price is the final per-1K price set by admin.
+
 
         // ── Auth ────────────────────────────────────────────────────────────────
         if (!key) return err('Authentication required (key)', 401)
@@ -111,7 +106,7 @@ serve(async (req) => {
                     service: parseInt(s.provider_service_id) || s.provider_service_id,
                     name: s.name,
                     category: s.category,
-                    rate: (s.price * markupMultiplier).toFixed(4),
+                    rate: Number(s.price).toFixed(4),
                     min: s.min_quantity,
                     max: s.max_quantity,
                     dripfeed: s.drip_feed_enabled ?? false,
@@ -142,8 +137,8 @@ serve(async (req) => {
                     return err(`Quantity must be between ${svc.min_quantity} and ${svc.max_quantity}`)
                 }
 
-                const markedUpPrice = svc.price * markupMultiplier
-                const totalPrice = (qty / 1000) * markedUpPrice
+                const totalPrice = (qty / 1000) * Number(svc.price)
+
 
                 const { data: wallet } = await supabase
                     .from('wallets').select('*').eq('user_id', userId).single()

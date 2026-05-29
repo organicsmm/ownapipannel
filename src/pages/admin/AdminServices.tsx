@@ -30,7 +30,6 @@ import {
   Loader2,
   ArrowLeft,
   Download,
-  RefreshCw,
 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -44,7 +43,7 @@ export default function AdminServices() {
   const [showAddService, setShowAddService] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [isSyncingPrices, setIsSyncingPrices] = useState(false);
+  
   const [formData, setFormData] = useState({
     provider_service_id: '',
     name: '',
@@ -259,30 +258,9 @@ export default function AdminServices() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              disabled={isSyncingPrices}
-              onClick={async () => {
-                setIsSyncingPrices(true);
-                try {
-                  const { data, error } = await supabase.functions.invoke('sync-service-prices', {
-                    body: {},
-                  });
-                  if (error) throw error;
-                  if (data?.error) throw new Error(data.error);
-                  toast.success(`${data.updated} service prices synced from providers!`);
-                  queryClient.invalidateQueries({ queryKey: ['admin-all-services'] });
-                } catch (err: any) {
-                  toast.error(err.message || 'Sync failed');
-                } finally {
-                  setIsSyncingPrices(false);
-                }
-              }}
-            >
-              {isSyncingPrices ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sync Prices
-            </Button>
+            {/* Sync Prices button removed — admin sets per-1K price manually.
+                Provider rate fetch sirf reference/import ke time hota hai. */}
+
             <Button
               variant="outline"
               className="gap-2"
