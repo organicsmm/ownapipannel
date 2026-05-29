@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Shield, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Shield, Sparkles, TrendingUp, Crown, Quote } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
 
@@ -27,6 +27,7 @@ const Index = () => {
           <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">features</a>
           <a href="#platforms" className="text-muted-foreground hover:text-foreground transition-colors">platforms</a>
           <a href="#why" className="text-muted-foreground hover:text-foreground transition-colors">why us</a>
+          <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">pricing</a>
         </div>
 
         <div className="flex items-center gap-3">
@@ -240,6 +241,104 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* ═══ PRICING ═══ */}
+      <section id="pricing" className="px-6 lg:px-14 py-32 border-t border-border bg-card/20 relative overflow-hidden">
+        <div aria-hidden className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 50% 40% at 50% 0%, hsl(var(--primary) / 0.10), transparent 70%)' }} />
+        <div className="max-w-[1200px] mx-auto relative">
+          <div className="text-center mb-16">
+            <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-6">:04 / membership</p>
+            <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+              Two ways to <span className="italic text-primary">begin.</span>
+            </h2>
+            <p className="mt-6 max-w-xl mx-auto text-[15px] leading-[1.7] text-muted-foreground font-light">
+              Single membership — full platform access. No tiers, no upsells, no hidden gates.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            <div className="relative rounded-2xl border border-border bg-background p-8 lg:p-10 hover:border-primary/40 transition-all">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-primary" />
+                </div>
+                <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">monthly</p>
+              </div>
+              <h3 className="font-serif text-2xl text-foreground mb-2">Monthly Access</h3>
+              <p className="text-[13px] text-muted-foreground font-light mb-6">For creators testing the waters.</p>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="font-serif text-5xl text-foreground">$20</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">/ month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Full platform access', 'All platforms & services', 'Organic delivery engine', 'Cancel anytime'].map((t) => (
+                  <li key={t} className="flex gap-3 text-[13px] text-foreground/80 font-light">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />{t}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/auth" className="group flex items-center justify-center gap-2 w-full h-11 rounded-md border border-border bg-card/40 hover:bg-card text-foreground font-mono text-[11px] uppercase tracking-[0.2em] transition-all">
+                start monthly
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </div>
+
+            <div className="relative rounded-2xl border-2 border-primary/50 bg-background p-8 lg:p-10 shadow-[0_30px_80px_-30px_hsl(var(--primary)/0.5)]">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.25em]">
+                best value
+              </div>
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-10 h-10 rounded-lg border border-primary/30 bg-primary/10 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-primary" />
+                </div>
+                <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-primary">lifetime</p>
+              </div>
+              <h3 className="font-serif text-2xl text-foreground mb-2">Lifetime Access</h3>
+              <p className="text-[13px] text-muted-foreground font-light mb-6">One payment. Forever.</p>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="font-serif text-5xl text-foreground">$100</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">/ once</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Everything in monthly', 'Pay once, use forever', 'All future updates included', 'Priority support'].map((t) => (
+                  <li key={t} className="flex gap-3 text-[13px] text-foreground/80 font-light">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />{t}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/auth" className="group flex items-center justify-center gap-2 w-full h-11 rounded-md bg-primary text-primary-foreground font-mono text-[11px] uppercase tracking-[0.2em] hover:shadow-[0_20px_60px_-20px_hsl(var(--primary)/0.7)] transition-all">
+                claim lifetime
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </div>
+          </div>
+
+          <p className="text-center mt-10 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+            · activation handled manually within minutes ·
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ FOUNDER NOTE ═══ */}
+      <section className="px-6 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[900px] mx-auto">
+          <Quote className="w-10 h-10 text-primary/40 mb-8" />
+          <p className="font-serif text-[clamp(1.5rem,3.5vw,2.5rem)] leading-[1.35] tracking-tight text-foreground">
+            "I built Boostly Pro after watching creator after creator get burned by panels that promise growth and deliver bans. Every line of this platform exists to do one thing — make algorithms feel safe with you. <span className="text-primary italic">Quiet. Patient. Human.</span>"
+          </p>
+          <div className="mt-10 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full border border-border bg-card flex items-center justify-center font-serif text-lg text-primary italic">
+              A
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">Abhishek · founder</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-0.5">building boostly since 2024</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* ═══ CTA ═══ */}
       <section className="px-6 lg:px-14 py-32 border-t border-border relative overflow-hidden">

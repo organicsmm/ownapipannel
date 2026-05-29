@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +22,17 @@ interface SubscriptionGuardProps {
 
 export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
   const { hasActiveSubscription, hasPendingRequest, isLoading } = useSubscription();
+  const { isAdmin } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'lifetime'>('monthly');
 
   // If loading, show nothing to prevent flash
   if (isLoading) {
+    return <>{children}</>;
+  }
+
+  // Admins bypass subscription requirement
+  if (isAdmin) {
     return <>{children}</>;
   }
 
@@ -125,7 +132,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                 </div>
                 <h3 className="font-semibold mb-1">Lifetime Plan</h3>
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-3xl font-bold">$199</span>
+                  <span className="text-3xl font-bold">$100</span>
                   <span className="text-muted-foreground">one-time</span>
                 </div>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
