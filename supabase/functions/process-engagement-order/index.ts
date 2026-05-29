@@ -261,7 +261,9 @@ serve(async (req) => {
           let providerMin = config.defaultMinQty
           if (finalServiceId) {
             const { data: s } = await supabase.from('services').select('min_quantity').eq('id', finalServiceId).single()
-            if (s?.min_quantity) providerMin = s.min_quantity
+            // Use the smaller of provider min and organic default so splits look natural.
+            // The executor will merge consecutive small runs to satisfy real provider minimum.
+            if (s?.min_quantity) providerMin = Math.min(s.min_quantity, config.defaultMinQty)
           }
 
           const isViewType = ['views', 'impressions', 'reach', 'plays', 'watch_hours'].includes(engType)
