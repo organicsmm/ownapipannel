@@ -35,6 +35,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { Service } from '@/lib/supabase';
 import { ImportServicesDialog } from '@/components/admin/ImportServicesDialog';
+import { CategoryPricingCard } from '@/components/admin/CategoryPricingCard';
 
 export default function AdminServices() {
   const { isAdmin, isLoading: authLoading } = useAuth();
@@ -291,6 +292,9 @@ export default function AdminServices() {
             </Dialog>
           </div>
         </div>
+
+        {/* Category Pricing — single source of truth for prices */}
+        <CategoryPricingCard />
 
         {/* Search */}
         <div className="relative max-w-md">
