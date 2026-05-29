@@ -822,7 +822,7 @@ export default function EngagementOrderDetail() {
           runs={stats.allRuns}
           totalQuantity={stats.totalQuantity}
           totalDelivered={stats.totalDelivered}
-          platform={(order.items?.[0]?.service?.category || 'instagram').toString().toLowerCase().split(' ')[0]}
+          platform={((order.items?.[0] as any)?.service?.category || 'instagram').toString().toLowerCase().split(' ')[0]}
         />
 
         {/* Per-Type Breakdown with Real-Time History - Clickable cards */}
