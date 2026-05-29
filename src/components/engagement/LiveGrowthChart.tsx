@@ -747,104 +747,106 @@ export function LiveGrowthChart({
   );
 
   return (
-    <Card className="border-2 border-border bg-gradient-to-br from-background to-secondary/20 overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Activity className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <span className="text-foreground">Live Organic Growth Preview</span>
-            <p className="text-xs text-muted-foreground font-normal mt-0.5">
-              Bursts + pauses • Service-wise natural steps
+    <Card className="relative border border-primary/20 bg-background overflow-hidden shadow-[0_20px_80px_-30px_hsl(var(--primary)/0.35)]">
+      {/* Ambient glow */}
+      <div aria-hidden className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(ellipse 60% 40% at 0% 0%, hsl(var(--primary) / 0.10), transparent 60%), radial-gradient(ellipse 50% 40% at 100% 100%, hsl(var(--primary) / 0.08), transparent 60%)' }} />
+      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{ backgroundImage: 'linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+
+      {/* HUD top strip */}
+      <div className="relative flex items-center justify-between px-4 sm:px-6 py-2.5 border-b border-border bg-card/40 backdrop-blur">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
+          <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary">live · broadcasting</span>
+          <span className="hidden sm:inline font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">· {platform}</span>
+        </div>
+        <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase">
+          <span className="text-muted-foreground hidden sm:inline">organic</span>
+          <span className="text-primary font-bold">{organicScore}%</span>
+        </div>
+      </div>
+
+      <CardHeader className="relative pb-3 pt-4">
+        <CardTitle className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+          <div className="flex-1 min-w-0">
+            <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground mb-1">
+              :preview / organic_delivery_simulation
             </p>
+            <h3 className="font-serif text-2xl sm:text-3xl tracking-tight text-foreground leading-tight">
+              Live Organic <span className="italic text-primary">Growth Engine</span>
+            </h3>
           </div>
-          <div className="flex items-center gap-2">
-            {onRefresh && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRandomTemplate}
-                className="h-8 px-3 gap-1.5 border-border hover:bg-secondary text-foreground"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">New Pattern</span>
-              </Button>
-            )}
-            {/* Chart always shows each type as % of its own target */}
-            <Badge variant="outline" className="border-border bg-secondary/40 text-foreground gap-1">
-              <Sparkles className="h-3 w-3" />
-              {organicScore}% Organic
-            </Badge>
-          </div>
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRandomTemplate}
+              className="h-8 px-3 gap-1.5 border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground font-mono text-[10px] uppercase tracking-[0.18em]"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              new pattern
+            </Button>
+          )}
         </CardTitle>
 
-        {/* Template Search & Info */}
-        <div className="flex flex-wrap items-center gap-2 mt-3 p-2 rounded-lg bg-secondary/30 border border-border">
-          <div className="flex items-center gap-1.5">
-            <Hash className="h-4 w-4 text-primary" />
-            <span className="text-xs text-muted-foreground">Template:</span>
+        {/* Metric tiles */}
+        <div className="grid grid-cols-3 gap-px bg-border border border-border rounded-lg overflow-hidden mt-4">
+          <div className="bg-background/80 p-3">
+            <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground mb-1">:total</p>
+            <p className="font-serif text-xl text-foreground leading-none">{stats?.totalEngagements.toLocaleString()}</p>
+            <p className="font-mono text-[9px] tracking-[0.15em] uppercase text-primary mt-1 flex items-center gap-1"><Zap className="h-2.5 w-2.5" /> engage</p>
           </div>
-          <div className="relative">
+          <div className="bg-background/80 p-3">
+            <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground mb-1">:runs</p>
+            <p className="font-serif text-xl text-foreground leading-none">{stats?.totalRuns}</p>
+            <p className="font-mono text-[9px] tracking-[0.15em] uppercase text-primary mt-1 flex items-center gap-1"><TrendingUp className="h-2.5 w-2.5" /> bursts</p>
+          </div>
+          <div className="bg-background/80 p-3">
+            <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground mb-1">:eta</p>
+            <p className="font-serif text-xl text-foreground leading-none">~{formatDuration(stats?.duration || 0)}</p>
+            <p className="font-mono text-[9px] tracking-[0.15em] uppercase text-primary mt-1 flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> duration</p>
+          </div>
+        </div>
+
+        {/* Template chip */}
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/40 border border-border">
+            <Hash className="h-3 w-3 text-primary" />
             <Input
               type="number"
               placeholder={`1-${totalTemplates}`}
               value={templateSearch || usedTemplateId || ''}
               onChange={(e) => handleTemplateSearch(e.target.value)}
-              className="h-7 w-20 text-xs font-mono text-center bg-background border-border"
+              className="h-5 w-14 text-[10px] font-mono p-0 border-0 bg-transparent shadow-none focus-visible:ring-0"
               min={1}
               max={totalTemplates}
             />
+            {(currentTemplate || usedTemplateId) && (
+              <span className="font-mono text-[9px] uppercase tracking-wider text-primary">
+                · {currentTemplate?.style || 'custom'}
+              </span>
+            )}
           </div>
-          {(currentTemplate || usedTemplateId) && (
-            <Badge variant="outline" className="text-xs border-primary/50 text-primary bg-primary/10">
-              #{usedTemplateId} • {currentTemplate?.style || 'Custom'}
-            </Badge>
-          )}
-          <span className="text-[10px] text-muted-foreground ml-auto">
-            {totalTemplates}+ patterns
+          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground ml-auto">
+            {totalTemplates}+ patterns indexed
           </span>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-3">
-          <Badge className="bg-primary text-primary-foreground font-bold gap-1">
-            <Zap className="h-3 w-3" />
-            {stats?.totalEngagements.toLocaleString()} total
-          </Badge>
-          <Badge variant="outline" className="border-border text-foreground gap-1">
-            <TrendingUp className="h-3 w-3" />
-            {stats?.totalRuns} runs
-          </Badge>
-          <Badge variant="outline" className="border-border text-foreground gap-1">
-            <Clock className="h-3 w-3" />
-            ~{formatDuration(stats?.duration || 0)}
-          </Badge>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-3">
-          {typeBreakdown.map(({ type, quantity }) => {
-            const cfg = ENGAGEMENT_CONFIG[type];
-            return (
-              <div
-                key={type}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-secondary/50 border border-border"
-              >
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: TYPE_COLORS[type as VisibleType] }}
-                />
-                <span className="text-xs">{cfg?.emoji}</span>
-                <span className="text-xs font-bold text-foreground">{quantity.toLocaleString()}</span>
-              </div>
-            );
-          })}
         </div>
       </CardHeader>
 
-      <CardContent className="p-3 sm:p-6">
-        <div className="h-[320px] w-full">
+      <CardContent className="relative p-3 sm:p-6 pt-2">
+        <div className="relative h-[320px] w-full rounded-lg overflow-hidden bg-card/20 border border-border/60">
+          {/* Corner ticks */}
+          <span aria-hidden className="absolute top-2 left-2 w-3 h-3 border-l border-t border-primary/60 z-10" />
+          <span aria-hidden className="absolute top-2 right-2 w-3 h-3 border-r border-t border-primary/60 z-10" />
+          <span aria-hidden className="absolute bottom-2 left-2 w-3 h-3 border-l border-b border-primary/60 z-10" />
+          <span aria-hidden className="absolute bottom-2 right-2 w-3 h-3 border-r border-b border-primary/60 z-10" />
+
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 16, right: 16, left: 4, bottom: 4 }}>
               <defs>
                 {activeTypes.map((type) => (
                   <linearGradient key={type} id={`grad-${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -884,27 +886,21 @@ export function LiveGrowthChart({
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null;
                   const ts = typeof label === "number" ? label : Number(label);
-                  // Find the raw data point for showing actual values
                   const dataPoint = chartData.find(d => d.timestamp === ts);
                   return (
-                    <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl">
-                      <p className="text-xs text-muted-foreground mb-2 font-mono">
+                    <div className="bg-background/95 backdrop-blur-sm border border-primary/40 rounded-md p-3 shadow-xl">
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
                         {Number.isFinite(ts) ? format(new Date(ts), "HH:mm") : String(label)}
                       </p>
                       {payload
                         .filter((p) => (p.value as number) > 0)
                         .map((entry, idx) => {
-                          // Extract the base type from normalized key
                           const rawKey = (entry.dataKey as string).replace('_norm', '') as VisibleType;
                           const cfg = ENGAGEMENT_CONFIG[rawKey];
                           const actualValue = dataPoint ? dataPoint[rawKey] : (entry.value as number);
-                          const normValue = dataPoint ? dataPoint[`${rawKey}_norm` as keyof ChartDataPoint] as number : 0;
                           return (
                             <div key={idx} className="flex items-center gap-2 text-sm">
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: entry.color as string }}
-                              />
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color as string }} />
                               <span>{cfg?.emoji}</span>
                               <span className="font-bold">{actualValue.toLocaleString()}</span>
                             </div>
@@ -926,12 +922,7 @@ export function LiveGrowthChart({
                   fill={`url(#grad-${type})`}
                   fillOpacity={1}
                   dot={false}
-                  activeDot={{
-                    r: 4,
-                    strokeWidth: 2,
-                    stroke: TYPE_COLORS[type],
-                    fill: "hsl(var(--background))",
-                  }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: TYPE_COLORS[type], fill: "hsl(var(--background))" }}
                   isAnimationActive={false}
                 />
               ))}
@@ -939,13 +930,22 @@ export function LiveGrowthChart({
           </ResponsiveContainer>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-4 border-t border-border">
-          {activeTypes.map((type) => {
+        {/* Type breakdown HUD */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-4">
+          {typeBreakdown.map(({ type, quantity }) => {
             const cfg = ENGAGEMENT_CONFIG[type];
             return (
-              <div key={type} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TYPE_COLORS[type] }} />
-                <span className="text-xs text-muted-foreground">{cfg?.label}</span>
+              <div
+                key={type}
+                className="relative flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-card/40 hover:border-primary/40 transition-colors"
+              >
+                <div className="w-1 h-8 rounded-full" style={{ backgroundColor: TYPE_COLORS[type as VisibleType] }} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[9px] tracking-[0.18em] uppercase text-muted-foreground truncate">
+                    {cfg?.emoji} {cfg?.label}
+                  </p>
+                  <p className="font-serif text-base text-foreground leading-tight">{quantity.toLocaleString()}</p>
+                </div>
               </div>
             );
           })}
