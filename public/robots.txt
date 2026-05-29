@@ -1,5 +1,5 @@
-# Voting Pro — robots.txt
-# Site:    https://votingpro.online
+# Boostly Pro — robots.txt
+# Site:    https://boostlypro.online
 # Updated: 2026-05-05
 
 # ───────────────────────────── Default rule ─────────────────────────────
@@ -98,5 +98,5 @@ User-agent: DotBot
 Disallow: /
 
 # ───────────────────────────── Sitemap & host ─────────────────────────────
-Sitemap: https://votingpro.online/sitemap.xml
-Host: https://votingpro.online
+Sitemap: https://boostlypro.online/sitemap.xml
+Host: https://boostlypro.online

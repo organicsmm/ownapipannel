@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useGlobalMarkup } from './useGlobalMarkup';
 import type { Service } from '@/lib/supabase';
 
-const SERVICES_CACHE_KEY = 'whopautopilot_services_cache';
+const SERVICES_CACHE_KEY = 'boostlypro_services_cache';
 const SERVICES_CACHE_TTL = 30 * 60 * 1000; // 30 minutes localStorage cache
 
 /** Read services from localStorage if still fresh */

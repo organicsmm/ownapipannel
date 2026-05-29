@@ -93,8 +93,8 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-background text-foreground relative overflow-hidden">
       <PageMeta
-        title={isLogin ? 'Sign in — Voting Pro' : 'Create your account — Voting Pro'}
-        description="Sign in or create your free Voting Pro account to launch organic Instagram, YouTube and TikTok growth campaigns. No credit card required."
+        title={isLogin ? 'Sign in — Boostly Pro' : 'Create your account — Boostly Pro'}
+        description="Sign in or create your free Boostly Pro account to launch organic Instagram, YouTube and TikTok growth campaigns. No credit card required."
         canonicalPath="/auth"
       />
 
@@ -201,7 +201,7 @@ export default function Auth() {
         )}
 
         {/* Telegram */}
-        <a href="https://t.me/votingpro" target="_blank" rel="noopener noreferrer" className="mt-10 flex items-center gap-3 p-4 rounded-md border border-border bg-card/60 hover:bg-card hover:border-primary/40 transition-all">
+        <a href="https://t.me/boostlypro" target="_blank" rel="noopener noreferrer" className="mt-10 flex items-center gap-3 p-4 rounded-md border border-border bg-card/60 hover:bg-card hover:border-primary/40 transition-all">
           <div className="w-9 h-9 rounded-md border border-border flex items-center justify-center bg-background">
             <svg className="w-4 h-4 fill-primary" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.53-1.39.52-.46-.01-1.33-.26-1.98-.48-.8-.27-1.43-.42-1.37-.89.03-.25.38-.51 1.03-.78 4.04-1.76 6.74-2.92 8.09-3.48 3.85-1.61.8-1.88 1.77-1.88.21 0 .69.05.99.23.32.19.43.46.46.72.02.16.01.32-.01.48z" /></svg>
           </div>

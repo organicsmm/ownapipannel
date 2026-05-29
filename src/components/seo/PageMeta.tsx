@@ -19,9 +19,9 @@ interface PageMetaProps {
   faqItems?: FaqItem[];
 }
 
-const DEFAULT_DESCRIPTION = "Voting Pro — World's first AI-organic SMM panel. Real Instagram, YouTube & TikTok engagement with natural delivery. 50,000+ orders, zero bans, 100% safe.";
-const SITE_NAME = 'Voting Pro';
-const BASE_URL = 'https://votingpro.online';
+const DEFAULT_DESCRIPTION = "Boostly Pro — World's first AI-organic SMM panel. Real Instagram, YouTube & TikTok engagement with natural delivery. 50,000+ orders, zero bans, 100% safe.";
+const SITE_NAME = 'Boostly Pro';
+const BASE_URL = 'https://boostlypro.online';
 const BREADCRUMB_SCRIPT_ID = 'breadcrumb-jsonld';
 const FAQ_SCRIPT_ID = 'faq-page-jsonld';
 
