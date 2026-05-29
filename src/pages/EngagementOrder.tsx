@@ -19,6 +19,7 @@ import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
 import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
 import { DrawableGrowthChart } from "@/components/engagement/DrawableGrowthChart";
+import { LiveBotMonitor } from "@/components/engagement/LiveBotMonitor";
 import {
   EngagementType,
   EngagementConfig,
