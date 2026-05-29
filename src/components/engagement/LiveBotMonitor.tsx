@@ -1,129 +1,133 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Activity, Bot, ShieldCheck, Zap, Gauge, Radio, Globe2,
-  Cpu, Eye, TrendingUp, Sparkles, CheckCircle2
+  Activity, Bot, ShieldCheck, Zap, Gauge, Radio,
+  Cpu, Eye, TrendingUp, Sparkles, CheckCircle2, XCircle, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EngagementType, EngagementConfig } from "@/lib/engagement-types";
+import { formatDistanceToNowStrict } from "date-fns";
 
-interface Props {
-  engagements: Record<EngagementType, EngagementConfig>;
-  platform: string;
-  baseQuantity: number;
+interface RunLike {
+  id: string;
+  status: string;
+  quantity_to_send: number;
+  provider_status?: string | null;
+  provider_remains?: number | null;
+  completed_at?: string | null;
+  started_at?: string | null;
+  scheduled_at?: string | null;
+  engagement_type?: string;
+  error_message?: string | null;
 }
 
-// Pseudo-random but deterministic feeling jitter
-const wobble = (base: number, range: number, t: number, seed: number) =>
-  base + Math.sin(t / 1200 + seed) * range + (Math.random() - 0.5) * range * 0.4;
-
-const REGIONS = [
-  { code: "US", name: "United States", flag: "🇺🇸", base: 28 },
-  { code: "BR", name: "Brazil",        flag: "🇧🇷", base: 14 },
-  { code: "IN", name: "India",         flag: "🇮🇳", base: 18 },
-  { code: "GB", name: "UK",            flag: "🇬🇧", base: 9  },
-  { code: "DE", name: "Germany",       flag: "🇩🇪", base: 7  },
-  { code: "JP", name: "Japan",         flag: "🇯🇵", base: 6  },
-  { code: "FR", name: "France",        flag: "🇫🇷", base: 5  },
-  { code: "AU", name: "Australia",     flag: "🇦🇺", base: 4  },
-  { code: "CA", name: "Canada",        flag: "🇨🇦", base: 5  },
-  { code: "AE", name: "UAE",           flag: "🇦🇪", base: 4  },
-];
+interface Props {
+  runs: RunLike[];
+  totalQuantity: number;
+  totalDelivered: number;
+  platform: string;
+}
 
 const ACTION_VERBS: Record<string, string> = {
-  views: "watched", likes: "liked", comments: "commented on",
-  saves: "saved", shares: "shared", reposts: "reposted",
-  followers: "followed", subscribers: "subscribed to",
-  watch_hours: "watched", retweets: "retweeted",
+  views: "views", likes: "likes", comments: "comments",
+  saves: "saves", shares: "shares", reposts: "reposts",
+  followers: "followers", subscribers: "subscribers",
+  watch_hours: "watch hours", retweets: "retweets",
 };
 
-const FIRST = ["alex", "maria", "leo", "kenji", "amelia", "lucas", "zoe", "noah", "yuki", "diego", "priya", "olivia", "ravi", "sofia", "mateo", "ava", "ibrahim", "mia", "lin", "isla"];
-const LAST  = ["_official", ".hq", "_real", "_studio", ".live", "_pro", "_x", ".world", "_co", "_io"];
+// Compute real delivered from a single run
+const deliveredOf = (r: RunLike): number => {
+  const ps = (r.provider_status ?? "").toString().toLowerCase().trim();
+  if (ps === "completed" || ps === "complete") return r.quantity_to_send;
+  if (r.provider_remains !== null && r.provider_remains !== undefined) {
+    return Math.max(0, r.quantity_to_send - r.provider_remains);
+  }
+  if (r.status === "completed") return r.quantity_to_send;
+  return 0;
+};
 
-const randomUser = () =>
-  FIRST[Math.floor(Math.random() * FIRST.length)] +
-  Math.floor(Math.random() * 99) +
-  LAST[Math.floor(Math.random() * LAST.length)];
-
-export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
-  const [tick, setTick] = useState(0);
-  const [feed, setFeed] = useState<{ id: number; user: string; type: string; region: string; flag: string }[]>([]);
-  const idRef = useRef(0);
-
-  const activeTypes = useMemo(
-    () => (Object.keys(engagements) as EngagementType[]).filter((t) => engagements[t]?.enabled),
-    [engagements]
-  );
-
-  // Animation tick
+export function LiveBotMonitor({ runs, totalQuantity, totalDelivered, platform }: Props) {
+  // Re-render every 5s to refresh "time ago" labels & throughput window
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const i = setInterval(() => setTick((t) => t + 1), 900);
+    const i = setInterval(() => setTick((t) => t + 1), 5000);
     return () => clearInterval(i);
   }, []);
 
-  // Live activity feed
-  useEffect(() => {
-    if (activeTypes.length === 0) return;
-    const i = setInterval(() => {
-      const region = REGIONS[Math.floor(Math.random() * REGIONS.length)];
-      const type = activeTypes[Math.floor(Math.random() * activeTypes.length)];
-      const entry = {
-        id: ++idRef.current,
-        user: randomUser(),
-        type: ACTION_VERBS[type] || type,
-        region: region.code,
-        flag: region.flag,
-      };
-      setFeed((f) => [entry, ...f].slice(0, 6));
-    }, 1400);
-    return () => clearInterval(i);
-  }, [activeTypes]);
+  const metrics = useMemo(() => {
+    const completed = runs.filter((r) => r.status === "completed");
+    const failed = runs.filter((r) => r.status === "failed");
+    const pending = runs.filter((r) => r.status === "pending");
+    const started = runs.filter((r) => r.status === "started");
 
-  // Live metrics — beautiful but believable
-  const realAcct      = Math.max(96, Math.min(99.9, wobble(98.6, 0.6, tick * 100, 1))); // %
-  const botRate       = Math.max(0.05, Math.min(2, wobble(0.6, 0.3, tick * 100, 2)));   // %
-  const antiDetect    = Math.max(94, Math.min(99.9, wobble(97.8, 1.1, tick * 100, 3)));
-  const velocity      = Math.max(120, wobble(Math.max(180, baseQuantity / 60), Math.max(40, baseQuantity / 200), tick * 100, 4));
-  const proxyHealth   = Math.max(92, Math.min(100, wobble(96.4, 1.8, tick * 100, 5)));
-  const queueDepth    = Math.max(0, Math.round(wobble(activeTypes.length * 12, 6, tick * 100, 6)));
+    const finishedCount = completed.length + failed.length;
+    const successRate = finishedCount > 0 ? (completed.length / finishedCount) * 100 : 100;
+    const failRate = finishedCount > 0 ? (failed.length / finishedCount) * 100 : 0;
 
-  // Region distribution — normalize after wobble
-  const regions = useMemo(() => {
-    const raw = REGIONS.map((r, i) => ({ ...r, val: Math.max(1, wobble(r.base, 2, tick * 100, i + 10)) }));
-    const sum = raw.reduce((s, r) => s + r.val, 0);
-    return raw
-      .map((r) => ({ ...r, pct: (r.val / sum) * 100 }))
-      .sort((a, b) => b.pct - a.pct)
-      .slice(0, 6);
-  }, [tick]);
-
-  // Sparkline data
-  const sparkPoints = useMemo(() => {
-    const pts: number[] = [];
-    for (let i = 0; i < 28; i++) {
-      pts.push(wobble(50, 18, (tick - (28 - i)) * 100, 9));
+    // Throughput sparkline — delivered per minute, last 30 minutes
+    const now = Date.now();
+    const WINDOW_MIN = 30;
+    const buckets = Array.from({ length: WINDOW_MIN }, () => 0);
+    for (const r of completed) {
+      const ts = r.completed_at ? new Date(r.completed_at).getTime() : 0;
+      if (!ts) continue;
+      const ageMin = Math.floor((now - ts) / 60000);
+      if (ageMin >= 0 && ageMin < WINDOW_MIN) {
+        buckets[WINDOW_MIN - 1 - ageMin] += deliveredOf(r);
+      }
     }
-    return pts;
-  }, [tick]);
+    // Velocity = average delivery over last 5 minutes
+    const recent = buckets.slice(-5).reduce((a, b) => a + b, 0);
+    const velocityPerMin = Math.round(recent / 5);
 
+    // Progress
+    const progressPct = totalQuantity > 0 ? Math.min(100, (totalDelivered / totalQuantity) * 100) : 0;
+
+    // Proxy health proxy = inverse of recent failure intensity + base
+    const proxyHealth = Math.max(80, 100 - failRate * 1.2);
+
+    // Recent activity (last 8 completed runs)
+    const recentEvents = [...runs]
+      .filter((r) => r.completed_at || r.status === "failed")
+      .sort((a, b) => {
+        const ta = new Date(a.completed_at || a.started_at || 0).getTime();
+        const tb = new Date(b.completed_at || b.started_at || 0).getTime();
+        return tb - ta;
+      })
+      .slice(0, 8);
+
+    return {
+      completed, failed, pending, started,
+      successRate, failRate,
+      buckets, velocityPerMin,
+      progressPct,
+      proxyHealth,
+      recentEvents,
+      queueDepth: pending.length + started.length,
+    };
+  }, [runs, totalQuantity, totalDelivered]);
+
+  // Build sparkline path
   const sparkPath = useMemo(() => {
     const w = 100, h = 36;
-    const min = Math.min(...sparkPoints), max = Math.max(...sparkPoints);
-    const range = max - min || 1;
-    return sparkPoints
+    const pts = metrics.buckets;
+    const max = Math.max(...pts, 1);
+    return pts
       .map((v, i) => {
-        const x = (i / (sparkPoints.length - 1)) * w;
-        const y = h - ((v - min) / range) * h;
+        const x = (i / (pts.length - 1)) * w;
+        const y = h - (v / max) * h;
         return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(" ");
-  }, [sparkPoints]);
+  }, [metrics.buckets]);
 
-  if (activeTypes.length === 0) return null;
+  if (runs.length === 0) return null;
+
+  const realAcct = metrics.successRate;
+  const botRate = metrics.failRate; // failed deliveries treated as "bot detected / blocked"
+  const antiDetect = Math.max(0, Math.min(100, 100 - metrics.failRate * 0.8));
 
   return (
     <Card className="border-2 border-border bg-card overflow-hidden relative">
-      {/* Animated gradient sheen */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)),transparent_60%)]" />
 
       <CardContent className="p-4 sm:p-6 relative">
@@ -153,21 +157,21 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
           </div>
         </div>
 
-        {/* Core stat grid */}
+        {/* Core stat grid — derived from REAL runs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-4 sm:mb-5">
           <MetricTile
             icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            label=":real accounts"
-            value={`${realAcct.toFixed(2)}%`}
+            label=":success rate"
+            value={`${realAcct.toFixed(1)}%`}
             tone="emerald"
             bar={realAcct}
           />
           <MetricTile
             icon={<Bot className="h-3.5 w-3.5" />}
-            label=":bot rate"
+            label=":bot / blocked"
             value={`${botRate.toFixed(2)}%`}
             tone="amber"
-            bar={Math.min(100, botRate * 30)}
+            bar={Math.min(100, botRate * 3)}
             invert
           />
           <MetricTile
@@ -180,9 +184,9 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
           <MetricTile
             icon={<Zap className="h-3.5 w-3.5" />}
             label=":velocity /min"
-            value={Math.round(velocity).toLocaleString()}
+            value={metrics.velocityPerMin.toLocaleString()}
             tone="sky"
-            bar={Math.min(100, (velocity / Math.max(300, baseQuantity / 30)) * 100)}
+            bar={Math.min(100, totalQuantity > 0 ? (metrics.velocityPerMin / Math.max(1, totalQuantity / 60)) * 100 : 0)}
           />
         </div>
 
@@ -194,11 +198,11 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
                 <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
-                  :throughput · 60s
+                  :throughput · last 30m
                 </span>
               </div>
               <span className="text-[11px] font-medium text-foreground">
-                {Math.round(velocity).toLocaleString()}/min
+                {metrics.velocityPerMin.toLocaleString()}/min
               </span>
             </div>
             <svg viewBox="0 0 100 36" preserveAspectRatio="none" className="w-full h-14 sm:h-16">
@@ -222,17 +226,17 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
                   :queue
                 </span>
               </div>
-              <span className="font-serif text-lg leading-none text-foreground">{queueDepth}</span>
+              <span className="font-serif text-lg leading-none text-foreground">{metrics.queueDepth}</span>
             </div>
             <div className="flex items-center justify-between mt-1">
               <div className="flex items-center gap-2">
                 <Gauge className="h-3.5 w-3.5 text-emerald-500" />
                 <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
-                  :proxies
+                  :node health
                 </span>
               </div>
               <span className="text-[11px] font-semibold text-emerald-500">
-                {proxyHealth.toFixed(1)}%
+                {metrics.proxyHealth.toFixed(1)}%
               </span>
             </div>
             <div className="mt-2 grid grid-cols-12 gap-[2px]">
@@ -241,7 +245,7 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
                   key={i}
                   className={cn(
                     "h-1.5 rounded-sm transition-colors",
-                    i < Math.round((proxyHealth / 100) * 12)
+                    i < Math.round((metrics.proxyHealth / 100) * 12)
                       ? "bg-emerald-500/80"
                       : "bg-border"
                   )}
@@ -251,36 +255,39 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
           </div>
         </div>
 
-        {/* Bottom — regions + activity feed */}
+        {/* Bottom — progress + activity feed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
-          {/* Region distribution */}
+          {/* Progress + run counters */}
           <div className="rounded-xl border border-border bg-secondary/40 p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Globe2 className="h-3.5 w-3.5 text-primary" />
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
               <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
-                :geo distribution
+                :delivery progress
               </span>
             </div>
-            <div className="space-y-2">
-              {regions.map((r) => (
-                <div key={r.code} className="flex items-center gap-2.5">
-                  <span className="text-base leading-none w-5">{r.flag}</span>
-                  <span className="font-mono text-[10px] tracking-wider text-muted-foreground w-7">{r.code}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-700"
-                      style={{ width: `${r.pct}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] font-mono tabular-nums text-foreground w-10 text-right">
-                    {r.pct.toFixed(1)}%
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="font-serif text-2xl text-primary tabular-nums">
+                {totalDelivered.toLocaleString()}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                / {totalQuantity.toLocaleString()} delivered ({metrics.progressPct.toFixed(1)}%)
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-border overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-700"
+                style={{ width: `${metrics.progressPct}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <RunCounter label="done" value={metrics.completed.length} tone="emerald" icon={<CheckCircle2 className="h-3 w-3" />} />
+              <RunCounter label="active" value={metrics.started.length} tone="sky" icon={<Activity className="h-3 w-3" />} />
+              <RunCounter label="queued" value={metrics.pending.length} tone="primary" icon={<Clock className="h-3 w-3" />} />
+              <RunCounter label="failed" value={metrics.failed.length} tone="amber" icon={<XCircle className="h-3 w-3" />} />
             </div>
           </div>
 
-          {/* Activity feed */}
+          {/* Activity feed — real run events */}
           <div className="rounded-xl border border-border bg-secondary/40 p-3 sm:p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -292,27 +299,44 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
               <Sparkles className="h-3 w-3 text-primary animate-pulse" />
             </div>
             <div className="space-y-1.5 min-h-[160px]">
-              {feed.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground italic">Warming up delivery nodes…</p>
+              {metrics.recentEvents.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground italic">Waiting for first delivery…</p>
               ) : (
-                feed.map((e, i) => (
-                  <div
-                    key={e.id}
-                    className={cn(
-                      "flex items-center gap-2 text-[11px] sm:text-[12px] py-1 px-2 rounded-md transition-all",
-                      i === 0 ? "bg-primary/5 border border-primary/20" : "border border-transparent",
-                    )}
-                    style={{ opacity: 1 - i * 0.13 }}
-                  >
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                    <span className="text-base leading-none">{e.flag}</span>
-                    <span className="font-mono text-foreground truncate">@{e.user}</span>
-                    <span className="text-muted-foreground">{e.type}</span>
-                    <span className="ml-auto font-mono text-[9px] text-muted-foreground/70 shrink-0">
-                      now
-                    </span>
-                  </div>
-                ))
+                metrics.recentEvents.map((e, i) => {
+                  const ok = e.status === "completed";
+                  const ts = e.completed_at || e.started_at;
+                  const ago = ts ? formatDistanceToNowStrict(new Date(ts), { addSuffix: false }) : "now";
+                  const verb = ACTION_VERBS[e.engagement_type || ""] || e.engagement_type || "delivered";
+                  const qty = deliveredOf(e);
+                  return (
+                    <div
+                      key={e.id}
+                      className={cn(
+                        "flex items-center gap-2 text-[11px] sm:text-[12px] py-1 px-2 rounded-md transition-all",
+                        i === 0 ? "bg-primary/5 border border-primary/20" : "border border-transparent",
+                      )}
+                      style={{ opacity: 1 - i * 0.09 }}
+                    >
+                      {ok ? (
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                      ) : (
+                        <XCircle className="h-3 w-3 text-amber-500 shrink-0" />
+                      )}
+                      <span className="font-mono text-foreground tabular-nums">
+                        +{(ok ? qty : e.quantity_to_send).toLocaleString()}
+                      </span>
+                      <span className="text-muted-foreground truncate">{verb}</span>
+                      {!ok && (
+                        <span className="text-[9px] text-amber-500 font-mono uppercase tracking-wider">
+                          retry
+                        </span>
+                      )}
+                      <span className="ml-auto font-mono text-[9px] text-muted-foreground/70 shrink-0">
+                        {ago} ago
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -322,10 +346,10 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
         <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-mono tracking-wider uppercase text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            nodes online · {12 + (tick % 4)}
+            runs · {runs.length}
           </span>
-          <span>· avg latency {(120 + Math.sin(tick / 3) * 18).toFixed(0)}ms</span>
-          <span>· encryption tls 1.3</span>
+          <span>· completed {metrics.completed.length}</span>
+          <span>· queued {metrics.pending.length}</span>
           <span className="ml-auto text-primary/80">:organic engine v4.2</span>
         </div>
       </CardContent>
@@ -333,7 +357,28 @@ export function LiveBotMonitor({ engagements, platform, baseQuantity }: Props) {
   );
 }
 
-/* — Metric tile — */
+function RunCounter({
+  label, value, tone, icon,
+}: { label: string; value: number; tone: "emerald" | "sky" | "primary" | "amber"; icon: React.ReactNode }) {
+  const toneCfg = {
+    emerald: "text-emerald-500 border-emerald-500/30",
+    sky: "text-sky-500 border-sky-500/30",
+    primary: "text-primary border-primary/30",
+    amber: "text-amber-500 border-amber-500/30",
+  }[tone];
+  return (
+    <div className={cn("rounded-lg border bg-card/40 px-1.5 py-2", toneCfg.split(" ")[1])}>
+      <div className={cn("flex items-center justify-center gap-1", toneCfg.split(" ")[0])}>
+        {icon}
+        <span className="font-serif text-base leading-none tabular-nums">{value}</span>
+      </div>
+      <div className="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground mt-1">
+        {label}
+      </div>
+    </div>
+  );
+}
+
 function MetricTile({
   icon, label, value, tone, bar, invert,
 }: {
