@@ -19,6 +19,7 @@ import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
 import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
 import { DrawableGrowthChart } from "@/components/engagement/DrawableGrowthChart";
+import { LiveBotMonitor } from "@/components/engagement/LiveBotMonitor";
 import {
   EngagementType,
   EngagementConfig,
@@ -763,6 +764,15 @@ export default function EngagementOrder() {
             refreshKey={previewRefreshKey}
             onRefresh={() => setPreviewRefreshKey(k => k + 1)}
             platform={platform as 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook'}
+          />
+        )}
+
+        {/* Live Botting % + Quality + Geo + Activity Monitor */}
+        {activeEngagementTypes.length > 0 && (
+          <LiveBotMonitor
+            engagements={engagements as Record<EngagementType, EngagementConfig>}
+            platform={platform}
+            baseQuantity={baseQuantity}
           />
         )}
 
