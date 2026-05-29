@@ -170,7 +170,6 @@ export function EditRunDialog({
               <DateTimePicker
                 value={scheduledDate}
                 onChange={setScheduledDate}
-                minDate={new Date()}
               />
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>Original:</span>
