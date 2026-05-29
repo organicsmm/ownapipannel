@@ -71,6 +71,27 @@ export type Database = {
           },
         ]
       }
+      category_pricing: {
+        Row: {
+          category: string
+          created_at: string
+          price_per_1k: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          price_per_1k?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          price_per_1k?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string

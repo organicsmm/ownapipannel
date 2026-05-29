@@ -94,7 +94,6 @@ serve(async (req) => {
             }
 
             // ─────────── SERVICES ──────────────────────────────────────────────
-            // Standard format: [{"service":1,"name":"...","rate":"0.50","min":100,"max":50000,...}]
             case 'services': {
                 const { data: services, error } = await supabase
                     .from('services')
@@ -102,16 +101,24 @@ serve(async (req) => {
                     .eq('is_active', true)
                     .order('category')
                 if (error) throw error
-                return json(services.map(s => ({
-                    service: parseInt(s.provider_service_id) || s.provider_service_id,
-                    name: s.name,
-                    category: s.category,
-                    rate: Number(s.price).toFixed(4),
-                    min: s.min_quantity,
-                    max: s.max_quantity,
-                    dripfeed: s.drip_feed_enabled ?? false,
-                    description: s.description ?? '',
-                })))
+                const { data: cats } = await supabase
+                    .from('category_pricing')
+                    .select('category, price_per_1k')
+                const catMap: Record<string, number> = {}
+                ;(cats || []).forEach((c: any) => { catMap[c.category] = Number(c.price_per_1k) || 0 })
+                return json(services.map(s => {
+                    const effective = catMap[s.category] > 0 ? catMap[s.category] : Number(s.price)
+                    return {
+                        service: parseInt(s.provider_service_id) || s.provider_service_id,
+                        name: s.name,
+                        category: s.category,
+                        rate: effective.toFixed(4),
+                        min: s.min_quantity,
+                        max: s.max_quantity,
+                        dripfeed: s.drip_feed_enabled ?? false,
+                        description: s.description ?? '',
+                    }
+                }))
             }
 
             // ─────────── ADD ORDER ─────────────────────────────────────────────
@@ -137,7 +144,16 @@ serve(async (req) => {
                     return err(`Quantity must be between ${svc.min_quantity} and ${svc.max_quantity}`)
                 }
 
-                const totalPrice = (qty / 1000) * Number(svc.price)
+                // Category pricing override (admin's per-1K rate)
+                const { data: cp } = await supabase
+                    .from('category_pricing')
+                    .select('price_per_1k')
+                    .eq('category', svc.category)
+                    .maybeSingle()
+                const effectivePer1k = cp && Number(cp.price_per_1k) > 0
+                    ? Number(cp.price_per_1k)
+                    : Number(svc.price)
+                const totalPrice = (qty / 1000) * effectivePer1k
 
 
                 const { data: wallet } = await supabase
