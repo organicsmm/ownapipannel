@@ -48,6 +48,7 @@ import { TypeHistoryCard } from "@/components/engagement/TypeHistoryCard";
 import { PerTypeBreakdown } from "@/components/engagement/PerTypeBreakdown";
 import { EditRunDialog } from "@/components/engagement/EditRunDialog";
 import { OrderProgressChart } from "@/components/engagement/OrderProgressChart";
+import { LiveBotMonitor } from "@/components/engagement/LiveBotMonitor";
 
 const ENGAGEMENT_ICONS = {
   views: { icon: Eye, label: "Views", emoji: "👁️" },
@@ -815,6 +816,14 @@ export default function EngagementOrderDetail() {
 
         {/* Real-Time Progress Chart */}
         <OrderProgressChart runs={stats.allRuns} perType={stats.perType} />
+
+        {/* Live Delivery Monitor — real-time stats from actual runs */}
+        <LiveBotMonitor
+          runs={stats.allRuns}
+          totalQuantity={stats.totalQuantity}
+          totalDelivered={stats.totalDelivered}
+          platform={((order.items?.[0] as any)?.service?.category || 'instagram').toString().toLowerCase().split(' ')[0]}
+        />
 
         {/* Per-Type Breakdown with Real-Time History - Clickable cards */}
         <PerTypeBreakdown 

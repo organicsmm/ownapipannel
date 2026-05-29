@@ -19,7 +19,7 @@ import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
 import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
 import { DrawableGrowthChart } from "@/components/engagement/DrawableGrowthChart";
-import { LiveBotMonitor } from "@/components/engagement/LiveBotMonitor";
+
 import {
   EngagementType,
   EngagementConfig,
@@ -767,14 +767,7 @@ export default function EngagementOrder() {
           />
         )}
 
-        {/* Live Botting % + Quality + Geo + Activity Monitor */}
-        {activeEngagementTypes.length > 0 && (
-          <LiveBotMonitor
-            engagements={engagements as Record<EngagementType, EngagementConfig>}
-            platform={platform}
-            baseQuantity={baseQuantity}
-          />
-        )}
+        {/* Live Delivery Monitor moved to order detail page (real-time, real data) */}
 
         {/* Delivery Timeline Preview - Detailed schedule */}
         {activeEngagementTypes.length > 0 && (
