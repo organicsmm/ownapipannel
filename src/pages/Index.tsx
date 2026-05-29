@@ -1,182 +1,135 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ArrowRight, TrendingUp, Zap, Shield, BarChart3, CheckCircle2, Shuffle,
-  Clock, Moon, Timer, Eye, ChevronRight, Sparkles, Star, Vote, Rocket,
-  Activity, Layers3,
-} from 'lucide-react';
-import logo from '@/assets/logo.jpg';
+import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
-
-const Pill: React.FC<{ children: React.ReactNode; tone?: 'mint' | 'glass' }> = ({ children, tone = 'mint' }) => (
-  <span
-    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.14em] ${
-      tone === 'mint'
-        ? 'bg-primary/10 text-primary border border-primary/30'
-        : 'bg-white/5 text-foreground/80 border border-white/10'
-    }`}
-  >
-    {children}
-  </span>
-);
 
 const Index = () => {
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-background text-foreground font-sans relative">
+    <div className="min-h-screen w-full bg-background text-foreground font-sans antialiased overflow-x-hidden">
       <PageMeta
-        title="Voting Pro — Powerful Organic Growth Platform"
-        description="Voting Pro delivers natural, undetectable engagement for Instagram, YouTube, TikTok and more. 100% safe accounts, AI-organic delivery."
+        title="Voting Pro — Luxury Engagement Platform"
+        description="Voting Pro delivers natural, undetectable engagement for serious creators. Obsidian-grade reliability, AI-organic delivery, zero compromise."
         canonicalPath="/"
         breadcrumbs={[{ name: 'Home', path: '/' }]}
       />
 
-      {/* ═══ AMBIENT ORBS ═══ */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="orb orb-mint w-[600px] h-[600px] -top-40 -left-32 animate-orb-drift" />
-        <div className="orb orb-bright w-[500px] h-[500px] top-1/3 -right-32 animate-orb-drift" style={{ animationDelay: '4s' }} />
-        <div className="orb orb-forest w-[700px] h-[700px] bottom-0 left-1/4 animate-orb-drift" style={{ animationDelay: '8s' }} />
-        <div className="absolute inset-0 bg-grid opacity-30" />
-      </div>
-
       {/* ═══ NAV ═══ */}
-      <nav className="sticky top-3 z-50 w-full px-3 sm:px-4">
-        <div className="max-w-6xl mx-auto rounded-2xl flex items-center justify-between h-14 px-3 sm:px-4 glass-panel">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="relative">
-              <div className="absolute -inset-1 rounded-2xl opacity-70 blur-md transition-opacity group-hover:opacity-100 bg-gradient-to-br from-primary to-accent" />
-              <div className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-card border border-primary/30">
-                <Vote className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 leading-none">
-              <span className="text-[15px] sm:text-[16px] font-bold tracking-tight font-display">Voting Pro</span>
-              <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.16em] px-1.5 py-[3px] rounded-md bg-primary/15 text-primary border border-primary/20">
-                v2.0
-              </span>
-            </div>
-          </Link>
-          <div className="hidden md:flex items-center gap-7">
-            {['Features', 'How it works', 'Why us'].map((t, i) => (
-              <a key={t} href={['#features', '#how-it-works', '#comparison'][i]}
-                className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                {t}
-              </a>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <Link to="/auth" className="hidden sm:inline-flex h-9 px-3.5 items-center text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors">
-              Sign in
-            </Link>
-            <Link to="/auth" className="btn-3d h-10 px-5 text-[13px] inline-flex items-center gap-1.5">
-              Get Started <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+      <nav className="fixed top-0 inset-x-0 z-50 px-8 lg:px-14 py-6 flex items-center justify-between text-[12px] font-mono tracking-[0.18em] uppercase">
+        <div className="flex items-center gap-10">
+          <a href="#product" className="text-foreground"><span className="text-primary">:</span>product</a>
+          <a href="#how" className="text-muted-foreground hover:text-foreground transition-colors hidden md:inline"><span className="text-primary">:</span>system</a>
+          <a href="#why" className="text-muted-foreground hover:text-foreground transition-colors hidden md:inline"><span className="text-primary">:</span>protocol</a>
+        </div>
+
+        <Link to="/" className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+          <span className="font-serif italic text-primary text-[20px] leading-none">v</span>
+          <span className="text-foreground tracking-[0.3em] text-[13px]">VOTING·PRO</span>
+        </Link>
+
+        <div className="flex items-center gap-6">
+          <Link to="/auth" className="text-muted-foreground hover:text-foreground transition-colors hidden md:inline">sign in</Link>
+          <Link to="/auth" className="text-foreground"><span className="text-primary">:</span>begin →</Link>
         </div>
       </nav>
 
-      {/* ═══ HERO ═══ */}
-      <section className="pt-16 sm:pt-24 lg:pt-32 pb-12 sm:pb-20 text-center px-4 sm:px-6 lg:px-8 relative">
-        <div className="max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 mb-6 animate-fade-up">
-            <Pill>
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-primary" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-              </span>
-              Voting Pro v2.0 — Live now
-            </Pill>
-          </div>
+      {/* ═══ HERO — monumental ═══ */}
+      <section className="min-h-screen flex flex-col justify-center px-8 lg:px-14 pt-32 pb-24 relative lux-grain">
+        {/* Subtle ambient gradient — not orbs */}
+        <div aria-hidden className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsla(66, 70%, 60%, 0.04), transparent 70%)' }} />
 
-          <h1 className="font-display text-[2.6rem] sm:text-6xl lg:text-[5rem] font-extrabold leading-[1.02] tracking-[-0.035em] mb-6 text-balance animate-fade-up" style={{ animationDelay: '0.1s' }}>
-            Engineered for
-            <br className="hidden sm:block" />
-            <span className="gradient-text glow-mint-text">unstoppable growth.</span>
-          </h1>
-
-          <p className="text-[15px] sm:text-[18px] leading-[1.7] mb-10 max-w-2xl mx-auto text-muted-foreground animate-fade-up" style={{ animationDelay: '0.2s' }}>
-            AI-organic delivery patterns that move like real humans. Natural variance, peak-hour
-            intelligence, zero detection. <span className="text-foreground font-semibold">Built for serious creators.</span>
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-            <Link to="/auth" className="btn-3d w-full sm:w-auto h-12 px-7 text-[14.5px] gap-2 animate-pulse-mint">
-              <Rocket className="w-4 h-4" /> Launch your growth
-            </Link>
-            <Link to="/auth" className="btn-glass w-full sm:w-auto h-12 px-7 text-[14.5px] inline-flex items-center justify-center gap-2">
-              Explore services <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap text-[12px] sm:text-[13px] font-medium text-muted-foreground animate-fade-up" style={{ animationDelay: '0.4s' }}>
-            {['No credit card', 'All features included', '60-second setup'].map((t) => (
-              <span key={t} className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> {t}</span>
-            ))}
-          </div>
-
-          {/* social proof */}
-          <div className="mt-14 flex items-center justify-center gap-6 sm:gap-10 flex-wrap animate-fade-up" style={{ animationDelay: '0.5s' }}>
-            <div className="flex items-center gap-1.5">
-              {[1,2,3,4,5].map(i => <Star key={i} className="w-4 h-4 fill-current text-warning" />)}
-              <span className="text-[12.5px] font-semibold ml-1">4.9/5</span>
-              <span className="text-[12px] text-muted-foreground">· 2,400+ creators</span>
+        <div className="relative max-w-[1400px] mx-auto w-full">
+          {/* Top eyebrow row */}
+          <div className="flex justify-between items-start mb-20 font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
+            <div className="flex flex-col gap-1">
+              <span>:est. 2024</span>
+              <span className="text-foreground/40">·new delhi / global</span>
             </div>
-            <span className="hidden sm:inline-block w-px h-5 bg-border" />
-            <span className="text-[12.5px] text-muted-foreground">
-              <strong className="text-foreground font-bold">50,000+</strong> orders delivered
-            </span>
-            <span className="hidden sm:inline-block w-px h-5 bg-border" />
-            <span className="text-[12.5px] text-muted-foreground">
-              <strong className="text-primary font-bold">99.9%</strong> success rate
-            </span>
+            <div className="hidden md:flex flex-col items-end gap-1">
+              <span>:edition 02</span>
+              <span className="text-primary">·active</span>
+            </div>
+          </div>
+
+          {/* Wordmark */}
+          <div className="text-center animate-fade-up">
+            <p className="lux-eyebrow mb-6">:engagement intelligence platform</p>
+
+            <h1 className="font-serif text-[clamp(3.5rem,12vw,11rem)] leading-[0.95] tracking-[-0.04em] text-foreground">
+              Voting <span className="italic text-primary">Pro</span>
+            </h1>
+
+            <p className="mt-10 max-w-xl mx-auto text-[15px] leading-[1.7] text-muted-foreground font-light">
+              An obsidian-grade engagement platform engineered for creators who refuse the obvious.
+              Quiet machinery, precise delivery, undetectable patterns.
+            </p>
+
+            <div className="mt-12 flex items-center justify-center gap-8 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span><span className="text-primary">·</span> ai-organic</span>
+              <span className="w-px h-3 bg-border" />
+              <span><span className="text-primary">·</span> zero detection</span>
+              <span className="w-px h-3 bg-border" />
+              <span><span className="text-primary">·</span> 99.9% uptime</span>
+            </div>
+
+            <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-up" style={{ animationDelay: '0.2s' }}>
+              <Link to="/auth" className="btn-primary group">
+                Begin trial
+                <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+              <Link to="/services" className="btn-ghost">View services</Link>
+            </div>
+          </div>
+
+          {/* Bottom stat strip — Shaga-style */}
+          <div className="mt-24 lg:mt-32 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
+            {[
+              { k: 'Orders', v: '50K+', sub: 'delivered' },
+              { k: 'Creators', v: '2,400+', sub: 'active' },
+              { k: 'Bans', v: '00', sub: 'zero reported' },
+              { k: 'Success', v: '99.9%', sub: 'guaranteed' },
+            ].map((s) => (
+              <div key={s.k} className="bg-background p-6 lg:p-8">
+                <p className="lux-eyebrow mb-3">:{s.k.toLowerCase()}</p>
+                <p className="font-serif text-[40px] lg:text-[56px] leading-none text-foreground">{s.v}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground font-mono uppercase tracking-wider">{s.sub}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ FEATURES BENTO ═══ */}
-      <section id="features" className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <Pill><Zap className="w-3 h-3" /> Features no other panel has</Pill>
-            <h2 className="mt-4 font-display text-[2rem] sm:text-5xl font-bold tracking-tight text-balance">
-              Engineered to feel <span className="gradient-text">perfectly natural</span>
-            </h2>
+      {/* ═══ PROTOCOL — How it works ═══ */}
+      <section id="how" className="px-8 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="grid lg:grid-cols-12 gap-10 mb-20">
+            <div className="lg:col-span-5">
+              <p className="lux-eyebrow mb-6">:01 / protocol</p>
+              <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+                Engineered<br />
+                <span className="italic text-primary">in silence.</span>
+              </h2>
+            </div>
+            <div className="lg:col-span-7 lg:pt-14">
+              <p className="text-[16px] leading-[1.8] text-muted-foreground font-light max-w-xl">
+                Every delivery is choreographed against a thousand invisible signals — peak hours,
+                organic variance, dwell intervals, regional drift. The result reads as life, not labor.
+              </p>
+            </div>
           </div>
 
-          {/* Bento grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 perspective-1000">
-            {/* Large card */}
-            <div className="three-d-card col-span-2 sm:col-span-2 lg:col-span-3 row-span-2 p-6 sm:p-8 flex flex-col justify-between min-h-[280px] relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-radial-mint opacity-60" />
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-primary/15 border border-primary/30">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-display text-2xl font-bold mb-2">S-Curve Growth</h3>
-                <p className="text-[13.5px] text-muted-foreground leading-relaxed">
-                  Slow start, viral middle, gentle taper. The exact growth curve real content follows — modelled mathematically.
-                </p>
-              </div>
-              <div className="relative mt-4 h-20 flex items-end gap-1">
-                {[8, 12, 18, 28, 42, 60, 78, 88, 94, 96, 97].map((h, i) => (
-                  <div key={i} className="flex-1 rounded-t-sm bg-gradient-to-t from-primary/40 to-primary/80" style={{ height: `${h}%` }} />
-                ))}
-              </div>
-            </div>
-
+          {/* Specs grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border">
             {[
-              { icon: Shuffle, title: '±50% Variance', desc: 'Random qty per drop' },
-              { icon: Clock, title: 'Peak Boost', desc: '1.5× at 6–10 PM' },
-              { icon: Moon, title: 'Night Slowdown', desc: 'Realistic sleep' },
-              { icon: Timer, title: '±5min Jitter', desc: 'Anti-detection' },
-              { icon: Eye, title: 'Live Preview', desc: 'See before order' },
-              { icon: Layers3, title: 'Multi-Provider', desc: 'LRU rotation' },
+              { n: '01', t: 'S-curve modelling', d: 'Mathematical growth that mirrors organic virality — slow ignition, viral middle, gentle taper.' },
+              { n: '02', t: '±50% variance', d: 'No two intervals identical. Quantity, cadence, and timing fluctuate within human bounds.' },
+              { n: '03', t: 'Peak-hour weighting', d: 'Activity weighted to 6–10 PM local. Night-time slowdowns mimic real audience sleep.' },
+              { n: '04', t: 'LRU provider rotation', d: 'Multiple providers, rotating priority, automatic failover. Never single-point-fragile.' },
             ].map((f) => (
-              <div key={f.title} className="three-d-card col-span-1 lg:col-span-1 p-4 sm:p-5 text-left">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-primary/10 border border-primary/20">
-                  <f.icon className="w-4 h-4 text-primary" />
-                </div>
-                <h3 className="text-[13px] font-bold mb-1 font-display">{f.title}</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">{f.desc}</p>
+              <div key={f.n} className="bg-background p-8 lg:p-10 group hover:bg-card transition-colors duration-300">
+                <p className="font-mono text-[10px] tracking-[0.25em] text-primary mb-6">:{f.n}</p>
+                <h3 className="font-serif text-[26px] leading-tight mb-3 text-foreground">{f.t}</h3>
+                <p className="text-[13px] leading-[1.7] text-muted-foreground font-light">{f.d}</p>
               </div>
             ))}
           </div>
@@ -184,160 +137,83 @@ const Index = () => {
       </section>
 
       {/* ═══ COMPARISON ═══ */}
-      <section id="comparison" className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto glass-premium rounded-3xl overflow-hidden">
-          <div className="grid md:grid-cols-2">
-            {/* Regular */}
-            <div className="p-6 sm:p-10 border-r border-white/5">
-              <div className="flex items-center gap-2.5 mb-6">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-destructive/15 border border-destructive/30">
-                  <span className="text-[18px] text-destructive font-bold">×</span>
-                </div>
-                <span className="text-[15px] font-bold font-display text-muted-foreground">Regular SMM Panels</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  'Same quantity every batch — easy to detect',
-                  'Fixed intervals — bot pattern visible',
-                  '24/7 delivery — unnatural behavior',
-                  'Accounts get flagged & banned',
-                ].map((t) => (
-                  <div key={t} className="flex items-start gap-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 bg-destructive" />
-                    <span className="text-[13px] leading-relaxed text-muted-foreground">{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Us */}
-            <div className="p-6 sm:p-10 relative bg-gradient-to-br from-primary/10 via-transparent to-accent/5">
-              <span className="absolute top-5 right-5 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md bg-primary text-primary-foreground">
-                Voting Pro
-              </span>
-              <div className="flex items-center gap-2.5 mb-6">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/20 border border-primary/40">
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
-                </div>
-                <span className="text-[15px] font-bold font-display">Voting Pro</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  'Random variance — looks like real users',
-                  'Jittered timing — undetectable patterns',
-                  'Peak hours + night slow — human behavior',
-                  '100% safe, zero bans reported',
-                ].map((t) => (
-                  <div key={t} className="flex items-start gap-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 bg-primary" />
-                    <span className="text-[13px] leading-relaxed text-foreground/90">{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-center gap-6 sm:gap-10 flex-wrap py-5 px-6 border-t border-white/5 bg-black/20">
-            {[
-              { icon: '🏆', text: '50,000+ Orders Delivered' },
-              { icon: '🛡️', text: 'Zero Account Bans' },
-              { icon: '⚡', text: '99.9% Success Rate' },
-            ].map((s) => (
-              <span key={s.text} className="flex items-center gap-2 text-[12.5px] font-semibold text-muted-foreground">
-                <span>{s.icon}</span> {s.text}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ WHY ═══ */}
-      <section id="how-it-works" className="py-14 sm:py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <Pill tone="glass">Why choose Voting Pro</Pill>
-            <h2 className="mt-4 font-display text-[2rem] sm:text-5xl font-bold tracking-tight text-balance">
-              Built for <span className="gradient-text">real growth</span>
+      <section id="why" className="px-8 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="text-center mb-20">
+            <p className="lux-eyebrow mb-6">:02 / contrast</p>
+            <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+              The difference is <span className="italic text-primary">obvious.</span>
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {[
-              { icon: TrendingUp, title: 'Natural growth curves', desc: 'Variable delivery quantities that perfectly mimic real organic engagement patterns.' },
-              { icon: Zap, title: 'Peak hour optimization', desc: 'Higher delivery during active hours (6 PM – 10 PM) for realistic engagement timing.' },
-              { icon: Shield, title: 'Account safety', desc: 'Randomized patterns prevent detection and keep your accounts 100% secure.' },
-              { icon: Activity, title: 'Live preview', desc: 'See exactly when and how much will be delivered before placing your order.' },
-              { icon: CheckCircle2, title: 'Premium quality', desc: 'High-quality engagement from real-looking accounts with complete profiles.' },
-              { icon: Shuffle, title: 'Organic variance', desc: '±25% random variance on each delivery for unpredictable, natural growth.' },
-            ].map((f) => (
-              <div key={f.title} className="three-d-card p-6 sm:p-7">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-primary/10 border border-primary/20">
-                  <f.icon className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="text-[15px] font-bold mb-2 font-display">{f.title}</h3>
-                <p className="text-[13px] leading-relaxed text-muted-foreground">{f.desc}</p>
-              </div>
-            ))}
+          <div className="grid md:grid-cols-2 gap-px bg-border border border-border">
+            <div className="bg-background p-10 lg:p-14">
+              <p className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground mb-8">:standard panels</p>
+              <ul className="space-y-5">
+                {[
+                  'Identical batches every cycle',
+                  'Fixed intervals, visible bot signature',
+                  'Round-the-clock delivery — never sleeps',
+                  'Account flagging within 30 days',
+                ].map((t) => (
+                  <li key={t} className="flex gap-4 text-[14px] text-muted-foreground font-light leading-relaxed">
+                    <span className="text-destructive shrink-0">—</span>{t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-background p-10 lg:p-14 relative">
+              <p className="font-mono text-[10px] tracking-[0.25em] text-primary mb-8">:voting pro</p>
+              <ul className="space-y-5">
+                {[
+                  'Variable batches — reads like real users',
+                  'Jittered timing — algorithmically invisible',
+                  'Peak-weighted, night-aware — fully human',
+                  'Zero bans across 50,000+ orders',
+                ].map((t) => (
+                  <li key={t} className="flex gap-4 text-[14px] text-foreground/85 font-light leading-relaxed">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />{t}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ═══ CTA ═══ */}
-      <section className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto rounded-[28px] text-center py-14 sm:py-20 px-6 sm:px-10 relative overflow-hidden glass-premium">
-          <div aria-hidden className="absolute -top-32 -right-32 w-[400px] h-[400px] orb orb-mint" />
-          <div aria-hidden className="absolute -bottom-32 -left-32 w-[400px] h-[400px] orb orb-bright" />
-
-          <div className="relative">
-            <Pill><Sparkles className="w-3 h-3" /> Free to start</Pill>
-            <h2 className="mt-5 font-display text-[2rem] sm:text-5xl font-bold tracking-tight mb-4 text-balance">
-              Ready to grow with <span className="gradient-text">Voting Pro</span>?
-            </h2>
-            <p className="text-[14.5px] sm:text-[16px] mb-8 max-w-md mx-auto text-muted-foreground">
-              Join thousands of creators using our AI-organic delivery system. No credit card required.
-            </p>
-            <Link to="/auth" className="btn-3d h-12 px-8 text-[14.5px] inline-flex items-center gap-2">
-              Create free account <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+      <section className="px-8 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[1400px] mx-auto text-center">
+          <p className="lux-eyebrow mb-8">:03 / commence</p>
+          <h2 className="font-serif text-[clamp(3rem,9vw,8rem)] leading-[0.95] tracking-[-0.04em] mb-12">
+            Quiet power.<br />
+            <span className="italic text-primary">Loud results.</span>
+          </h2>
+          <Link to="/auth" className="btn-primary group">
+            Begin your edition
+            <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </Link>
+          <p className="mt-8 font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
+            no credit card · full access · cancel anytime
+          </p>
         </div>
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer className="border-t border-white/5 py-12 px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/15 border border-primary/30">
-                <Vote className="w-4 h-4 text-primary" />
-              </div>
-              <span className="font-display font-bold">Voting Pro</span>
-            </div>
-            <p className="text-[12px] text-muted-foreground leading-relaxed">
-              Revolutionary organic social media growth platform with natural delivery patterns.
-            </p>
+      <footer className="px-8 lg:px-14 py-12 border-t border-border">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="font-serif italic text-primary text-[16px] leading-none">v</span>
+            <span className="text-foreground tracking-[0.3em]">VOTING·PRO</span>
           </div>
-          {[
-            { title: 'Quick Links', links: [['Get Started', '/auth'], ['Services', '/services']] },
-            { title: 'Legal', links: [['Terms of Service', '/legal/terms'], ['Privacy Policy', '/legal/privacy'], ['Refund Policy', '/legal/refund'], ['Cookie Policy', '/legal/cookies']] },
-            { title: 'Support', links: [['Help Center', '/support'], ['Contact Us', '/support'], ['API Documentation', '/api-access']] },
-          ].map((col) => (
-            <div key={col.title}>
-              <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-3">{col.title}</h4>
-              <ul className="space-y-2">
-                {col.links.map(([label, href]) => (
-                  <li key={label}>
-                    <Link to={href} className="text-[13px] text-foreground/80 hover:text-primary transition-colors">{label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-white/5 flex items-center justify-between flex-wrap gap-3">
-          <span className="text-[11.5px] text-muted-foreground">© 2026 Voting Pro. All rights reserved.</span>
-          <div className="flex items-center gap-4 text-[11.5px] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3 text-primary" /> SSL Secured</span>
-            <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> 99.9% Uptime</span>
+          <div className="flex items-center gap-6 flex-wrap justify-center">
+            <Link to="/terms" className="hover:text-foreground transition-colors">terms</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">privacy</Link>
+            <Link to="/refund" className="hover:text-foreground transition-colors">refund</Link>
+            <Link to="/cookies" className="hover:text-foreground transition-colors">cookies</Link>
           </div>
+          <span>© 2026 · edition 02</span>
         </div>
       </footer>
     </div>
