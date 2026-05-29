@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
-import PageMeta from '@/components/seo/PageMeta';
+import { PageMeta } from '@/components/seo/PageMeta';
 import {
   Brain, Calculator, TrendingUp, Trophy, ShieldCheck, Clock,
   Hash, Target, Sparkles, Zap, BarChart3, Activity, Menu
