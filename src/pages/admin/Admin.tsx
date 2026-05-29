@@ -25,11 +25,9 @@ import {
   CreditCard,
   MessageCircle,
   Globe,
-  Percent,
-  Save,
   Loader2,
-  TrendingDown,
 } from 'lucide-react';
+
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
