@@ -7,8 +7,8 @@ const Index = () => {
   return (
     <div className="min-h-screen w-full bg-background text-foreground font-sans antialiased overflow-x-hidden">
       <PageMeta
-        title="Voting Pro — Luxury Engagement Platform"
-        description="Voting Pro delivers natural, undetectable engagement for serious creators. Obsidian-grade reliability, AI-organic delivery, zero compromise."
+        title="Boostly Pro — Luxury Engagement Platform"
+        description="Boostly Pro delivers natural, undetectable engagement for serious creators. Obsidian-grade reliability, AI-organic delivery, zero compromise."
         canonicalPath="/"
         breadcrumbs={[{ name: 'Home', path: '/' }]}
       />
@@ -164,7 +164,7 @@ const Index = () => {
             </div>
 
             <div className="bg-background p-10 lg:p-14 relative">
-              <p className="font-mono text-[10px] tracking-[0.25em] text-primary mb-8">:voting pro</p>
+              <p className="font-mono text-[10px] tracking-[0.25em] text-primary mb-8">:boostly pro</p>
               <ul className="space-y-5">
                 {[
                   'Variable batches — reads like real users',

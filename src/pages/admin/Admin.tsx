@@ -80,7 +80,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ['platform-settings-markup'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
       // Clear localStorage services cache so markup reflects immediately
-      localStorage.removeItem('whopautopilot_services_cache');
+      localStorage.removeItem('boostlypro_services_cache');
     },
     onError: (err: Error) => toast.error(err.message),
   });

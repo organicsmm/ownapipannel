@@ -39,7 +39,7 @@ export function Sidebar({ onClose }: SidebarProps) {
             <span className="font-serif italic text-primary text-[18px] leading-none">v</span>
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-[13px] font-medium tracking-tight text-foreground">VOTING PRO</span>
+            <span className="text-[13px] font-medium tracking-tight text-foreground">BOOSTLY PRO</span>
             <span className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground">:LUXURY EDITION</span>
           </div>
         </Link>

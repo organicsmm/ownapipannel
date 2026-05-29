@@ -23,7 +23,7 @@ export function MobileBottomNav() {
             <div className="w-7 h-7 rounded-md border border-primary/40 flex items-center justify-center bg-card">
               <span className="font-serif italic text-primary text-[14px] leading-none">v</span>
             </div>
-            <span className="text-[13px] font-medium tracking-tight text-foreground">VOTING PRO</span>
+            <span className="text-[13px] font-medium tracking-tight text-foreground">BOOSTLY PRO</span>
           </div>
           <button onClick={() => setSidebarOpen(true)}
             aria-label="Open menu"

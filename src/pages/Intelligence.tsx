@@ -96,7 +96,7 @@ export default function Intelligence() {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
-      <PageMeta title="Intelligence — Voting Pro" description="Engagement intelligence suite." />
+      <PageMeta title="Intelligence — Boostly Pro" description="Engagement intelligence suite." />
 
       <div className="hidden lg:block w-64 shrink-0 fixed left-0 top-0 h-screen z-30">
         <Sidebar />

@@ -1,11 +1,11 @@
 {
-    "name": "Voting Pro",
-    "short_name": "Whopautopilot",
+    "name": "Boostly Pro",
+    "short_name": "BoostlyPro",
     "description": "Premium High-Growth Social Media Terminal",
     "start_url": "/",
     "display": "fullscreen",
-    "background_color": "#0a0a0c",
-    "theme_color": "#0a0a0c",
+    "background_color": "#ffffff",
+    "theme_color": "#F97316",
     "orientation": "portrait",
     "icons": [
         {
