@@ -16,7 +16,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [user, isLoading, navigate]);
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(180deg, #f0fdf4 0%, #dcfce7 40%, #bbf7d0 70%, #f0fdf4 100%)', color: '#1a1a2e' }}>
+    <div className="min-h-screen bg-background text-foreground relative" style={{ backgroundImage: 'radial-gradient(1200px 600px at 85% -10%, hsl(var(--primary) / 0.06), transparent 60%), radial-gradient(900px 500px at -10% 100%, hsl(var(--primary) / 0.04), transparent 60%)' }}>
       <aside className="fixed inset-y-0 left-0 z-40 w-[260px] hidden lg:block">
         <Sidebar />
       </aside>
