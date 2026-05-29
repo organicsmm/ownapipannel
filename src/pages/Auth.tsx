@@ -7,6 +7,7 @@ import { Mail, Loader2, ArrowLeft, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { PageMeta } from '@/components/seo/PageMeta';
+import logo from '@/assets/logo.png';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Invalid email address'),
@@ -109,12 +110,10 @@ export default function Auth() {
 
         {/* Brand mark */}
         <div className="flex items-center gap-3 mb-12">
-          <div className="w-11 h-11 rounded-md border border-border bg-card flex items-center justify-center" style={{ boxShadow: 'inset 0 1px 0 hsl(var(--primary) / 0.15)' }}>
-            <span className="font-serif italic text-2xl text-primary leading-none">v</span>
-          </div>
+          <img src={logo} alt="Boostly Pro" className="w-11 h-11 rounded-lg object-contain border border-border bg-card p-1" />
           <div className="flex flex-col leading-tight">
-            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">voting</span>
-            <span className="font-serif text-xl text-foreground -mt-0.5">Pro <span className="text-primary italic">edition</span></span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">premium engine</span>
+            <span className="font-serif text-xl text-foreground -mt-0.5">Boostly <span className="text-primary italic">Pro</span></span>
           </div>
         </div>
 
