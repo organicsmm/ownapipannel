@@ -72,8 +72,10 @@ export function useSubscription() {
     enabled: !!user,
   });
 
-  const hasActiveSubscription = subscription?.status === 'active' && subscription?.plan_type !== 'trial';
-  const isSubscriptionExpired = subscription?.status === 'expired';
+  // Check expiry: monthly subs expire, lifetime has expires_at = null
+  const notExpired = !subscription?.expires_at || new Date(subscription.expires_at) > new Date();
+  const hasActiveSubscription = subscription?.status === 'active' && subscription?.plan_type !== 'trial' && notExpired;
+  const isSubscriptionExpired = subscription?.status === 'expired' || (subscription?.status === 'active' && !notExpired);
   const hasPendingRequest = !!pendingRequest;
   const isTrial = subscription?.plan_type === 'trial' && subscription?.status === 'active';
   const trialDaysRemaining = null;

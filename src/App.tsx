@@ -43,6 +43,8 @@ import AdminChat from "./pages/admin/AdminChat";
 import AdminDeposits from "./pages/admin/AdminDeposits";
 import AdminProviderAccounts from "./pages/admin/AdminProviderAccounts";
 import AdminServiceProviderMapping from "./pages/admin/AdminServiceProviderMapping";
+import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
+import { SubscriptionGuard } from "./components/subscription/SubscriptionGuard";
 
 // Legal pages
 import TermsOfService from "./pages/legal/TermsOfService";
@@ -104,7 +106,7 @@ const App = () => {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/services" element={<Services />} />
-                    <Route path="/order" element={<Order />} />
+                    <Route path="/order" element={<SubscriptionGuard><Order /></SubscriptionGuard>} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/wallet" element={<Wallet />} />
                     <Route path="/settings" element={<Settings />} />
@@ -113,7 +115,7 @@ const App = () => {
                     <Route path="/intelligence" element={<Intelligence />} />
 
                     {/* Engagement */}
-                    <Route path="/engagement-order" element={<EngagementOrder />} />
+                    <Route path="/engagement-order" element={<SubscriptionGuard><EngagementOrder /></SubscriptionGuard>} />
                     <Route path="/engagement-orders" element={<EngagementOrders />} />
                     <Route path="/engagement-orders/:orderNumber" element={<EngagementOrderDetail />} />
 
@@ -128,6 +130,7 @@ const App = () => {
                     <Route path="/admin/deposits" element={<AdminGuard><AdminDeposits /></AdminGuard>} />
                     <Route path="/admin/provider-accounts" element={<AdminGuard><AdminProviderAccounts /></AdminGuard>} />
                     <Route path="/admin/service-provider-mapping" element={<AdminGuard><AdminServiceProviderMapping /></AdminGuard>} />
+                    <Route path="/admin/subscriptions" element={<AdminGuard><AdminSubscriptions /></AdminGuard>} />
 
                     {/* Legal */}
                     <Route path="/terms" element={<TermsOfService />} />
