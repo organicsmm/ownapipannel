@@ -1,336 +1,303 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Check, Instagram, Youtube, Music2, Facebook, Twitter, Heart, MessageCircle, Eye, Sparkles } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Shield, Sparkles, TrendingUp, Crown, Quote } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
 
-/**
- * Boostly Pro — Landing page
- * Direct visual match to user reference (RoomSketch by Phenomenon):
- *  - Deep forest-green full-bleed background
- *  - Tiny logo top-left, tiny diamond top-right
- *  - Huge centered "device" mockup (iPad-like) with a soft cream interior
- *    showing a Boostly dashboard preview with hotspots + a floating product card
- *  - "Designed by" signature bottom-right
- */
-
-const bg = '#2A382A';          // deep forest green page bg
-const bgDeep = '#1E2A1E';      // darker for device bezel
-const cream = '#F3EEE3';       // warm cream device interior
-const ink = '#1F1F1D';
-const forest = '#2E3D2E';
-const sage = '#E8E3D7';
-
 const Index = () => {
   return (
-    <div className="min-h-screen w-full antialiased relative overflow-x-hidden"
-      style={{ background: bg, color: cream, fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Inter", sans-serif' }}>
+    <div className="min-h-screen w-full bg-background text-foreground font-sans antialiased overflow-x-hidden">
       <PageMeta
-        title="Boostly Pro — Premium Social Growth, Quietly Engineered"
-        description="Hand-tuned organic engagement for Instagram, YouTube, TikTok and beyond. Built for creators who want quiet machinery and loud results."
+        title="Boostly Pro — Premium Social Growth Engine"
+        description="Boostly Pro delivers organic, undetectable engagement for serious creators. Multi-platform growth with AI-organic delivery and zero compromise."
         canonicalPath="/"
         breadcrumbs={[{ name: 'Home', path: '/' }]}
       />
 
-      {/* ═══ HERO ═══ */}
-      <section className="relative min-h-screen px-4 md:px-10 pt-6 pb-20 flex flex-col">
-        {/* Top row: tiny logo + tiny diamond */}
-        <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="Boostly Pro" className="w-5 h-5 rounded-sm object-contain" />
-            <span className="text-[14px] tracking-tight" style={{ color: cream, fontWeight: 500 }}>Boostly Pro</span>
-          </Link>
-          <Diamond />
+      {/* NAV */}
+      <nav className="fixed top-0 inset-x-0 z-50 px-6 lg:px-14 py-5 flex items-center justify-between backdrop-blur-xl bg-background/70 border-b border-border/50">
+        <Link to="/" className="flex items-center gap-2.5">
+          <img src={logo} alt="Boostly Pro" className="w-9 h-9 rounded-lg object-contain" />
+          <span className="font-serif text-[18px] tracking-tight">
+            Boostly<span className="text-primary italic"> Pro</span>
+          </span>
+        </Link>
+        <div className="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-[0.18em] uppercase">
+          <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">features</a>
+          <a href="#platforms" className="text-muted-foreground hover:text-foreground transition-colors">platforms</a>
+          <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">pricing</a>
         </div>
+        <Link to="/auth" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-mono uppercase tracking-[0.15em] hover:shadow-[0_10px_40px_-10px_hsl(var(--primary)/0.6)] transition-all">
+          start free <ArrowUpRight className="w-3.5 h-3.5" />
+        </Link>
+      </nav>
 
-        {/* Center: device mockup */}
-        <div className="flex-1 flex items-center justify-center py-10 md:py-14">
-          <DeviceMockup />
-        </div>
-
-        {/* Bottom row: tiny diamond + designed-by */}
-        <div className="flex items-end justify-between">
-          <Diamond />
-          <div className="text-right">
-            <p className="text-[12px] md:text-[13px]" style={{ color: cream }}>
-              Designed by <em style={{ fontFamily: '"Instrument Serif", Georgia, serif' }}>Boostly</em>
-            </p>
+      {/* HERO */}
+      <section className="min-h-screen flex flex-col justify-center px-6 lg:px-14 pt-32 pb-20 relative">
+        <div aria-hidden className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(var(--primary) / 0.12), transparent 70%)' }} />
+        <div className="relative max-w-[1400px] mx-auto w-full text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-card/60 backdrop-blur mb-10">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-primary animate-ping opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+            <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+              live — 2,400+ creators growing now
+            </span>
           </div>
-        </div>
 
-        {/* Centered CTA pill (overlay, doesn't interfere with mockup) */}
-        <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
-          <Link
-            to="/auth"
-            className="pointer-events-auto hidden md:inline-flex items-center gap-1.5 text-[13px] px-4 py-2 rounded-full transition-transform active:scale-[0.98]"
-            style={{ background: cream, color: ink }}
-          >
-            Get started <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ═══ HEADLINE BELOW DEVICE ═══ */}
-      <section className="px-5 md:px-10 pt-10 pb-20 md:pb-28">
-        <div className="max-w-[1100px] mx-auto text-center">
-          <h1 className="tracking-[-0.035em] leading-[1.02]"
-            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 'clamp(2.6rem, 7.5vw, 5.5rem)', fontWeight: 400, color: cream }}>
-            Growth that looks <br className="hidden sm:block" />
-            <em style={{ color: '#C9D4B6' }}>handcrafted</em>, not bought.
+          <h1 className="font-serif text-[clamp(3rem,11vw,10rem)] leading-[0.92] tracking-[-0.04em]">
+            Boostly <span className="italic text-primary">Pro</span>
           </h1>
-          <p className="mt-6 mx-auto max-w-[560px] text-[15px] md:text-[17px] leading-[1.65]" style={{ color: '#B8C2B5' }}>
-            Boostly Pro delivers slow, organic engagement across Instagram, YouTube and TikTok — tuned by hand, paced like real fans, invisible to the algorithm.
+          <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.3em] text-primary">
+            · premium engagement engine ·
           </p>
-          <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
-            <Link to="/auth" className="inline-flex items-center gap-2 px-5 h-12 rounded-full text-[14px]"
-              style={{ background: cream, color: ink }}>
+          <p className="mt-10 max-w-xl mx-auto text-[16px] leading-[1.7] text-muted-foreground font-light">
+            Organic, undetectable growth across Instagram, YouTube, TikTok and beyond.
+            Built for creators who demand quiet machinery and loud results.
+          </p>
+
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link to="/auth" className="inline-flex items-center gap-2 px-7 h-12 rounded-md bg-primary text-primary-foreground font-mono text-xs uppercase tracking-[0.2em] hover:shadow-[0_20px_60px_-20px_hsl(var(--primary)/0.7)] transition-all">
               Start free trial <ArrowUpRight className="w-4 h-4" />
             </Link>
-            <a href="#pricing" className="inline-flex items-center gap-2 px-5 h-12 rounded-full text-[14px]"
-              style={{ background: 'transparent', color: cream, border: '1px solid rgba(243,238,227,0.2)' }}>
-              See pricing
-            </a>
+            <Link to="/services" className="inline-flex items-center gap-2 px-7 h-12 rounded-md border border-border bg-card/40 font-mono text-xs uppercase tracking-[0.2em] hover:bg-card hover:border-primary/40 transition-all">
+              Explore services
+            </Link>
+          </div>
+
+          <div className="mt-10 flex items-center justify-center gap-6 flex-wrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3 text-primary" /> zero bans</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> instant start</span>
+            <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> ai-organic</span>
+          </div>
+
+          <div className="mt-20 overflow-hidden border-y border-border py-6 bg-card/30">
+            <div className="flex items-center justify-around gap-12 font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-2"><Instagram className="w-4 h-4 text-primary" /> Instagram</span>
+              <span className="flex items-center gap-2"><Youtube className="w-4 h-4 text-primary" /> YouTube</span>
+              <span className="flex items-center gap-2"><Music2 className="w-4 h-4 text-primary" /> TikTok</span>
+              <span className="flex items-center gap-2"><Facebook className="w-4 h-4 text-primary" /> Facebook</span>
+              <span className="flex items-center gap-2"><Twitter className="w-4 h-4 text-primary" /> Twitter / X</span>
+            </div>
+          </div>
+
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
+            {[
+              { k: 'Orders', v: '50K+', sub: 'delivered' },
+              { k: 'Creators', v: '2,400+', sub: 'active' },
+              { k: 'Bans', v: '00', sub: 'zero reported' },
+              { k: 'Uptime', v: '99.9%', sub: 'guaranteed' },
+            ].map((s) => (
+              <div key={s.k} className="bg-background p-6 lg:p-8 text-left">
+                <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-3">:{s.k.toLowerCase()}</p>
+                <p className="font-serif text-[40px] lg:text-[56px] leading-none">{s.v}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground font-mono uppercase tracking-wider">{s.sub}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ FEATURES ═══ */}
-      <section className="px-5 md:px-10 pb-20 md:pb-28">
-        <div className="max-w-[1100px] mx-auto">
-          <p className="text-[12px] mb-4" style={{ color: '#9eaa9e' }}>· The engine</p>
-          <h2 className="tracking-[-0.025em] leading-[1.05] mb-12"
-            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 'clamp(2rem, 4.5vw, 3.4rem)', color: cream, fontWeight: 400 }}>
-            Built slowly. <em style={{ color: '#C9D4B6' }}>Delivered quietly.</em>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* FEATURES */}
+      <section id="features" className="px-6 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="grid lg:grid-cols-12 gap-10 mb-20">
+            <div className="lg:col-span-5">
+              <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-6">:01 / engine</p>
+              <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+                Built <span className="italic text-primary">precisely.</span><br />
+                Delivered <span className="italic text-primary">quietly.</span>
+              </h2>
+            </div>
+            <div className="lg:col-span-7 lg:pt-14">
+              <p className="text-[16px] leading-[1.8] text-muted-foreground font-light max-w-xl">
+                Every order is choreographed against thousands of invisible signals — peak hours,
+                organic variance, dwell intervals, regional drift. Reads as life, never as labor.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
             {[
-              { t: 'S-curve pacing', d: 'Slow ignition, viral middle, gentle taper. Mathematical, never mechanical.' },
-              { t: '±50% variance', d: 'No two intervals identical. Quantity and cadence drift within human bounds.' },
-              { t: 'Peak-hour weighting', d: 'Activity weighted to 6–10 PM local. Night slowdown mimics real audiences.' },
-            ].map((f) => (
-              <div key={f.t} className="rounded-2xl p-6"
-                style={{ background: '#243324', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-5" style={{ background: '#34452F' }}>
-                  <Sparkles className="w-4 h-4" style={{ color: '#C9D4B6' }} />
+              { icon: TrendingUp, n: '01', t: 'S-curve modelling', d: 'Mathematical growth mirroring organic virality — slow ignition, viral middle, gentle taper.' },
+              { icon: Sparkles, n: '02', t: '±50% variance', d: 'No two intervals identical. Quantity, cadence, and timing fluctuate within human bounds.' },
+              { icon: Zap, n: '03', t: 'Peak-hour weighting', d: 'Activity weighted to 6–10 PM local. Night slowdowns mimic real audience sleep.' },
+              { icon: Shield, n: '04', t: 'LRU provider rotation', d: 'Multiple providers, rotating priority, automatic failover. Never single-point-fragile.' },
+            ].map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.n} className="bg-background p-8 lg:p-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <Icon className="w-5 h-5 text-primary" />
+                    <p className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground">:{f.n}</p>
+                  </div>
+                  <h3 className="font-serif text-[24px] leading-tight mb-3">{f.t}</h3>
+                  <p className="text-[13px] leading-[1.7] text-muted-foreground font-light">{f.d}</p>
                 </div>
-                <h3 className="text-[17px] tracking-tight mb-2" style={{ color: cream, fontWeight: 500 }}>{f.t}</h3>
-                <p className="text-[13.5px] leading-[1.6]" style={{ color: '#A6B0A4' }}>{f.d}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* ═══ PLATFORMS ═══ */}
-      <section className="px-5 md:px-10 pb-20 md:pb-28">
-        <div className="max-w-[1100px] mx-auto rounded-3xl p-8 md:p-12" style={{ background: cream, color: ink }}>
-          <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
-            <h2 className="tracking-[-0.025em] leading-[1.05]"
-              style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 400 }}>
-              Every platform. <em style={{ color: forest }}>One engine.</em>
+      {/* PLATFORMS */}
+      <section id="platforms" className="px-6 lg:px-14 py-32 border-t border-border bg-card/20">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="text-center mb-16">
+            <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-6">:02 / coverage</p>
+            <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+              Every platform. <span className="italic text-primary">One engine.</span>
             </h2>
-            <p className="text-[13px]" style={{ color: '#6b6b66' }}>Likes · Views · Followers · Comments · Shares</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
-              { I: Instagram, n: 'Instagram' },
-              { I: Youtube, n: 'YouTube' },
-              { I: Music2, n: 'TikTok' },
-              { I: Facebook, n: 'Facebook' },
-              { I: Twitter, n: 'Twitter / X' },
-            ].map(({ I, n }) => (
-              <div key={n} className="rounded-2xl p-5 flex items-center gap-3"
-                style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.05)' }}>
-                <I className="w-4 h-4" style={{ color: forest }} />
-                <span className="text-[13.5px]" style={{ color: ink }}>{n}</span>
-              </div>
-            ))}
+              { icon: Instagram, name: 'Instagram', services: 'Likes · Views · Followers' },
+              { icon: Youtube, name: 'YouTube', services: 'Views · Subs · Watch time' },
+              { icon: Music2, name: 'TikTok', services: 'Views · Likes · Shares' },
+              { icon: Facebook, name: 'Facebook', services: 'Likes · Followers · Reach' },
+              { icon: Twitter, name: 'Twitter / X', services: 'Followers · Retweets · Likes' },
+            ].map((p) => {
+              const Icon = p.icon;
+              return (
+                <div key={p.name} className="p-6 rounded-lg border border-border bg-background hover:border-primary/40 hover:bg-card transition-all">
+                  <Icon className="w-7 h-7 text-primary mb-4" />
+                  <h3 className="font-serif text-[18px] mb-1">{p.name}</h3>
+                  <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">{p.services}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* ═══ PRICING ═══ */}
-      <section id="pricing" className="px-5 md:px-10 pb-20 md:pb-28">
-        <div className="max-w-[1000px] mx-auto">
-          <div className="text-center mb-12">
-            <p className="text-[12px] mb-4" style={{ color: '#9eaa9e' }}>· Membership</p>
-            <h2 className="tracking-[-0.025em] leading-[1.05]"
-              style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 'clamp(2rem, 5vw, 3.6rem)', color: cream, fontWeight: 400 }}>
-              Two quiet ways to <em style={{ color: '#C9D4B6' }}>begin.</em>
+      {/* PRICING */}
+      <section id="pricing" className="px-6 lg:px-14 py-32 border-t border-border bg-card/20 relative overflow-hidden">
+        <div aria-hidden className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 50% 40% at 50% 0%, hsl(var(--primary) / 0.10), transparent 70%)' }} />
+        <div className="max-w-[1200px] mx-auto relative">
+          <div className="text-center mb-16">
+            <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-6">:03 / membership</p>
+            <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.03em]">
+              Two ways to <span className="italic text-primary">begin.</span>
             </h2>
+            <p className="mt-6 max-w-xl mx-auto text-[15px] leading-[1.7] text-muted-foreground font-light">
+              Single membership — full platform access. No tiers, no upsells, no hidden gates.
+            </p>
           </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-3xl p-7 md:p-8" style={{ background: cream, color: ink }}>
-              <p className="text-[12px]" style={{ color: '#7a7a74' }}>Monthly</p>
-              <div className="mt-3 flex items-baseline gap-1.5">
-                <span style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: '3rem', lineHeight: 1 }}>$20</span>
-                <span className="text-[12px]" style={{ color: '#7a7a74' }}>/ month</span>
+
+          <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            <div className="rounded-2xl border border-border bg-background p-8 lg:p-10 hover:border-primary/40 transition-all">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-primary" />
+                </div>
+                <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">monthly</p>
               </div>
-              <ul className="mt-6 space-y-2.5">
-                {['Full platform access', 'All services & platforms', 'Organic delivery engine', 'Cancel anytime'].map((t) => (
-                  <li key={t} className="flex gap-2.5 text-[13.5px]" style={{ color: '#3a3a36' }}>
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" style={{ color: forest }} /> {t}
+              <h3 className="font-serif text-2xl mb-2">Monthly Access</h3>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="font-serif text-5xl">$20</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">/ month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Full platform access', 'All platforms & services', 'Organic delivery engine', 'Cancel anytime'].map((t) => (
+                  <li key={t} className="flex gap-3 text-[13px] text-foreground/80 font-light">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />{t}
                   </li>
                 ))}
               </ul>
-              <Link to="/auth" className="mt-7 flex items-center justify-center gap-2 h-11 rounded-full text-[13px]"
-                style={{ background: '#F2EEE6', color: ink, border: '1px solid rgba(0,0,0,0.06)' }}>
-                Start monthly <ArrowRight className="w-3.5 h-3.5" />
+              <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-md border border-border bg-card/40 hover:bg-card font-mono text-[11px] uppercase tracking-[0.2em] transition-all">
+                start monthly <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-            <div className="rounded-3xl p-7 md:p-8 relative" style={{ background: bgDeep, color: cream, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <span className="absolute top-5 right-5 text-[10px] px-2.5 py-1 rounded-full"
-                style={{ background: '#C9D4B6', color: bgDeep, fontWeight: 500 }}>Best value</span>
-              <p className="text-[12px]" style={{ color: '#9eaa9e' }}>Lifetime</p>
-              <div className="mt-3 flex items-baseline gap-1.5">
-                <span style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: '3rem', lineHeight: 1, color: cream }}>$100</span>
-                <span className="text-[12px]" style={{ color: '#9eaa9e' }}>/ once</span>
+
+            <div className="relative rounded-2xl border-2 border-primary/50 bg-background p-8 lg:p-10 shadow-[0_30px_80px_-30px_hsl(var(--primary)/0.5)]">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.25em]">
+                best value
               </div>
-              <ul className="mt-6 space-y-2.5">
-                {['Everything in monthly', 'Pay once, use forever', 'All future updates', 'Priority support'].map((t) => (
-                  <li key={t} className="flex gap-2.5 text-[13.5px]" style={{ color: '#dfe5db' }}>
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#C9D4B6' }} /> {t}
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-10 h-10 rounded-lg border border-primary/30 bg-primary/10 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-primary" />
+                </div>
+                <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-primary">lifetime</p>
+              </div>
+              <h3 className="font-serif text-2xl mb-2">Lifetime Access</h3>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="font-serif text-5xl">$100</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">/ once</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Everything in monthly', 'Pay once, use forever', 'All future updates included', 'Priority support'].map((t) => (
+                  <li key={t} className="flex gap-3 text-[13px] text-foreground/80 font-light">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />{t}
                   </li>
                 ))}
               </ul>
-              <Link to="/auth" className="mt-7 flex items-center justify-center gap-2 h-11 rounded-full text-[13px]"
-                style={{ background: cream, color: bgDeep }}>
-                Claim lifetime <ArrowRight className="w-3.5 h-3.5" />
+              <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-md bg-primary text-primary-foreground font-mono text-[11px] uppercase tracking-[0.2em] hover:shadow-[0_20px_60px_-20px_hsl(var(--primary)/0.7)] transition-all">
+                claim lifetime <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
-          <p className="text-center mt-6 text-[12px]" style={{ color: '#9eaa9e' }}>· activation handled manually within minutes ·</p>
+
+          <p className="text-center mt-10 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+            · activation handled manually within minutes ·
+          </p>
         </div>
       </section>
 
-      {/* ═══ FOOTER ═══ */}
-      <footer className="px-5 md:px-10 pb-10">
-        <div className="max-w-[1280px] mx-auto flex items-center justify-between flex-wrap gap-4 text-[12px]" style={{ color: '#9eaa9e' }}>
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="" className="w-5 h-5 rounded object-contain" />
-            <span style={{ color: cream, fontWeight: 500 }}>Boostly Pro</span>
-            <span>· © 2026</span>
+      {/* FOUNDER NOTE */}
+      <section className="px-6 lg:px-14 py-32 border-t border-border">
+        <div className="max-w-[900px] mx-auto">
+          <Quote className="w-10 h-10 text-primary/40 mb-8" />
+          <p className="font-serif text-[clamp(1.5rem,3.5vw,2.5rem)] leading-[1.35] tracking-tight">
+            "I built Boostly Pro after watching creator after creator get burned by panels that promise growth and deliver bans. Every line of this platform exists to do one thing — make algorithms feel safe with you. <span className="text-primary italic">Quiet. Patient. Human.</span>"
+          </p>
+          <div className="mt-10 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full border border-border bg-card flex items-center justify-center font-serif text-lg text-primary italic">A</div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em]">Abhishek · founder</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-0.5">building boostly since 2024</p>
+            </div>
           </div>
-          <div className="flex items-center gap-5">
-            <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <Link to="/refund" className="hover:text-white transition-colors">Refund</Link>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="px-6 lg:px-14 py-32 border-t border-border relative overflow-hidden">
+        <div aria-hidden className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, hsl(var(--primary) / 0.08), transparent 70%)' }} />
+        <div className="max-w-[1400px] mx-auto text-center relative">
+          <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-8">:04 / commence</p>
+          <h2 className="font-serif text-[clamp(3rem,9vw,8rem)] leading-[0.92] tracking-[-0.04em] mb-12">
+            Quiet power.<br />
+            <span className="italic text-primary">Loud results.</span>
+          </h2>
+          <Link to="/auth" className="inline-flex items-center gap-2 px-8 h-14 rounded-md bg-primary text-primary-foreground font-mono text-xs uppercase tracking-[0.2em] hover:shadow-[0_30px_80px_-20px_hsl(var(--primary)/0.7)] transition-all">
+            Begin with Boostly Pro <ArrowUpRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="px-6 lg:px-14 py-12 border-t border-border">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+          <Link to="/" className="flex items-center gap-2">
+            <img src={logo} alt="Boostly Pro" className="w-7 h-7 rounded object-contain" />
+            <span className="font-serif text-[14px] text-foreground tracking-tight normal-case">
+              Boostly<span className="text-primary italic"> Pro</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-6 flex-wrap justify-center">
+            <Link to="/terms" className="hover:text-foreground transition-colors">terms</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">privacy</Link>
+            <Link to="/refund" className="hover:text-foreground transition-colors">refund</Link>
           </div>
-          <span>Designed with care</span>
+          <span>© 2026 · Boostly Pro</span>
         </div>
       </footer>
     </div>
   );
 };
-
-/** Diamond corner marker (matches RoomSketch reference) */
-const Diamond: React.FC = () => (
-  <span className="inline-block w-2 h-2 rotate-45" style={{ background: cream, opacity: 0.9 }} />
-);
-
-/** Centered iPad-like device mockup with cream interior + dashboard preview */
-const DeviceMockup: React.FC = () => (
-  <div className="w-full max-w-[1080px] relative">
-    <div className="rounded-[28px] md:rounded-[40px] p-3 md:p-4 shadow-[0_50px_140px_-40px_rgba(0,0,0,0.55)]"
-      style={{ background: bgDeep, border: '1px solid rgba(255,255,255,0.04)' }}>
-      {/* device top bar */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3a4a3a' }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3a4a3a' }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3a4a3a' }} />
-        <div className="mx-auto px-4 py-1 rounded-md text-[11px]" style={{ background: '#0e180e', color: '#9aa49a' }}>
-          boostly.pro / dashboard
-        </div>
-      </div>
-
-      {/* screen */}
-      <div className="relative rounded-[18px] md:rounded-[28px] overflow-hidden"
-        style={{ background: cream, aspectRatio: '16 / 11' }}>
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 80% at 20% 0%, #ECE6D7 0%, transparent 55%), radial-gradient(80% 60% at 100% 100%, #DDE3D6 0%, transparent 60%)' }} />
-
-        {/* chrome */}
-        <div className="absolute top-3 md:top-4 left-3 md:left-4 right-3 md:right-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-full text-[10px] md:text-[11px]"
-            style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.06)', color: ink }}>
-            <img src={logo} alt="" className="w-3.5 h-3.5 rounded-sm object-contain" />
-            <span style={{ fontWeight: 500 }}>Boostly</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="hidden md:inline px-3 py-1.5 rounded-full text-[11px]"
-              style={{ background: '#FFFFFF', color: ink, border: '1px solid rgba(0,0,0,0.06)' }}>Export</span>
-            <span className="px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-[11px]"
-              style={{ background: forest, color: cream }}>New campaign</span>
-          </div>
-        </div>
-
-        {/* center post preview */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-[52%] md:w-[40%] aspect-[4/5] rounded-[14px] shadow-[0_20px_60px_-20px_rgba(0,0,0,0.25)] overflow-hidden relative"
-            style={{ background: 'linear-gradient(160deg,#E2D5C1 0%, #C9B79A 40%, #8A9B7E 100%)' }}>
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between text-[10px]" style={{ color: ink }}>
-              <div className="flex items-center gap-1.5">
-                <Instagram className="w-3 h-3" />
-                <span>@your.brand</span>
-              </div>
-              <span>2h</span>
-            </div>
-            <div className="absolute bottom-3 left-3 right-3 flex items-center gap-3 text-[11px]" style={{ color: ink }}>
-              <span className="flex items-center gap-1"><Heart className="w-3 h-3 fill-current" />12.4K</span>
-              <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" />286</span>
-              <span className="flex items-center gap-1"><Eye className="w-3 h-3" />84K</span>
-            </div>
-          </div>
-        </div>
-
-        {/* hotspots */}
-        <Hotspot top="30%" left="22%" />
-        <Hotspot top="62%" left="80%" />
-        <Hotspot top="78%" left="44%" />
-
-        {/* floating product-style annotation card */}
-        <div className="absolute left-3 md:left-6 bottom-3 md:bottom-6 w-[88%] md:w-[340px] rounded-2xl p-3 md:p-4 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.22)]"
-          style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.05)' }}>
-          <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: sage }}>
-              <Sparkles className="w-5 h-5" style={{ color: forest }} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px]" style={{ color: '#7a7a74' }}>
-                <span>Organic Engine</span><span>·</span>
-                <span style={{ color: forest, fontWeight: 500 }}>live</span>
-              </div>
-              <p className="text-[13px] mt-0.5" style={{ color: ink, fontWeight: 500 }}>Drip · 500 likes / 1h · ±25% variance</p>
-              <p className="text-[11.5px] mt-1 leading-[1.5]" style={{ color: '#6b6b66' }}>
-                Paced to 6–10 PM IST. Night slowdown on. Reads like real fans, not a bot.
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button className="flex-1 h-8 rounded-md text-[11.5px]" style={{ background: '#F2EEE6', color: ink }}>Pause</button>
-            <button className="flex-1 h-8 rounded-md text-[11.5px]" style={{ background: forest, color: cream }}>Open campaign</button>
-          </div>
-        </div>
-
-        {/* compare chip */}
-        <div className="hidden md:flex absolute right-6 bottom-6 items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px]"
-          style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.06)', color: ink }}>
-          Compare runs
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const Hotspot: React.FC<{ top: string; left: string }> = ({ top, left }) => (
-  <div className="absolute" style={{ top, left, transform: 'translate(-50%, -50%)' }}>
-    <span className="relative flex h-4 w-4 items-center justify-center">
-      <span className="absolute inline-flex h-full w-full rounded-full opacity-50 animate-ping" style={{ background: '#FFFFFF' }} />
-      <span className="relative inline-flex h-4 w-4 rounded-full items-center justify-center"
-        style={{ background: '#FFFFFF', border: '2px solid #1B2A1B' }}>
-        <span className="block w-1.5 h-1.5 rounded-full" style={{ background: '#1B2A1B' }} />
-      </span>
-    </span>
-  </div>
-);
 
 export default Index;
