@@ -184,15 +184,46 @@ serve(async (req) => {
 
       // Step 6: Send to provider API
       console.log(`Sending to ${provider.name}: ${run.quantity_to_send} items`)
-      
-      // Respect configured service minimum only
+
       let quantityToSend = run.quantity_to_send
       const serviceMinQty = Number(orderData.service.min_quantity || 0)
-      const effectiveMin = serviceMinQty > 0 ? serviceMinQty : quantityToSend
-      if (quantityToSend < effectiveMin) {
-        console.log(`📏 Boosting qty from ${quantityToSend} to configured min ${effectiveMin}`)
-        quantityToSend = effectiveMin
+      const mergedRunIds: string[] = []
+
+      // MERGE MODE: If this run is below provider's min, pull in the next pending
+      // sibling runs (same order) and combine quantities. This keeps organic
+      // splits looking natural in the UI while still satisfying provider minimums
+      // and avoiding over-delivery from blind boosting.
+      if (serviceMinQty > 0 && quantityToSend < serviceMinQty) {
+        const { data: siblings } = await supabase
+          .from('organic_run_schedule')
+          .select('id, quantity_to_send, run_number')
+          .eq('order_id', order.id)
+          .eq('status', 'pending')
+          .order('run_number', { ascending: true })
+
+        for (const sib of (siblings || [])) {
+          if (quantityToSend >= serviceMinQty) break
+          quantityToSend += Number(sib.quantity_to_send || 0)
+          mergedRunIds.push(sib.id)
+        }
+
+        if (quantityToSend < serviceMinQty) {
+          // Not enough remaining work to meet provider min — last-resort boost
+          console.log(`📏 Boosting qty from ${quantityToSend} to provider min ${serviceMinQty}`)
+          quantityToSend = serviceMinQty
+        } else if (mergedRunIds.length > 0) {
+          console.log(`🔗 Merged ${mergedRunIds.length} sibling run(s) → qty ${quantityToSend}`)
+          await supabase
+            .from('organic_run_schedule')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              error_message: `Merged into run #${run.run_number}`
+            })
+            .in('id', mergedRunIds)
+        }
       }
+
       
       const formData = new URLSearchParams()
       formData.append('key', provider.api_key)
