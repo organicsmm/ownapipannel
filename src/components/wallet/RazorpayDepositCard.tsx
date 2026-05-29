@@ -3,9 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Loader2, IndianRupee, ExternalLink, ArrowLeft,
-  CheckCircle2, ShieldCheck, Send,
-  ArrowRight, ImagePlus, Copy, Upload
+  Loader2,
+  IndianRupee,
+  ArrowLeft,
+  CheckCircle2,
+  Send,
+  ArrowRight,
+  QrCode,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -184,23 +189,23 @@ export default function RazorpayDepositCard() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'white', border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 2px 16px rgba(0,0,0,.04)' }}>
+      <div className="rounded-2xl overflow-hidden border border-border bg-background shadow-sm">
 
         {/* Progress bar */}
         <div className="flex gap-1 px-4 pt-3">
-          <div className="h-1 flex-1 rounded-full" style={{ background: '#16a34a' }} />
-          <div className="h-1 flex-1 rounded-full" style={{ background: ['pay_and_submit', 'done'].includes(step) ? '#16a34a' : 'rgba(0,0,0,.06)' }} />
-          <div className="h-1 flex-1 rounded-full" style={{ background: step === 'done' ? '#16a34a' : 'rgba(0,0,0,.06)' }} />
+          <div className="h-1 flex-1 rounded-full bg-primary" />
+          <div className={`h-1 flex-1 rounded-full ${['checkout', 'done'].includes(step) ? 'bg-primary' : 'bg-muted'}`} />
+          <div className={`h-1 flex-1 rounded-full ${step === 'done' ? 'bg-primary' : 'bg-muted'}`} />
         </div>
 
         {/* Header */}
-        <div className="p-5 pb-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(0,0,0,.04)' }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(22, 163, 74,.1)' }}>
-            <IndianRupee className="h-5 w-5" style={{ color: '#16a34a' }} />
+        <div className="flex items-center gap-3 border-b border-border p-5 pb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <IndianRupee className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-[16px] font-bold" style={{ color: '#1a1a2e' }}>UPI / Card Deposit</h2>
-            <p className="text-[10px] font-medium" style={{ color: '#16a34a' }}>Manual Verification • 5-10 min</p>
+            <h2 className="text-[16px] font-bold text-foreground">UPI / Card Deposit</h2>
+            <p className="text-[10px] font-medium text-primary">Instant wallet credit • Razorpay Checkout</p>
           </div>
         </div>
 
