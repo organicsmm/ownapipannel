@@ -164,35 +164,26 @@ export function ImportServicesDialog({ open, onOpenChange, onImportSuccess }: Im
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-          {/* Provider & Markup Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Provider</label>
-              <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                <SelectTrigger className="input-glass">
-                  <SelectValue placeholder="Choose a provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers?.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Markup %</label>
-              <Input
-                type="number"
-                value={markupPercent}
-                onChange={(e) => setMarkupPercent(parseInt(e.target.value) || 0)}
-                className="input-glass"
-                min={0}
-                max={500}
-              />
-            </div>
+          {/* Provider Selection — no markup. Admin sets per-1K price manually after import. */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Provider</label>
+            <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+              <SelectTrigger className="input-glass">
+                <SelectValue placeholder="Choose a provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providers?.map((provider) => (
+                  <SelectItem key={provider.id} value={provider.id}>
+                    {provider.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              💡 Import ke baad har service ka final per-1K price <strong>Admin → Services</strong> me set/edit karo.
+            </p>
           </div>
+
 
           {/* Search */}
           {selectedProvider && (
@@ -279,9 +270,10 @@ export function ImportServicesDialog({ open, onOpenChange, onImportSuccess }: Im
                             <td className="px-3 py-2 text-xs text-muted-foreground">
                               {service.category}
                             </td>
-                            <td className="px-3 py-2 text-sm font-medium text-success">
-                              ${(service.rate * (1 + markupPercent / 100)).toFixed(2)}
+                            <td className="px-3 py-2 text-sm font-medium text-muted-foreground">
+                              ${Number(service.rate).toFixed(2)} <span className="text-xs">(provider)</span>
                             </td>
+
                             <td className="px-3 py-2 text-xs text-muted-foreground">
                               {service.min.toLocaleString()} / {service.max.toLocaleString()}
                             </td>
