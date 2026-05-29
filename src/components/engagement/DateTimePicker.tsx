@@ -126,7 +126,7 @@ export function DateTimePicker({ value, onChange, minDate }: DateTimePickerProps
                 mode="single"
                 selected={selectedDate}
                 onSelect={handleDateSelect}
-                disabled={(date) => minDate ? date < minDate : date < new Date()}
+                disabled={(date) => minDate ? date < minDate : false}
                 initialFocus
                 className="pointer-events-auto"
               />
