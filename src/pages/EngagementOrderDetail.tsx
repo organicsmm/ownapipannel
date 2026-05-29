@@ -817,6 +817,14 @@ export default function EngagementOrderDetail() {
         {/* Real-Time Progress Chart */}
         <OrderProgressChart runs={stats.allRuns} perType={stats.perType} />
 
+        {/* Live Delivery Monitor — real-time stats from actual runs */}
+        <LiveBotMonitor
+          runs={stats.allRuns}
+          totalQuantity={stats.totalQuantity}
+          totalDelivered={stats.totalDelivered}
+          platform={(order.items?.[0]?.service?.category || 'instagram').toString().toLowerCase().split(' ')[0]}
+        />
+
         {/* Per-Type Breakdown with Real-Time History - Clickable cards */}
         <PerTypeBreakdown 
           types={stats.perType} 
