@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Package, Wallet, ListOrdered, Settings,
-  LifeBuoy, Shield, LogOut, Rocket, Sparkles, X, ChevronDown, Code2, Brain
+  LifeBuoy, Shield, LogOut, Rocket, Sparkles, X, ChevronDown, Code2, Brain,
+  KeyRound, Layers, Boxes
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency, CURRENCIES } from '@/hooks/useCurrency';
@@ -117,6 +118,29 @@ export function Sidebar({ onClose }: SidebarProps) {
             </Link>
           </>
         )}
+        {/* My Provider section (per-user) */}
+        <div className="my-4 mx-3 border-t border-sidebar-border" />
+        <p className="px-3 mb-2 lux-eyebrow">:my provider</p>
+        {[
+          { icon: KeyRound, label: 'My Providers', path: '/my-providers' },
+          { icon: Layers, label: 'My Services', path: '/my-services' },
+          { icon: Boxes, label: 'My Bundles', path: '/my-bundles' },
+        ].map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Link key={item.path} to={item.path} onClick={onClose}
+              className={cn(
+                'group flex items-center gap-3 h-10 px-3 mb-0.5 text-[12.5px] font-medium transition-all rounded-md',
+                isActive ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+              )}
+            >
+              <span className={cn('w-[2px] h-5 rounded-full', isActive ? 'bg-primary' : 'bg-transparent')} />
+              <item.icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} />
+              <span className="flex-1">{item.label}</span>
+              <span className="font-mono text-[8px] tracking-[0.15em] px-1.5 py-0.5 rounded-sm border border-primary/30 text-primary">PRO</span>
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Currency */}
