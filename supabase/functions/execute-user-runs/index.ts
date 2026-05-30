@@ -10,6 +10,9 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+const TERMINAL_OK = ["completed", "complete", "success", "partial"];
+const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
+
 async function recomputeStatuses(itemId: string, engOrderId: string) {
   const { data: runs } = await supabase
     .from("organic_run_schedule")
@@ -42,18 +45,142 @@ async function recomputeStatuses(itemId: string, engOrderId: string) {
   await supabase.from("engagement_orders").update({ status: s }).eq("id", engOrderId).neq("status", "cancelled");
 }
 
+// ===== POLL STARTED RUNS (check real provider status) =====
+async function pollStartedRuns() {
+  let polled = 0, finished = 0, stillRunning = 0, reFailed = 0;
+
+  const { data: startedRuns } = await supabase
+    .from("organic_run_schedule")
+    .select(`
+      id, run_number, quantity_to_send, provider_order_id, provider_account_id, provider_status, retry_count, started_at,
+      engagement_order_item:engagement_order_items!inner(
+        id, engagement_type, status,
+        engagement_order:engagement_orders!inner(id, status, use_user_api)
+      )
+    `)
+    .eq("status", "started")
+    .not("provider_order_id", "is", null)
+    .not("provider_account_id", "is", null)
+    .eq("engagement_order_item.engagement_order.use_user_api", true)
+    .limit(100);
+
+  for (const run of (startedRuns || [])) {
+    const item = (run as any).engagement_order_item;
+    const eo = item?.engagement_order;
+    if (!eo || !item) continue;
+    if (eo.status === "cancelled" || item.status === "cancelled") {
+      await supabase.from("organic_run_schedule").update({
+        status: "cancelled",
+        error_message: "Order cancelled by user",
+        completed_at: new Date().toISOString(),
+        last_status_check: new Date().toISOString(),
+      }).eq("id", run.id);
+      continue;
+    }
+
+    // Look up the user_provider_account used for this run
+    const { data: acc } = await supabase
+      .from("user_provider_accounts")
+      .select("id, api_url, api_key, name")
+      .eq("id", (run as any).provider_account_id)
+      .maybeSingle();
+    if (!acc) continue;
+
+    try {
+      const form = new URLSearchParams();
+      form.append("key", acc.api_key);
+      form.append("action", "status");
+      form.append("order", String(run.provider_order_id));
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 15000);
+      const resp = await fetch(acc.api_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      const text = await resp.text();
+      let result: any;
+      try { result = JSON.parse(text); } catch { result = { error: text }; }
+      polled++;
+
+      if (result?.error) {
+        await supabase.from("organic_run_schedule").update({
+          last_status_check: new Date().toISOString(),
+          provider_response: result,
+        }).eq("id", run.id);
+        stillRunning++;
+        continue;
+      }
+
+      const providerStatus = String(result.status || "").toLowerCase();
+      const startCount = parseInt(result.start_count) || null;
+      const remains = parseInt(result.remains);
+      const remainsNum = isNaN(remains) ? null : remains;
+      const charge = parseFloat(result.charge) || null;
+
+      const tracking: any = {
+        provider_status: result.status,
+        provider_start_count: startCount,
+        provider_remains: remainsNum,
+        provider_charge: charge,
+        provider_response: result,
+        last_status_check: new Date().toISOString(),
+      };
+
+      if (TERMINAL_OK.includes(providerStatus) || (remainsNum === 0 && !TERMINAL_BAD.includes(providerStatus))) {
+        await supabase.from("organic_run_schedule").update({
+          ...tracking,
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          error_message: providerStatus === "partial" ? `Partial: ${remainsNum ?? 0} remaining` : null,
+        }).eq("id", run.id);
+        finished++;
+        await recomputeStatuses(item.id, eo.id);
+      } else if (TERMINAL_BAD.includes(providerStatus)) {
+        // Provider cancelled / refunded / failed
+        await supabase.from("organic_run_schedule").update({
+          ...tracking,
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: `Provider ${result.status}`,
+        }).eq("id", run.id);
+        reFailed++;
+        await recomputeStatuses(item.id, eo.id);
+      } else {
+        // Still pending / in progress / processing
+        await supabase.from("organic_run_schedule").update(tracking).eq("id", run.id);
+        stillRunning++;
+      }
+    } catch (e: any) {
+      await supabase.from("organic_run_schedule").update({
+        last_status_check: new Date().toISOString(),
+        error_message: `Status check network: ${e?.message || "unknown"}`,
+      }).eq("id", run.id);
+      stillRunning++;
+    }
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  return { polled, finished, stillRunning, reFailed };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // Auth: anon or service key allowed (for cron/self-trigger); user JWTs also OK
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 1) POLL existing started runs first — check real provider status
+    const pollStats = await pollStartedRuns();
+
     const nowIso = new Date().toISOString();
-    // Pull due pending runs for engagement orders with use_user_api=true
+    // 2) Pull due pending runs for user-API engagement orders
     const { data: dueRuns, error } = await supabase
       .from("organic_run_schedule")
       .select(`
@@ -87,7 +214,6 @@ Deno.serve(async (req) => {
       }
       if (eo.status === "paused" || item.status === "paused") { skipped++; continue; }
 
-      // Find bundle item for this engagement_type
       const { data: bi } = await supabase
         .from("user_bundle_items")
         .select("id, provider_service_id, user_provider_account_id")
@@ -101,7 +227,6 @@ Deno.serve(async (req) => {
         failed++; continue;
       }
 
-      // Build provider rotation list (priority asc); fallback to bi.user_provider_account_id if no mappings
       const { data: mappings } = await supabase
         .from("user_bundle_item_providers")
         .select("priority, provider_service_id, user_provider_accounts(id, api_url, api_key, is_active, name)")
@@ -129,7 +254,6 @@ Deno.serve(async (req) => {
         failed++; continue;
       }
 
-      // Claim the run
       const { data: locked, error: lockErr } = await supabase
         .from("organic_run_schedule")
         .update({ status: "started", started_at: new Date().toISOString(), provider_account_name: candidates[0].provider.name })
@@ -139,11 +263,10 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (lockErr || !locked) { skipped++; continue; }
 
-      // Try each candidate in priority order until one succeeds
       let success = false;
       let lastErr = "";
       let lastResult: any = null;
-      let usedProviderName = candidates[0].provider.name;
+      let usedProvider: any = candidates[0].provider;
       let usedOrderId: string | null = null;
 
       for (const cand of candidates) {
@@ -173,7 +296,7 @@ Deno.serve(async (req) => {
             lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
             continue;
           }
-          usedProviderName = cand.provider.name;
+          usedProvider = cand.provider;
           usedOrderId = (result.order ?? result.id)?.toString() || null;
           success = true;
           break;
@@ -183,12 +306,15 @@ Deno.serve(async (req) => {
       }
 
       if (success) {
+        // IMPORTANT: keep status='started' until provider reports real completion
         await supabase.from("organic_run_schedule").update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
+          status: "started",
           provider_order_id: usedOrderId,
-          provider_account_name: usedProviderName,
+          provider_account_id: usedProvider.id,
+          provider_account_name: usedProvider.name,
+          provider_status: "Pending",
           provider_response: lastResult,
+          last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
         processed++;
       } else {
@@ -196,6 +322,7 @@ Deno.serve(async (req) => {
           status: "failed",
           error_message: lastErr || "All providers failed",
           provider_response: lastResult,
+          completed_at: new Date().toISOString(),
         }).eq("id", run.id);
         failed++;
       }
@@ -203,11 +330,11 @@ Deno.serve(async (req) => {
       await recomputeStatuses(item.id, eo.id);
     }
 
-    // Self-trigger if more runs are pending in the near future (any user-API order)
+    // Self-trigger to keep polling if anything is still running or upcoming
     const { data: upcoming } = await supabase
       .from("organic_run_schedule")
       .select("id, engagement_order_item:engagement_order_items!inner(engagement_order:engagement_orders!inner(use_user_api,status))")
-      .eq("status", "pending")
+      .in("status", ["pending", "started"])
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .not("engagement_order_item.engagement_order.status", "in", '("cancelled","completed")')
       .limit(1);
@@ -231,7 +358,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, processed, failed, skipped, due: (dueRuns || []).length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      success: true,
+      processed,
+      failed,
+      skipped,
+      due: (dueRuns || []).length,
+      polled: pollStats,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("execute-user-runs error:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
