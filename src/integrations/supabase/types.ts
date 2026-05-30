@@ -1131,9 +1131,15 @@ export type Database = {
           engagement_type: string
           id: string
           is_base: boolean | null
+          max_qty: number | null
+          min_qty: number | null
+          provider_service_id: string | null
+          rate: number | null
           ratio_percent: number | null
+          service_name: string | null
           sort_order: number | null
           user_bundle_id: string
+          user_provider_account_id: string | null
           user_service_id: string | null
         }
         Insert: {
@@ -1144,9 +1150,15 @@ export type Database = {
           engagement_type: string
           id?: string
           is_base?: boolean | null
+          max_qty?: number | null
+          min_qty?: number | null
+          provider_service_id?: string | null
+          rate?: number | null
           ratio_percent?: number | null
+          service_name?: string | null
           sort_order?: number | null
           user_bundle_id: string
+          user_provider_account_id?: string | null
           user_service_id?: string | null
         }
         Update: {
@@ -1157,9 +1169,15 @@ export type Database = {
           engagement_type?: string
           id?: string
           is_base?: boolean | null
+          max_qty?: number | null
+          min_qty?: number | null
+          provider_service_id?: string | null
+          rate?: number | null
           ratio_percent?: number | null
+          service_name?: string | null
           sort_order?: number | null
           user_bundle_id?: string
+          user_provider_account_id?: string | null
           user_service_id?: string | null
         }
         Relationships: [
@@ -1168,6 +1186,13 @@ export type Database = {
             columns: ["user_bundle_id"]
             isOneToOne: false
             referencedRelation: "user_bundles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_bundle_items_user_provider_account_id_fkey"
+            columns: ["user_provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_provider_accounts"
             referencedColumns: ["id"]
           },
           {

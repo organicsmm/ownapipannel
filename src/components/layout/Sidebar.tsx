@@ -123,7 +123,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         <p className="px-3 mb-2 lux-eyebrow">:my provider</p>
         {[
           { icon: KeyRound, label: 'My Providers', path: '/my-providers' },
-          { icon: Layers, label: 'My Services', path: '/my-services' },
+          
           { icon: Boxes, label: 'My Bundles', path: '/my-bundles' },
         ].map((item) => {
           const isActive = location.pathname === item.path;

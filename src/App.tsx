@@ -26,7 +26,7 @@ import Support from "./pages/Support";
 import ApiAccess from "./pages/ApiAccess";
 import Intelligence from "./pages/Intelligence";
 import MyProviders from "./pages/MyProviders";
-import MyServices from "./pages/MyServices";
+
 import MyBundles from "./pages/MyBundles";
 
 // Engagement pages
@@ -119,7 +119,7 @@ const App = () => {
 
                     {/* My Provider (per-user API system) */}
                     <Route path="/my-providers" element={<MyProviders />} />
-                    <Route path="/my-services" element={<MyServices />} />
+                    
                     <Route path="/my-bundles" element={<MyBundles />} />
 
                     {/* Engagement */}
