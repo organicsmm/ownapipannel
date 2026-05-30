@@ -54,9 +54,11 @@ function Inner() {
     queryKey: ["user-bundles", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("user_bundles")
         .select("*, user_bundle_items(*, user_provider_accounts(id, name), user_bundle_item_providers(id))")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -149,7 +151,7 @@ function BundleCard({ bundle }: { bundle: any }) {
 
   const deleteBundle = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("user_bundles").delete().eq("id", bundle.id);
+      const { error } = await supabase.from("user_bundles").delete().eq("id", bundle.id).eq("user_id", bundle.user_id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -160,7 +162,7 @@ function BundleCard({ bundle }: { bundle: any }) {
 
   const toggleField = useMutation({
     mutationFn: async (patch: any) => {
-      const { error } = await supabase.from("user_bundles").update(patch).eq("id", bundle.id);
+      const { error } = await supabase.from("user_bundles").update(patch).eq("id", bundle.id).eq("user_id", bundle.user_id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
