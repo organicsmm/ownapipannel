@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Menu, LayoutGrid, Rocket, ListOrdered, Wallet as WalletIcon } from 'lucide-react';
+import { Menu, LayoutGrid, Rocket, ListOrdered, Boxes } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 
 const bottomItems = [
   { to: '/dashboard', label: 'Home', icon: LayoutGrid },
   { to: '/engagement-order', label: 'Engage', icon: Rocket },
   { to: '/engagement-orders', label: 'Orders', icon: ListOrdered },
-  { to: '/wallet', label: 'Wallet', icon: WalletIcon },
+  { to: '/my-bundles', label: 'Bundles', icon: Boxes },
 ];
 
 export function MobileBottomNav() {
