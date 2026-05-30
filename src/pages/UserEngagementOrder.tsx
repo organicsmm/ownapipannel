@@ -20,7 +20,7 @@ import {
 } from "@/lib/engagement-types";
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
-import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
+
 import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
 import { useDebounce } from "@/hooks/useDebounce";
 
