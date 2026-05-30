@@ -106,9 +106,10 @@ export function Sidebar({ onClose }: SidebarProps) {
             </Link>
           </>
         )}
-        {/* My Provider section (per-user) */}
+        {/* My Provider section (per-user) — only for active subscribers / admin */}
+        {canUsePro && (<>
         <div className="my-4 mx-3 border-t border-sidebar-border" />
-        <p className="px-3 mb-2 lux-eyebrow">:my provider</p>
+        <p className="px-3 mb-2 lux-eyebrow">:my provider</p></>)}
         {[
           { icon: KeyRound, label: 'My Providers', path: '/my-providers' },
           
