@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
       const providerMin = Math.max(1, Number(bi.min_qty || 1));
-      const batchCap = Math.max(c.batchCap, providerMin);
+      let batchCap = Math.max(c.batchCap, providerMin);
       const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
 
       let targetRuns: number;
@@ -168,19 +168,26 @@ Deno.serve(async (req) => {
         const totalMinutes = time_limit_hours * 60;
         const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
         const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
-        targetRuns = Math.min(ideal, maxFeasible, Math.max(1, Math.floor(totalMinutes / 5)));
+        const comfortableMax = quantity > providerMin
+          ? Math.max(1, Math.floor(quantity / Math.max(providerMin + 1, providerMin * 1.2)))
+          : 1;
+        targetRuns = Math.min(ideal, maxFeasible, comfortableMax, Math.max(1, Math.floor(totalMinutes / 5)));
         if (targetRuns < 1) targetRuns = 1;
         intervalMinutes = totalMinutes / targetRuns;
       } else if (is_organic_mode) {
         const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
         const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
-        targetRuns = Math.min(ideal, maxFeasible);
+        const comfortableMax = quantity > providerMin
+          ? Math.max(1, Math.floor(quantity / Math.max(providerMin + 1, providerMin * 1.2)))
+          : 1;
+        targetRuns = Math.min(ideal, maxFeasible, comfortableMax);
         if (targetRuns < 1) targetRuns = 1;
         intervalMinutes = c.baseInterval;
       } else {
         targetRuns = Math.max(1, Math.ceil(quantity / batchCap));
         intervalMinutes = c.baseInterval;
       }
+      batchCap = Math.max(batchCap, Math.ceil((quantity / Math.max(1, targetRuns)) * 2));
 
       const entries: any[] = [];
       let remaining = quantity;
@@ -191,7 +198,9 @@ Deno.serve(async (req) => {
         // Apply user variance to per-run quantity
         const varianceFactor = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : 1;
         let qty = Math.round(baseQty * varianceFactor);
-        qty = Math.max(providerMin, Math.min(qty, remaining, batchCap));
+        const minNeededAfter = (runsLeft - 1) * providerMin;
+        const maxAllowedNow = Math.max(providerMin, remaining - minNeededAfter);
+        qty = Math.max(providerMin, Math.min(qty, maxAllowedNow, batchCap));
         if (i === targetRuns) qty = remaining;
 
         // Peak hours: bias toward 6-11pm IST (UTC+5:30) — shift scheduled_at slightly into peak window
@@ -223,6 +232,16 @@ Deno.serve(async (req) => {
         entries[entries.length - 1].quantity_to_send += remaining;
         entries[entries.length - 1].base_quantity += remaining;
       }
+
+      for (let idx = entries.length - 1; idx >= 0; idx--) {
+        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < providerMin && entries.length > 1) {
+          const targetIdx = idx > 0 ? idx - 1 : 1;
+          entries[targetIdx].quantity_to_send += entries[idx].quantity_to_send;
+          entries[targetIdx].base_quantity += entries[idx].base_quantity;
+          entries.splice(idx, 1);
+        }
+      }
+      entries.forEach((entry, idx) => { entry.run_number = idx + 1; });
 
       if (entries.length > 0) {
         const { error: schedErr } = await supabase.from("organic_run_schedule").insert(entries);
