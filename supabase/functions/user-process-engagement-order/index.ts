@@ -40,7 +40,15 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { user_bundle_id, link, base_quantity, items, is_organic_mode = true } = body as {
       user_bundle_id: string; link: string; base_quantity: number;
-      items: Array<{ user_bundle_item_id: string; engagement_type: string; quantity: number; price: number }>;
+      items: Array<{
+        user_bundle_item_id: string;
+        engagement_type: string;
+        quantity: number;
+        price: number;
+        time_limit_hours?: number;       // 0 = Auto
+        variance_percent?: number;        // 10-50
+        peak_hours_enabled?: boolean;
+      }>;
       is_organic_mode?: boolean;
     };
 
