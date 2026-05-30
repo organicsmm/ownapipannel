@@ -75,6 +75,10 @@ function Inner() {
     if (!bundleId && bundles && bundles.length > 0) setBundleId(bundles[0].id);
   }, [bundles, bundleId]);
 
+  const bundle = useMemo(() => bundles?.find((b: any) => b.id === bundleId), [bundles, bundleId]);
+  const platform = (bundle?.platform || "instagram") as 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook';
+  const items = bundle?.user_bundle_items || [];
+
   // Auto-refresh service metadata (min/max/rate) from provider when a bundle is selected
   // so stale DB values don't block the user (e.g. provider lowered min from 100 to 10).
   useEffect(() => {
@@ -130,10 +134,6 @@ function Inner() {
     })();
     return () => { cancelled = true; };
   }, [bundle?.id, user?.id, qc]);
-
-  const bundle = useMemo(() => bundles?.find((b: any) => b.id === bundleId), [bundles, bundleId]);
-  const platform = (bundle?.platform || "instagram") as 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook';
-  const items = bundle?.user_bundle_items || [];
 
   const activeEngagementTypes = useMemo<EngagementType[]>(() => {
     const types = items
