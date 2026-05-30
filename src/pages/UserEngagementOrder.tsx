@@ -293,32 +293,21 @@ function Inner() {
 
 
 
-      {/* Order Summary */}
+      {/* Place Order */}
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-1 sm:space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary">${totalPrice.toFixed(4)}</span>
-                <span className="text-muted-foreground text-xs sm:text-sm">total (provider)</span>
-              </div>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                {totalQty.toLocaleString()} engagements • aapke provider balance se katenge
-              </p>
-            </div>
-            <Button
-              size="lg"
-              onClick={() => place.mutate()}
-              disabled={!bundle || !link.trim() || place.isPending || totalQty === 0}
-              className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-bold rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
-            >
-              {place.isPending ? (
-                <><Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" /> Processing...</>
-              ) : (
-                <><Rocket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Place Order — ${totalPrice.toFixed(4)}</>
-              )}
-            </Button>
-          </div>
+        <CardContent className="p-4 sm:p-6 flex justify-center">
+          <Button
+            size="lg"
+            onClick={() => place.mutate()}
+            disabled={!bundle || !link.trim() || place.isPending || totalQty === 0}
+            className="w-full sm:w-auto h-12 sm:h-14 px-8 sm:px-12 text-base sm:text-lg font-bold rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
+          >
+            {place.isPending ? (
+              <><Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" /> Processing...</>
+            ) : (
+              <><Rocket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Place Order</>
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>
