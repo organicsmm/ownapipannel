@@ -187,6 +187,35 @@ function Inner() {
 
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-6 lg:px-8 space-y-3 sm:space-y-6 pb-8">
+      {/* Page Intro */}
+      <Card className="glass-card border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-transparent to-primary/5">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Rocket className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground">
+                Engagement Order Banao
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
+                Apne saved bundle se ek hi link par multiple services (views, likes, comments, followers…)
+                ek saath organic pattern me deliver karwao. Niche steps follow karo:
+              </p>
+              <ol className="mt-3 space-y-1.5 text-xs sm:text-sm text-foreground/90 list-decimal list-inside">
+                <li><span className="font-semibold">Bundle select</span> karo — jisme tumne apne provider services link kiye hain.</li>
+                <li><span className="font-semibold">Video / Post ka link</span> daalo jis par engagement chahiye.</li>
+                <li><span className="font-semibold">Base quantity</span> set karo (jaise views = 10,000). Baaki ratio auto adjust hoga.</li>
+                <li>Har engagement type ki <span className="font-semibold">timing &amp; variance</span> customize karo, fir <span className="font-semibold">Place Order</span> dabao.</li>
+              </ol>
+              <p className="text-[11px] sm:text-xs text-muted-foreground mt-3">
+                💡 Tip: Pehli baar use kar rahe ho to <a href="/my-bundles" className="underline text-primary font-medium">My Bundles</a> page se ek bundle banao aur provider services link karo.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Bundle Selector */}
       <Card className="glass-card border-2 border-border">
         <CardContent className="p-4 sm:p-6">
