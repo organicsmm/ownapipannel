@@ -231,26 +231,27 @@ export function EngagementTypeCard({
     if (qtyTimerRef.current) clearTimeout(qtyTimerRef.current);
 
     qtyTimerRef.current = setTimeout(() => {
-      const quantity = parseInt(cleaned) || 0;
+      const quantity = Math.max(providerMin, parseInt(cleaned) || 0);
       const effectivePricePerK = pricePerK > 0
         ? pricePerK
         : (config.quantity > 0 ? (config.price * 1000) / config.quantity : 0);
       const newPrice = effectivePricePerK > 0 ? (quantity / 1000) * effectivePricePerK : 0;
+      setLocalQtyValue(quantity.toString());
       onChange({ ...config, quantity, price: newPrice });
     }, 500);
-  }, [pricePerK, config, onChange]);
+  }, [pricePerK, config, onChange, providerMin]);
 
   const handleQuantityBlur = useCallback(() => {
     if (qtyTimerRef.current) clearTimeout(qtyTimerRef.current);
     isQtyTypingRef.current = false;
-    const quantity = parseInt(localQtyValue) || 0;
+    const quantity = Math.max(providerMin, parseInt(localQtyValue) || 0);
     const effectivePricePerK = pricePerK > 0
       ? pricePerK
       : (config.quantity > 0 ? (config.price * 1000) / config.quantity : 0);
     const newPrice = effectivePricePerK > 0 ? (quantity / 1000) * effectivePricePerK : 0;
     setLocalQtyValue(quantity.toString());
     onChange({ ...config, quantity, price: newPrice });
-  }, [localQtyValue, pricePerK, config, onChange]);
+  }, [localQtyValue, pricePerK, config, onChange, providerMin]);
 
   const handleTimeLimitChange = (value: number) => {
     // -1 means "Custom" button was clicked - enter custom mode
