@@ -292,81 +292,9 @@ function AddOrShowChip({ bundleId, type, alreadyAdded, isFirst }: { bundleId: st
 
 function ItemRow({ item, isBase }: { item: any; isBase: boolean }) {
   const qc = useQueryClient();
-  const [sid, setSid] = useState(item.provider_service_id || "");
-  const [providerId, setProviderId] = useState(item.user_provider_account_id || "");
   const [rotateOpen, setRotateOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
   const linked = !!item.provider_service_id && !!item.user_provider_account_id;
   const providerCount = (item.user_bundle_item_providers || []).length;
-
-  const { data: providers } = useQuery({
-    queryKey: ["user-providers-min"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("user_provider_accounts")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      return data || [];
-    },
-  });
-
-  const link = async () => {
-    if (!providerId) { toast.error("Apna provider account choose karo"); return; }
-    if (!sid.trim()) { toast.error("Service ID enter karo"); return; }
-    setImporting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("user-import-services", {
-        body: { providerAccountId: providerId, service_ids: [sid.trim()], fetch_only: true },
-      });
-      if (error) {
-        let realMsg = error.message;
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx && typeof ctx.json === "function") {
-            const body = await ctx.json();
-            if (body?.error) realMsg = body.error;
-          }
-        } catch {}
-        throw new Error(realMsg);
-      }
-      const svc = (data as any)?.services?.[0];
-      if (!svc) throw new Error(`Service ID "${sid.trim()}" provider ki list me nahi mili. Check karo ki ID sahi hai aur provider account active hai.`);
-
-      const { error: upErr } = await supabase
-        .from("user_bundle_items")
-        .update({
-          user_provider_account_id: providerId,
-          provider_service_id: sid.trim(),
-          service_name: svc.name,
-          rate: svc.rate,
-          min_qty: svc.min,
-          max_qty: svc.max,
-        })
-        .eq("id", item.id);
-      if (upErr) throw upErr;
-
-      // Also create primary rotation entry if none exists
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("user_bundle_item_providers").upsert({
-          user_id: user.id,
-          user_bundle_item_id: item.id,
-          user_provider_account_id: providerId,
-          provider_service_id: sid.trim(),
-          priority: 1,
-          is_active: true,
-        }, { onConflict: "user_bundle_item_id,user_provider_account_id" });
-      }
-
-      toast.success("Service linked");
-      qc.invalidateQueries({ queryKey: ["user-bundles"] });
-    } catch (e: any) {
-      toast.error(e.message || "Link failed");
-    } finally {
-      setImporting(false);
-    }
-  };
 
   const unlink = useMutation({
     mutationFn: async () => {
@@ -424,19 +352,16 @@ function ItemRow({ item, isBase }: { item: any; isBase: boolean }) {
           </div>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-[1fr_140px_auto] gap-2">
-          <Select value={providerId} onValueChange={setProviderId}>
-            <SelectTrigger><SelectValue placeholder="Provider account" /></SelectTrigger>
-            <SelectContent>
-              {(providers || []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Input placeholder="Service ID" value={sid} onChange={(e) => setSid(e.target.value)} />
-          <Button size="sm" onClick={link} disabled={importing || !providerId || !sid.trim()}>
-            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Link"}
+        <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/30 rounded-md p-2">
+          <div className="text-xs text-muted-foreground">
+            Provider account + Service ID add karne ke liye <b>Provider</b> button dabao.
+          </div>
+          <Button size="sm" onClick={() => setRotateOpen(true)}>
+            <Globe className="w-3 h-3 mr-1" /> Provider
           </Button>
         </div>
       )}
+
 
       <UserProviderRotationDialog
         open={rotateOpen}
