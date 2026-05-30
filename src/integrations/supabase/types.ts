@@ -1122,6 +1122,57 @@ export type Database = {
           },
         ]
       }
+      user_bundle_item_providers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          provider_service_id: string
+          updated_at: string
+          user_bundle_item_id: string
+          user_id: string
+          user_provider_account_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          provider_service_id: string
+          updated_at?: string
+          user_bundle_item_id: string
+          user_id: string
+          user_provider_account_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          provider_service_id?: string
+          updated_at?: string
+          user_bundle_item_id?: string
+          user_id?: string
+          user_provider_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_bundle_item_providers_user_bundle_item_id_fkey"
+            columns: ["user_bundle_item_id"]
+            isOneToOne: false
+            referencedRelation: "user_bundle_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_bundle_item_providers_user_provider_account_id_fkey"
+            columns: ["user_provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_provider_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_bundle_items: {
         Row: {
           created_at: string
