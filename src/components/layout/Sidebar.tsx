@@ -16,10 +16,6 @@ const userNavItems = [
   { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW' },
   { icon: Brain, label: 'AI Intelligence', path: '/intelligence', tag: 'AI' },
   { icon: Sparkles, label: 'Engagement Orders', path: '/engagement-orders' },
-  { icon: ShoppingCart, label: 'Single Order', path: '/order' },
-  { icon: ListOrdered, label: 'Single Orders', path: '/orders' },
-  { icon: Package, label: 'Services', path: '/services' },
-  { icon: Wallet, label: 'Wallet', path: '/wallet' },
   { icon: Code2, label: 'API Access', path: '/api-access' },
   { icon: LifeBuoy, label: 'Support', path: '/support' },
   { icon: Settings, label: 'Settings', path: '/settings' },
@@ -27,8 +23,8 @@ const userNavItems = [
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
-  const { isAdmin, signOut, wallet, profile } = useAuth();
-  const { currency, setCurrency, formatPrice, currencyInfo } = useCurrency();
+  const { isAdmin, signOut, profile } = useAuth();
+  const { currency, setCurrency, currencyInfo } = useCurrency();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   return (
@@ -49,10 +45,10 @@ export function Sidebar({ onClose }: SidebarProps) {
         </button>
       </div>
 
-      {/* Profile + Wallet — minimal */}
+      {/* Profile */}
       {profile && (
         <div className="mx-5 mb-5 pb-5 border-b border-sidebar-border">
-          <div className="flex items-center gap-2.5 mb-4">
+          <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-[11px] font-medium bg-secondary text-foreground">
               {profile.full_name?.[0]?.toUpperCase() || 'U'}
             </div>
@@ -60,17 +56,6 @@ export function Sidebar({ onClose }: SidebarProps) {
               <p className="text-[12px] font-medium truncate text-foreground">{profile.full_name || 'User'}</p>
               <p className="text-[10px] truncate text-muted-foreground font-mono">{profile.email}</p>
             </div>
-          </div>
-
-          <div>
-            <p className="lux-eyebrow mb-1.5">:balance</p>
-            <div className="flex items-baseline justify-between mb-3">
-              <span className="font-serif text-[28px] leading-none text-foreground">{formatPrice(wallet?.balance || 0)}</span>
-            </div>
-            <Link to="/wallet" onClick={onClose}
-              className="w-full inline-flex items-center justify-center gap-1.5 h-9 text-[11px] font-medium uppercase tracking-[0.15em] rounded-md border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground transition-colors">
-              Add Funds →
-            </Link>
           </div>
         </div>
       )}
