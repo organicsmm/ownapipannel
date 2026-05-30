@@ -319,9 +319,19 @@ function ItemRow({ item, isBase }: { item: any; isBase: boolean }) {
       const { data, error } = await supabase.functions.invoke("user-import-services", {
         body: { providerAccountId: providerId, service_ids: [sid.trim()], fetch_only: true },
       });
-      if (error) throw error;
+      if (error) {
+        let realMsg = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            if (body?.error) realMsg = body.error;
+          }
+        } catch {}
+        throw new Error(realMsg);
+      }
       const svc = (data as any)?.services?.[0];
-      if (!svc) throw new Error("Service nahi mili provider par");
+      if (!svc) throw new Error(`Service ID "${sid.trim()}" provider ki list me nahi mili. Check karo ki ID sahi hai aur provider account active hai.`);
 
       const { error: upErr } = await supabase
         .from("user_bundle_items")
