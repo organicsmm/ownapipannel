@@ -134,7 +134,7 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
         })
         .eq("id", itemId);
       if (updErr) throw updErr;
-
+    },
     onSuccess: () => {
       toast.success("Provider rotation saved");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
