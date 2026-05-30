@@ -110,7 +110,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         {canUsePro && (<>
         <div className="my-4 mx-3 border-t border-sidebar-border" />
         <p className="px-3 mb-2 lux-eyebrow">:my provider</p></>)}
-        {[
+        {canUsePro && [
           { icon: KeyRound, label: 'My Providers', path: '/my-providers' },
           
           { icon: Boxes, label: 'My Bundles', path: '/my-bundles' },
