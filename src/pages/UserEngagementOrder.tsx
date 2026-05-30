@@ -20,7 +20,7 @@ import {
 } from "@/lib/engagement-types";
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
-import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
+
 import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -291,13 +291,7 @@ function Inner() {
         />
       )}
 
-      {activeEngagementTypes.length > 0 && (
-        <DeliveryPreview
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          platform={platform}
-        />
-      )}
+
 
       {/* Order Summary */}
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
