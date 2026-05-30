@@ -21,7 +21,7 @@ import {
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
 
-import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
+
 import { useDebounce } from "@/hooks/useDebounce";
 
 type EngagementConfigs = Record<string, EngagementConfig>;
