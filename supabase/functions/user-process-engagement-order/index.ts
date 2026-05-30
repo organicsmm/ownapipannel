@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     for (const bi of (bundle.user_bundle_items || [])) itemMap.set(bi.id, bi);
 
     // Validate every requested item
-    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number }> = [];
+    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
     for (const it of items) {
       const bi = itemMap.get(it.user_bundle_item_id);
       if (!bi) return new Response(JSON.stringify({ error: `Bundle item ${it.user_bundle_item_id} not found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -89,7 +89,15 @@ Deno.serve(async (req) => {
       if (maxQ > 0 && it.quantity > maxQ) {
         return new Response(JSON.stringify({ error: `${bi.engagement_type} above provider max ${maxQ}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      resolved.push({ bi, engagement_type: it.engagement_type, quantity: it.quantity, price: Number(it.price || 0) });
+      resolved.push({
+        bi,
+        engagement_type: it.engagement_type,
+        quantity: it.quantity,
+        price: Number(it.price || 0),
+        time_limit_hours: Math.max(0, Number(it.time_limit_hours || 0)),
+        variance_percent: Math.min(50, Math.max(0, Number(it.variance_percent ?? 25))),
+        peak_hours_enabled: !!it.peak_hours_enabled,
+      });
     }
 
     const total_price = resolved.reduce((s, r) => s + r.price, 0);
