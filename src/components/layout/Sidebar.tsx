@@ -66,7 +66,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-thin">
         <p className="px-3 mb-2 lux-eyebrow">:menu</p>
-        {userNavItems.map((item) => {
+        {userNavItems.filter((it) => !it.requiresSub || canUsePro).map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link key={item.path} to={item.path} onClick={onClose}
