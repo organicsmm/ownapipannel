@@ -292,24 +292,10 @@ function AddOrShowChip({ bundleId, type, alreadyAdded, isFirst }: { bundleId: st
 
 function ItemRow({ item, isBase }: { item: any; isBase: boolean }) {
   const qc = useQueryClient();
-  const [sid, setSid] = useState(item.provider_service_id || "");
-  const [providerId, setProviderId] = useState(item.user_provider_account_id || "");
   const [rotateOpen, setRotateOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
   const linked = !!item.provider_service_id && !!item.user_provider_account_id;
   const providerCount = (item.user_bundle_item_providers || []).length;
 
-  const { data: providers } = useQuery({
-    queryKey: ["user-providers-min"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("user_provider_accounts")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      return data || [];
-    },
-  });
 
   const link = async () => {
     if (!providerId) { toast.error("Apna provider account choose karo"); return; }
