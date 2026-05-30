@@ -94,7 +94,9 @@ function Inner() {
         if (!item) return;
         const ratio = DEFAULT_RATIOS[type] ?? 100;
         const isBase = type === "views" || item.is_base;
-        const qty = isBase ? debouncedBase : Math.max(1, Math.round(debouncedBase * (ratio / 100)));
+        const minQty = Number(item.min_qty || 0) || 1;
+        const rawQty = isBase ? debouncedBase : Math.round(debouncedBase * (ratio / 100));
+        const qty = Math.max(minQty, rawQty);
         const rate = Number(item.rate || 0);
         const price = (qty / 1000) * rate;
         next[type] = {
@@ -103,7 +105,7 @@ function Inner() {
           quantity: prev[type]?.quantity && !isBase ? prev[type].quantity : qty,
           price: prev[type]?.quantity && !isBase ? (prev[type].quantity / 1000) * rate : price,
           serviceId: item.id, // we send user_bundle_item_id as identifier
-          minQuantity: Number(item.min_qty || 0) || undefined,
+          minQuantity: minQty,
           timeLimitHours: prev[type]?.timeLimitHours ?? DEFAULT_ORGANIC_SETTINGS.timeLimitHours,
           variancePercent: prev[type]?.variancePercent ?? DEFAULT_ORGANIC_SETTINGS.variancePercent,
           peakHoursEnabled: prev[type]?.peakHoursEnabled ?? DEFAULT_ORGANIC_SETTINGS.peakHoursEnabled,
