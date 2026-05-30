@@ -256,7 +256,7 @@ const Index = () => {
           <div className="mt-10 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full border border-border bg-card flex items-center justify-center font-serif text-lg text-primary italic">A</div>
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em]">Abhishek · founder</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em]">Daniel Brooks · founder</p>
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-0.5">building boostly since 2024</p>
             </div>
           </div>
