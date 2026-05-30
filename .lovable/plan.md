@@ -1,105 +1,74 @@
-
-# Per-User API / Services / Bundles Feature
-
 ## Goal
-Abhi system admin-only hai: admin provider API key daalta hai → sab users wahi services use karte hain → admin ke provider balance se kat-ta hai.
 
-Naya behaviour: **har subscribed user apna khud ka provider API key daale, apni services import kare, apne bundles banaye, aur orders sirf uske hi API/balance se chale.** User A ka data User B ko bilkul na dikhe.
+User-side "My Bundles" ko bilkul admin Engagement Bundles jaisa banana hai — manual ratio hatao, AI auto-ratios use ho, aur ek engagement type (e.g. Views) ke andar multiple provider accounts rotate ho saken. Service ko service ID se directly link kiya jaye (admin jaise), na ki "import service" wala alag flow.
 
-Admin-managed (global) system bhi parallel chalta rahega (jo users API nahi laga rahe unke liye fallback / public mode).
+## New User Bundle UX (per bundle card)
 
----
+```
+[Platform tabs: Instagram | TikTok | YouTube | Twitter/X | Facebook]
 
-## Scope (A to Z, jaisa tune bola)
+Bundle: "My IG Bundle"          [Active toggle]  [Delete]
 
-### 1. User Provider Accounts
-- User Settings me naya "My Provider" section
-- User apna provider URL + API key add kar sake (multiple allowed, with priority)
-- Balance fetch button (uske API se balance dikhaye)
-- Sirf wahi user apna key dekh/edit kar sake
+  🧠 AI Organic Mode             [ON/OFF]
+  ✨ AI Organic Ratios (auto)    [ON/OFF]   ← replaces manual ratio %
 
-### 2. User Services (Import)
-- "My Services" page — user apne provider se services import kare (jaise admin abhi karta hai)
-- Apni pricing markup laga sake apni services pe
-- Enable/disable kar sake
-- Sirf uski services use karte time dikhe
+  [Views+] [Likes+] [Comments+] [Saves+] [Shares+] [Followers+]  ← add type
 
-### 3. User Bundles
-- "My Bundles" page — user apne services se bundles banaye (Instagram likes+views+comments etc.)
-- Existing admin bundle UI ka clone, but user-scoped
-
-### 4. Order Placement
-- Jab user order place kare:
-  - Agar usne apna API laga rakha hai → uske provider account se order ja-ye, uske wallet se nahi (uske provider ke balance se direct)
-  - Agar nahi laga rakha → existing admin/global flow (fallback)
-- Engagement orders bhi same — user ke bundles + user ke services + user ke API
-
-### 5. Access Control
-- Ye sab features sirf **active subscription** wale user ko milein (existing SubscriptionGuard reuse)
-- RLS: har table pe `user_id` based policy — apna data hi dikhe
-
-### 6. Admin Panel
-- Admin sab users ke provider accounts dekh/manage kar sake (existing admin pattern)
-
----
-
-## Technical Changes
-
-### Database (migration)
-Naye tables (sab `user_id` column ke saath + RLS):
-- `user_provider_accounts` — user ke provider API keys (url, key, balance, priority, is_active)
-- `user_services` — user ki imported services (provider_service_id, name, category, price, markup)
-- `user_bundles` + `user_bundle_items` — user ke custom bundles
-- `user_service_provider_mapping` — user service → user provider mapping
-
-RLS policies har table pe:
-- User: apna `user_id = auth.uid()` ka CRUD
-- Admin: `has_role(auth.uid(), 'admin')` se sab kuch
-
-Subscription check: insert policies me `EXISTS (SELECT 1 FROM subscriptions WHERE user_id=auth.uid() AND status='active')`
-
-### Edge Functions (naye / updated)
-- `user-import-services` — user ke API se services fetch karke `user_services` me daale
-- `user-check-balance` — user ke provider ka balance fetch
-- `user-place-order` — order user ke provider pe place kare, response store kare
-- `user-process-engagement-order` — engagement orders user ke API se chalaye
-- Existing `place-order` / `process-engagement-order` me branching: agar order user-scoped hai to user API use kare
-
-### Frontend (naye pages / components)
-- `/my-providers` — user provider account management
-- `/my-services` — user services import & list
-- `/my-bundles` — user bundle builder
-- Existing order/engagement pages me toggle: "Use my API" vs "Use platform services"
-- Sidebar me ye new section sirf subscribed users ko dikhe
-
-### Wallet behaviour
-- User-API orders me wallet se paisa nahi katega (kyunki user ka apna provider account hai)
-- Sirf platform/admin services wale orders me wallet kate (existing behaviour)
-- Subscription fee alag rahegi
-
----
-
-## Build Order (phases)
-
-```text
-Phase 1: DB schema + RLS for user_provider_accounts, user_services
-Phase 2: User provider management UI + balance check edge function
-Phase 3: Service import (user-side) + my services UI
-Phase 4: User bundles DB + UI
-Phase 5: Order placement routing (user API vs platform)
-Phase 6: Engagement orders with user bundles + user API
-Phase 7: Admin oversight panel
-Phase 8: QA + polish
+  ▼ Views  (Base)
+    Service ID: [____]  Name (auto-filled)  $rate/1k    [Providers (2)] [Unlink]
+  ▼ Likes
+    Service ID: [____]  ...                              [Providers (1)] [Unlink]
 ```
 
----
+- "Service ID" ek single input — user apne provider ka service number type karta hai, hum `user-import-services` (fetch_only) se metadata fetch karke `user_bundle_items` me link kar dete hain.
+- "Providers" button ek dialog kholega (admin jaise Provider Rotation modal): user apne multiple `user_provider_accounts` me se tick laga sakta hai, har account ka apna service ID + priority. Order place karte waqt priority 1 fail → 2 try.
 
-## Important Considerations
-- API keys sensitive hain — sirf edge functions me decrypt/use, frontend pe kabhi expose nahi
-- Existing admin flow break nahi hoga — purely additive
-- UI/design same theme rahegi (orange + white)
-- Subscription guard sab user-scoped pages pe lagega
+## DB changes
 
----
+Naya table for rotation (user-side mirror of admin's `service_provider_mapping`):
 
-Bhai bata — **start kar du Phase 1 (DB + provider management) se?** Ya kuch change karna hai plan me? Ye 6-8 alag steps me banega, ek hi message me poora nahi hoga.
+```
+user_bundle_item_providers
+  id uuid pk
+  user_id uuid
+  user_bundle_item_id uuid → user_bundle_items.id (cascade)
+  user_provider_account_id uuid → user_provider_accounts.id
+  provider_service_id text
+  priority int default 1
+  is_active bool default true
+  created_at, updated_at
+  unique(user_bundle_item_id, user_provider_account_id)
+```
+
+RLS: only owner can CRUD (`auth.uid() = user_id`), plus GRANTs. `user_bundle_items.ratio_percent` ko optional/null-able rakhenge (drop nahi karenge data ke liye), use band kar denge UI me.
+
+`user_bundles` me 2 naye flags:
+- `ai_organic_mode` bool default true
+- `ai_organic_ratios` bool default true
+
+## Edge function changes
+
+`user-process-engagement-order/index.ts`:
+- `items[]` ab ratio_percent ignore karega; jab `ai_organic_ratios=true` ho to `DEFAULT_RATIOS[platform]` se per-type quantity compute karega (admin ki tarah).
+- Har item ke liye `user_bundle_item_providers` se priority-ordered list lo; provider #1 pe order try → fail/balance kam → next priority. Existing single-provider path ko backwards-compatible rakho jab koi mapping nahi hai (current `user_provider_account_id` ko fallback).
+
+## Frontend changes
+
+- `src/pages/MyBundles.tsx` poora rewrite: platform tabs, engagement-type cards, ProviderRotationDialog component, AI toggles. Manual ratio input hata do.
+- `src/pages/UserEngagementOrder.tsx`: ratio inputs aur "enable per item" switches hata do. Sirf base quantity + link + organic toggle. Breakdown read-only auto-computed dikhao.
+- New small component: `UserProviderRotationDialog.tsx`.
+
+## Files to touch
+
+- (new migration) `user_bundle_item_providers` table + bundle flags
+- `src/pages/MyBundles.tsx` (rewrite)
+- `src/pages/UserEngagementOrder.tsx` (simplify)
+- `supabase/functions/user-process-engagement-order/index.ts` (auto-ratios + multi-provider rotation)
+- (new) `src/components/bundles/UserProviderRotationDialog.tsx`
+
+## Out of scope
+
+- Admin panel — koi change nahi.
+- Existing orders/data — preserved; old bundles with manual ratios will still work (legacy field stays but hidden).
+
+Approve karo to migration + code dono ek saath bhej dunga.
