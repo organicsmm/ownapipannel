@@ -146,33 +146,15 @@ export default function AdminSubscriptions() {
     mutationFn: async () => {
       if (!addEmail.trim()) throw new Error('Please enter email');
 
-      // Find user by email
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id, email, full_name')
-        .eq('email', addEmail.trim().toLowerCase())
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('admin_activate_subscription_by_email' as any, {
+        _email: addEmail.trim(),
+        _plan_type: addPlanType,
+        _admin_id: user?.id,
+      } as any);
 
-      if (profileError) throw profileError;
-      if (!profile) throw new Error('User not found with this email. They must sign up first.');
-
-      const expiresAt = addPlanType === 'monthly'
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()  // 30 days
-        : null; // lifetime — no expiry
-
-      // Upsert subscription
-      const { error: subError } = await supabase
-        .from('subscriptions')
-        .upsert({
-          user_id: profile.user_id,
-          plan_type: addPlanType,
-          status: 'active',
-          activated_at: new Date().toISOString(),
-          expires_at: expiresAt,
-          activated_by: user?.id,
-        }, { onConflict: 'user_id' });
-
-      if (subError) throw subError;
+      if (error) throw error;
+      const profile = Array.isArray(data) ? data[0] : data;
+      if (!profile) throw new Error('User account not found. Please make sure they signed up with this exact email.');
 
       // Fire-and-forget email - don't wait for response
       supabase.functions.invoke('send-subscription-email', {
