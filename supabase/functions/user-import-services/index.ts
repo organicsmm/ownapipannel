@@ -19,13 +19,22 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Verify active subscription
     const { data: sub } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-    if (!sub || sub.status !== "active") {
+    const isAdmin = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+    if ((!sub || sub.status !== "active") && !isAdmin.data) {
       return new Response(JSON.stringify({ error: "Active subscription required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { providerAccountId, markupPercent = 0, serviceIds } = await req.json();
+    const body = await req.json();
+    const providerAccountId = body.providerAccountId || body.user_provider_account_id;
+    const markupPercent = Number(body.markupPercent || 0);
+    const serviceIds: string[] | undefined = body.service_ids || body.serviceIds;
+    // fetch_only: just return service details without upsert (used by MyBundles)
+    const fetchOnly: boolean = !!body.fetch_only || (Array.isArray(serviceIds) && serviceIds.length > 0 && body.upsert !== true);
+
+    if (!providerAccountId) {
+      return new Response(JSON.stringify({ error: "providerAccountId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const { data: account, error: accErr } = await supabase
       .from("user_provider_accounts").select("*")
@@ -50,15 +59,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid response from provider", raw: text.slice(0, 500) }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!Array.isArray(services)) {
-      return new Response(JSON.stringify({ error: services?.error || "Provider did not return services list" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: (services as any)?.error || "Provider did not return services list" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Optional filter by selected serviceIds
     const filtered = serviceIds && Array.isArray(serviceIds) && serviceIds.length > 0
       ? services.filter((s: any) => serviceIds.includes(String(s.service)))
       : services;
 
-    const markupMultiplier = 1 + Number(markupPercent || 0) / 100;
+    const previewServices = filtered.map((s: any) => ({
+      id: String(s.service),
+      name: String(s.name || ""),
+      category: String(s.category || "Other"),
+      rate: Number(s.rate || 0),
+      min: Number(s.min || 10),
+      max: Number(s.max || 100000),
+      type: s.type || null,
+    }));
+
+    if (fetchOnly) {
+      return new Response(JSON.stringify({ success: true, services: previewServices, total: services.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const markupMultiplier = 1 + markupPercent / 100;
     const rows = filtered.map((s: any) => ({
       user_id: user.id,
       user_provider_account_id: providerAccountId,
@@ -67,7 +89,7 @@ Deno.serve(async (req) => {
       category: String(s.category || "Other"),
       description: s.description || null,
       price: Number(s.rate || 0) * markupMultiplier,
-      markup_percent: Number(markupPercent || 0),
+      markup_percent: markupPercent,
       min_quantity: Number(s.min || 10),
       max_quantity: Number(s.max || 100000),
       type: s.type || null,
@@ -78,10 +100,9 @@ Deno.serve(async (req) => {
     }));
 
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ success: true, imported: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: true, imported: 0, services: previewServices }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Upsert in batches of 500 to stay within row limits
     let imported = 0;
     for (let i = 0; i < rows.length; i += 500) {
       const batch = rows.slice(i, i + 500);
@@ -92,7 +113,7 @@ Deno.serve(async (req) => {
       imported += count ?? batch.length;
     }
 
-    return new Response(JSON.stringify({ success: true, imported, total: services.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, imported, total: services.length, services: previewServices }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("user-import-services error:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
