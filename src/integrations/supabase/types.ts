@@ -1450,6 +1450,14 @@ export type Database = {
       }
     }
     Functions: {
+      admin_activate_subscription_by_email: {
+        Args: { _admin_id?: string; _email: string; _plan_type: string }
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       cleanup_old_completed_engagement_orders: { Args: never; Returns: Json }
       get_admin_dashboard_stats: { Args: never; Returns: Json }
       get_admin_users_summary: { Args: never; Returns: Json }
