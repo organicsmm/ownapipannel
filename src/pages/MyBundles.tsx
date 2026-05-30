@@ -167,8 +167,9 @@ function BundleCard({ bundle, onDelete }: { bundle: any; onDelete: () => void })
     try {
       const { data, error } = await supabase.functions.invoke("user-import-services", {
         body: {
-          user_provider_account_id: itemForm.user_provider_account_id,
+          providerAccountId: itemForm.user_provider_account_id,
           service_ids: [itemForm.provider_service_id],
+          fetch_only: true,
         },
       });
       if (error) throw error;
