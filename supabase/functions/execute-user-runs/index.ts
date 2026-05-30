@@ -87,76 +87,115 @@ Deno.serve(async (req) => {
       }
       if (eo.status === "paused" || item.status === "paused") { skipped++; continue; }
 
-      // Find provider for this engagement_type from user_bundle_items
+      // Find bundle item for this engagement_type
       const { data: bi } = await supabase
         .from("user_bundle_items")
-        .select("provider_service_id, user_provider_accounts(api_url, api_key, is_active, name)")
+        .select("id, provider_service_id, user_provider_account_id")
         .eq("user_bundle_id", eo.user_bundle_id)
         .eq("engagement_type", item.engagement_type)
         .limit(1)
         .maybeSingle();
 
-      if (!bi || !bi.user_provider_accounts || !(bi as any).user_provider_accounts.is_active) {
-        await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "User provider not found/inactive" }).eq("id", run.id);
+      if (!bi) {
+        await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "Bundle item not found" }).eq("id", run.id);
         failed++; continue;
       }
-      const provider = (bi as any).user_provider_accounts;
-      const providerServiceId = (bi as any).provider_service_id;
+
+      // Build provider rotation list (priority asc); fallback to bi.user_provider_account_id if no mappings
+      const { data: mappings } = await supabase
+        .from("user_bundle_item_providers")
+        .select("priority, provider_service_id, user_provider_accounts(id, api_url, api_key, is_active, name)")
+        .eq("user_bundle_item_id", (bi as any).id)
+        .eq("is_active", true)
+        .order("priority", { ascending: true });
+
+      let candidates: Array<{ provider: any; providerServiceId: string }> = (mappings || [])
+        .map((m: any) => ({ provider: m.user_provider_accounts, providerServiceId: m.provider_service_id }))
+        .filter(c => c.provider && c.provider.is_active);
+
+      if (candidates.length === 0 && (bi as any).user_provider_account_id) {
+        const { data: prov } = await supabase
+          .from("user_provider_accounts")
+          .select("id, api_url, api_key, is_active, name")
+          .eq("id", (bi as any).user_provider_account_id)
+          .maybeSingle();
+        if (prov && prov.is_active) {
+          candidates = [{ provider: prov, providerServiceId: (bi as any).provider_service_id }];
+        }
+      }
+
+      if (candidates.length === 0) {
+        await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "No active provider available" }).eq("id", run.id);
+        failed++; continue;
+      }
 
       // Claim the run
       const { data: locked, error: lockErr } = await supabase
         .from("organic_run_schedule")
-        .update({ status: "started", started_at: new Date().toISOString(), provider_account_name: provider.name })
+        .update({ status: "started", started_at: new Date().toISOString(), provider_account_name: candidates[0].provider.name })
         .eq("id", run.id)
         .eq("status", "pending")
         .select("id")
         .maybeSingle();
       if (lockErr || !locked) { skipped++; continue; }
 
-      // Send to provider
-      try {
-        const form = new URLSearchParams();
-        form.append("key", provider.api_key);
-        form.append("action", "add");
-        form.append("service", providerServiceId);
-        form.append("link", eo.link);
-        form.append("quantity", String(run.quantity_to_send));
+      // Try each candidate in priority order until one succeeds
+      let success = false;
+      let lastErr = "";
+      let lastResult: any = null;
+      let usedProviderName = candidates[0].provider.name;
+      let usedOrderId: string | null = null;
 
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 20000);
-        const resp = await fetch(provider.api_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: form.toString(),
-          signal: ctrl.signal,
-        });
-        clearTimeout(tid);
-        const text = await resp.text();
-        let result: any;
-        try { result = JSON.parse(text); } catch { result = { error: text }; }
+      for (const cand of candidates) {
+        try {
+          const form = new URLSearchParams();
+          form.append("key", cand.provider.api_key);
+          form.append("action", "add");
+          form.append("service", cand.providerServiceId);
+          form.append("link", eo.link);
+          form.append("quantity", String(run.quantity_to_send));
 
-        if (result?.error) {
-          const msg = typeof result.error === "string" ? result.error : JSON.stringify(result.error);
-          await supabase.from("organic_run_schedule").update({
-            status: "failed",
-            error_message: msg,
-            provider_response: result,
-          }).eq("id", run.id);
-          failed++;
-        } else {
-          const providerOrderId = (result.order ?? result.id)?.toString() || null;
-          await supabase.from("organic_run_schedule").update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            provider_order_id: providerOrderId,
-            provider_response: result,
-          }).eq("id", run.id);
-          processed++;
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 20000);
+          const resp = await fetch(cand.provider.api_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: form.toString(),
+            signal: ctrl.signal,
+          });
+          clearTimeout(tid);
+          const text = await resp.text();
+          let result: any;
+          try { result = JSON.parse(text); } catch { result = { error: text }; }
+          lastResult = result;
+
+          if (result?.error) {
+            lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
+            continue;
+          }
+          usedProviderName = cand.provider.name;
+          usedOrderId = (result.order ?? result.id)?.toString() || null;
+          success = true;
+          break;
+        } catch (e: any) {
+          lastErr = `[${cand.provider.name}] Network: ${e?.message || "unknown"}`;
         }
-      } catch (e: any) {
+      }
+
+      if (success) {
+        await supabase.from("organic_run_schedule").update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          provider_order_id: usedOrderId,
+          provider_account_name: usedProviderName,
+          provider_response: lastResult,
+        }).eq("id", run.id);
+        processed++;
+      } else {
         await supabase.from("organic_run_schedule").update({
           status: "failed",
-          error_message: `Network: ${e?.message || "unknown"}`,
+          error_message: lastErr || "All providers failed",
+          provider_response: lastResult,
         }).eq("id", run.id);
         failed++;
       }
