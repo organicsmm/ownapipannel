@@ -274,27 +274,6 @@ export default function Admin() {
             </Card>
           </Link>
 
-          <Link to="/admin/provider-accounts">
-            <Card className="glass-card h-full hover:border-accent/50 hover:shadow-lg hover:shadow-accent/10 transition-all cursor-pointer group border-2 border-accent/30">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent/30 to-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Globe className="h-6 w-6 text-accent" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold group-hover:text-accent transition-colors">
-                        Provider Accounts
-                      </h3>
-                      <Badge className="text-[10px] h-4 px-1.5 bg-accent text-accent-foreground">NEW</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">API keys & URLs</p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-accent transition-colors" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
 
           <Link to="/admin/service-provider-mapping">
             <Card className="glass-card h-full hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all cursor-pointer group border-2 border-primary/30">
