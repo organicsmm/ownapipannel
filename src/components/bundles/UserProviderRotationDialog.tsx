@@ -100,15 +100,41 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
 
       // Also sync the primary (lowest priority) onto user_bundle_items for backwards compat
       const primary = [...enabledRows].sort((a, b) => a.priority - b.priority)[0];
+
+      // Fetch service metadata (name, rate, min, max) for the primary so engagement order flow works
+      let meta: { service_name?: string; rate?: number; min_qty?: number; max_qty?: number } = {};
+      try {
+        const { data: svcData, error: svcErr } = await supabase.functions.invoke("user-import-services", {
+          body: { providerAccountId: primary.user_provider_account_id, service_ids: [primary.provider_service_id.trim()], fetch_only: true },
+        });
+        if (svcErr) {
+          let realMsg = svcErr.message;
+          try {
+            const ctx: any = (svcErr as any).context;
+            if (ctx && typeof ctx.json === "function") {
+              const body = await ctx.json();
+              if (body?.error) realMsg = body.error;
+            }
+          } catch {}
+          throw new Error(realMsg);
+        }
+        const svc = (svcData as any)?.services?.[0];
+        if (!svc) throw new Error(`Service ID "${primary.provider_service_id}" provider ki list me nahi mili.`);
+        meta = { service_name: svc.name, rate: svc.rate, min_qty: svc.min, max_qty: svc.max };
+      } catch (e: any) {
+        throw new Error(`Primary provider ka service validate nahi hua: ${e.message}`);
+      }
+
       const { error: updErr } = await supabase
         .from("user_bundle_items")
         .update({
           user_provider_account_id: primary.user_provider_account_id,
           provider_service_id: primary.provider_service_id.trim(),
+          ...meta,
         })
         .eq("id", itemId);
       if (updErr) throw updErr;
-    },
+
     onSuccess: () => {
       toast.success("Provider rotation saved");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
