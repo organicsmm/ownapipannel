@@ -21,7 +21,7 @@ import {
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
 
-import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
+
 import { useDebounce } from "@/hooks/useDebounce";
 
 type EngagementConfigs = Record<string, EngagementConfig>;
@@ -282,14 +282,6 @@ function Inner() {
         )}
       </div>
 
-      {activeEngagementTypes.length > 0 && (
-        <LiveGrowthChart
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          onRefresh={() => setPreviewRefreshKey(k => k + 1)}
-          platform={platform}
-        />
-      )}
 
 
 
