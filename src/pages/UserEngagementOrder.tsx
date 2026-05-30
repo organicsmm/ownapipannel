@@ -57,9 +57,11 @@ function Inner() {
     queryKey: ["user-bundles-with-items", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("user_bundles")
         .select("*, user_bundle_items(*, user_provider_accounts(id, name, is_active))")
+        .eq("user_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
       if (error) throw error;

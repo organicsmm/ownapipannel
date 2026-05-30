@@ -33,9 +33,11 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
     queryKey: ["user-providers-active", user?.id],
     enabled: !!user && open,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("user_provider_accounts")
         .select("id, name, is_active")
+        .eq("user_id", user.id)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;

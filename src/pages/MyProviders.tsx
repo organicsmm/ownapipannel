@@ -32,9 +32,11 @@ function MyProvidersInner() {
     queryKey: ["user-providers", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("user_provider_accounts")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -63,7 +65,8 @@ function MyProvidersInner() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("user_provider_accounts").delete().eq("id", id);
+      if (!user) throw new Error("Not signed in");
+      const { error } = await supabase.from("user_provider_accounts").delete().eq("id", id).eq("user_id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
