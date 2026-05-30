@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
     // Create items + schedule runs
     const startTime = new Date();
-    const createdItems: Array<{ itemId: string; bi: any; quantity: number }> = [];
+    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
     for (const r of resolved) {
       const { data: item, error: itemErr } = await supabase
         .from("engagement_order_items")
@@ -144,46 +144,81 @@ Deno.serve(async (req) => {
         console.error("Failed to create item:", itemErr);
         continue;
       }
-      createdItems.push({ itemId: item.id, bi: r.bi, quantity: r.quantity });
+      createdItems.push({
+        itemId: item.id,
+        bi: r.bi,
+        quantity: r.quantity,
+        time_limit_hours: r.time_limit_hours,
+        variance_percent: r.variance_percent,
+        peak_hours_enabled: r.peak_hours_enabled,
+      });
     }
 
-    for (const { itemId, bi, quantity } of createdItems) {
+    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
       const providerMin = Math.max(1, Number(bi.min_qty || 1));
       const batchCap = Math.max(c.batchCap, providerMin);
+      const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
 
       let targetRuns: number;
-      if (is_organic_mode) {
+      let intervalMinutes: number;
+
+      if (time_limit_hours && time_limit_hours > 0) {
+        // User-set delivery window: distribute runs evenly across the window
+        const totalMinutes = time_limit_hours * 60;
+        const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
+        const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
+        targetRuns = Math.min(ideal, maxFeasible, Math.max(1, Math.floor(totalMinutes / 5)));
+        if (targetRuns < 1) targetRuns = 1;
+        intervalMinutes = totalMinutes / targetRuns;
+      } else if (is_organic_mode) {
         const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
         const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
         targetRuns = Math.min(ideal, maxFeasible);
         if (targetRuns < 1) targetRuns = 1;
+        intervalMinutes = c.baseInterval;
       } else {
         targetRuns = Math.max(1, Math.ceil(quantity / batchCap));
+        intervalMinutes = c.baseInterval;
       }
 
-      // Build runs
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + (5 + Math.random() * 10) * 60 * 1000);
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
-        let qty = Math.round((remaining / runsLeft) * (0.85 + Math.random() * 0.3));
+        const baseQty = remaining / runsLeft;
+        // Apply user variance to per-run quantity
+        const varianceFactor = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : 1;
+        let qty = Math.round(baseQty * varianceFactor);
         qty = Math.max(providerMin, Math.min(qty, remaining, batchCap));
         if (i === targetRuns) qty = remaining;
+
+        // Peak hours: bias toward 6-11pm IST (UTC+5:30) — shift scheduled_at slightly into peak window
+        let scheduled = new Date(currentTime);
+        if (peak_hours_enabled) {
+          const istHour = (scheduled.getUTCHours() + 5 + Math.floor((scheduled.getUTCMinutes() + 30) / 60)) % 24;
+          if (istHour < 18 || istHour > 23) {
+            // Pull forward/back into 18-23 IST by adding random hours within peak window
+            const targetHourIST = 18 + Math.floor(Math.random() * 6);
+            const deltaHours = ((targetHourIST - istHour) + 24) % 24;
+            if (deltaHours <= 6) scheduled = new Date(scheduled.getTime() + deltaHours * 60 * 60 * 1000);
+          }
+        }
+
         entries.push({
           engagement_order_item_id: itemId,
           run_number: i,
-          scheduled_at: currentTime.toISOString(),
+          scheduled_at: scheduled.toISOString(),
           quantity_to_send: qty,
           base_quantity: qty,
           status: "pending",
         });
         remaining -= qty;
-        const intervalMin = c.baseInterval + (Math.random() * 2 - 1) * c.intervalVariance;
-        currentTime = new Date(currentTime.getTime() + Math.max(5, intervalMin) * 60 * 1000);
+        // Interval variance: ±variance around configured interval
+        const intervalJitter = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : (1 + (Math.random() * 0.4 - 0.2));
+        currentTime = new Date(currentTime.getTime() + Math.max(5, intervalMinutes * intervalJitter) * 60 * 1000);
       }
-      // Merge any leftover into last run
       if (remaining > 0 && entries.length > 0) {
         entries[entries.length - 1].quantity_to_send += remaining;
         entries[entries.length - 1].base_quantity += remaining;
