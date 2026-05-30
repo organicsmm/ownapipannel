@@ -102,8 +102,8 @@ function Inner() {
         next[type] = {
           type,
           enabled: prev[type]?.enabled ?? true,
-          quantity: prev[type]?.quantity && !isBase ? prev[type].quantity : qty,
-          price: prev[type]?.quantity && !isBase ? (prev[type].quantity / 1000) * rate : price,
+          quantity: prev[type]?.quantity && !isBase ? Math.max(minQty, prev[type].quantity) : qty,
+          price: prev[type]?.quantity && !isBase ? (Math.max(minQty, prev[type].quantity) / 1000) * rate : price,
           serviceId: item.id, // we send user_bundle_item_id as identifier
           minQuantity: minQty,
           timeLimitHours: prev[type]?.timeLimitHours ?? DEFAULT_ORGANIC_SETTINGS.timeLimitHours,
