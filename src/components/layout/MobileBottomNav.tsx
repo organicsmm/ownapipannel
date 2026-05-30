@@ -2,17 +2,23 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Menu, LayoutGrid, Rocket, ListOrdered, Boxes } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 
-const bottomItems = [
-  { to: '/dashboard', label: 'Home', icon: LayoutGrid },
-  { to: '/engagement-order', label: 'Engage', icon: Rocket },
-  { to: '/engagement-orders', label: 'Orders', icon: ListOrdered },
-  { to: '/my-bundles', label: 'Bundles', icon: Boxes },
+const baseItems = [
+  { to: '/dashboard', label: 'Home', icon: LayoutGrid, requiresSub: false },
+  { to: '/engagement-order', label: 'Engage', icon: Rocket, requiresSub: true },
+  { to: '/engagement-orders', label: 'Orders', icon: ListOrdered, requiresSub: false },
+  { to: '/my-bundles', label: 'Bundles', icon: Boxes, requiresSub: true },
 ];
 
 export function MobileBottomNav() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
+  const { isAdmin } = useAuth();
+  const { hasActiveSubscription } = useSubscription();
+  const canUsePro = isAdmin || hasActiveSubscription;
+  const bottomItems = baseItems.filter((it) => !it.requiresSub || canUsePro);
 
   return (
     <>

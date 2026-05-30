@@ -5,6 +5,7 @@ import {
   KeyRound, Layers, Boxes
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useCurrency, CURRENCIES } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -13,8 +14,8 @@ interface SidebarProps { onClose?: () => void; }
 
 const userNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW' },
-  { icon: Brain, label: 'AI Intelligence', path: '/intelligence', tag: 'AI' },
+  { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW', requiresSub: true },
+  { icon: Brain, label: 'AI Intelligence', path: '/intelligence' },
   { icon: Sparkles, label: 'Engagement Orders', path: '/engagement-orders' },
   { icon: Code2, label: 'API Access', path: '/api-access' },
   { icon: LifeBuoy, label: 'Support', path: '/support' },
@@ -24,6 +25,8 @@ const userNavItems = [
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
   const { isAdmin, signOut, profile } = useAuth();
+  const { hasActiveSubscription } = useSubscription();
+  const canUsePro = isAdmin || hasActiveSubscription;
   const { currency, setCurrency, currencyInfo } = useCurrency();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
@@ -63,7 +66,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-thin">
         <p className="px-3 mb-2 lux-eyebrow">:menu</p>
-        {userNavItems.map((item) => {
+        {userNavItems.filter((it) => !it.requiresSub || canUsePro).map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link key={item.path} to={item.path} onClick={onClose}
@@ -103,10 +106,11 @@ export function Sidebar({ onClose }: SidebarProps) {
             </Link>
           </>
         )}
-        {/* My Provider section (per-user) */}
+        {/* My Provider section (per-user) — only for active subscribers / admin */}
+        {canUsePro && (<>
         <div className="my-4 mx-3 border-t border-sidebar-border" />
-        <p className="px-3 mb-2 lux-eyebrow">:my provider</p>
-        {[
+        <p className="px-3 mb-2 lux-eyebrow">:my provider</p></>)}
+        {canUsePro && [
           { icon: KeyRound, label: 'My Providers', path: '/my-providers' },
           
           { icon: Boxes, label: 'My Bundles', path: '/my-bundles' },
