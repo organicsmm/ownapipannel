@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -9,12 +9,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Rocket, Link as LinkIcon, Package, Brain, Sparkles } from "lucide-react";
-import { DEFAULT_RATIOS, EngagementType } from "@/lib/engagement-types";
+import { Loader2, Rocket, Link as LinkIcon, Package } from "lucide-react";
+import {
+  EngagementType,
+  EngagementConfig,
+  DEFAULT_RATIOS,
+  DEFAULT_ORGANIC_SETTINGS,
+} from "@/lib/engagement-types";
+import { QuantitySelector } from "@/components/engagement/QuantitySelector";
+import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
+import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
+import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
+import { useDebounce } from "@/hooks/useDebounce";
+
+type EngagementConfigs = Record<string, EngagementConfig>;
+
+const PREFERRED_ORDER: Record<string, number> = {
+  views: 1, likes: 2, comments: 3, shares: 4, reposts: 5, saves: 6, followers: 7, subscribers: 8, retweets: 9, watch_hours: 10,
+};
 
 export default function UserEngagementOrder() {
   return (
@@ -34,8 +48,10 @@ function Inner() {
 
   const [bundleId, setBundleId] = useState<string>("");
   const [link, setLink] = useState("");
-  const [baseQuantity, setBaseQuantity] = useState(1000);
-  const [organicOverride, setOrganicOverride] = useState<boolean | null>(null);
+  const [baseQuantity, setBaseQuantity] = useState(10000);
+  const debouncedBase = useDebounce(baseQuantity, 200);
+  const [engagements, setEngagements] = useState<EngagementConfigs>({});
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
@@ -49,51 +65,100 @@ function Inner() {
       if (error) throw error;
       return data || [];
     },
+    placeholderData: keepPreviousData,
   });
 
+  // Auto-select first bundle
+  useEffect(() => {
+    if (!bundleId && bundles && bundles.length > 0) setBundleId(bundles[0].id);
+  }, [bundles, bundleId]);
+
   const bundle = useMemo(() => bundles?.find((b: any) => b.id === bundleId), [bundles, bundleId]);
+  const platform = (bundle?.platform || "instagram") as 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook';
   const items = bundle?.user_bundle_items || [];
-  const organic = organicOverride ?? !!bundle?.ai_organic_enabled;
 
-  useEffect(() => { setOrganicOverride(null); }, [bundleId]);
+  const activeEngagementTypes = useMemo<EngagementType[]>(() => {
+    const types = items
+      .filter((it: any) => it.provider_service_id) // only linked items
+      .map((it: any) => it.engagement_type as EngagementType);
+    return [...new Set<EngagementType>(types)].sort((a, b) => (PREFERRED_ORDER[a] || 99) - (PREFERRED_ORDER[b] || 99));
+  }, [items]);
 
-  const calc = useMemo(() => {
-    return items
-      .filter((it: any) => it.provider_service_id && it.user_provider_account_id)
-      .map((it: any) => {
-        const ratio = DEFAULT_RATIOS[it.engagement_type as EngagementType] ?? Number(it.ratio_percent || 100);
-        // Base type (usually "views") = 100% of baseQuantity, others scale via ratio
-        const isBase = it.engagement_type === "views" || it.is_base;
-        const qty = isBase
-          ? baseQuantity
-          : Math.max(1, Math.round(baseQuantity * (ratio / 100)));
-        const rate = Number(it.rate || 0);
+  // Build per-type config from bundle items when bundle / quantity changes
+  useEffect(() => {
+    if (!bundle) { setEngagements({}); return; }
+    setEngagements((prev) => {
+      const next: EngagementConfigs = {};
+      activeEngagementTypes.forEach((type) => {
+        const item = items.find((it: any) => it.engagement_type === type);
+        if (!item) return;
+        const ratio = DEFAULT_RATIOS[type] ?? 100;
+        const isBase = type === "views" || item.is_base;
+        const qty = isBase ? debouncedBase : Math.max(1, Math.round(debouncedBase * (ratio / 100)));
+        const rate = Number(item.rate || 0);
         const price = (qty / 1000) * rate;
-        return { it, qty, price, ratio };
+        next[type] = {
+          type,
+          enabled: prev[type]?.enabled ?? true,
+          quantity: prev[type]?.quantity && !isBase ? prev[type].quantity : qty,
+          price: prev[type]?.quantity && !isBase ? (prev[type].quantity / 1000) * rate : price,
+          serviceId: item.id, // we send user_bundle_item_id as identifier
+          minQuantity: Number(item.min_qty || 0) || undefined,
+          timeLimitHours: prev[type]?.timeLimitHours ?? DEFAULT_ORGANIC_SETTINGS.timeLimitHours,
+          variancePercent: prev[type]?.variancePercent ?? DEFAULT_ORGANIC_SETTINGS.variancePercent,
+          peakHoursEnabled: prev[type]?.peakHoursEnabled ?? DEFAULT_ORGANIC_SETTINGS.peakHoursEnabled,
+        };
       });
-  }, [items, baseQuantity]);
+      return next;
+    });
+  }, [bundle?.id, debouncedBase, activeEngagementTypes.join(",")]);
 
-  const totalPrice = calc.reduce((s, c) => s + c.price, 0);
-  const totalQty = calc.reduce((s, c) => s + c.qty, 0);
+  const handleEngagementChange = useCallback((type: EngagementType, config: EngagementConfig) => {
+    setEngagements(prev => ({ ...prev, [type]: config }));
+  }, []);
+
+  const pricePerKMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    items.forEach((it: any) => { m[it.engagement_type] = Number(it.rate || 0); });
+    return m;
+  }, [items]);
+
+  const totalPrice = useMemo(
+    () => Object.values(engagements).filter(e => e.enabled).reduce((s, e) => s + e.price, 0),
+    [engagements]
+  );
+  const totalQty = useMemo(
+    () => Object.values(engagements).filter(e => e.enabled).reduce((s, e) => s + e.quantity, 0),
+    [engagements]
+  );
 
   const place = useMutation({
     mutationFn: async () => {
-      if (!bundle) throw new Error("Bundle select karo");
-      if (!link.trim()) throw new Error("Link enter karo");
-      const payload = calc.map(c => ({
-        user_bundle_item_id: c.it.id,
-        engagement_type: c.it.engagement_type,
-        quantity: c.qty,
-        price: c.price,
-      }));
-      if (payload.length === 0) throw new Error("Bundle me koi linked service nahi hai");
+      if (!bundle) throw new Error("Select a bundle");
+      if (!link.trim()) throw new Error("Enter link");
+      const enabled = Object.entries(engagements).filter(([_, c]) => c.enabled);
+      if (enabled.length === 0) throw new Error("Enable at least one engagement type");
+
+      const payload = enabled.map(([type, c]) => {
+        const item = items.find((it: any) => it.engagement_type === type);
+        let tl = c.timeLimitHours; if (tl === -1) tl = 0;
+        return {
+          user_bundle_item_id: item?.id,
+          engagement_type: type,
+          quantity: c.quantity,
+          price: c.price,
+          time_limit_hours: tl,
+          variance_percent: c.variancePercent,
+          peak_hours_enabled: c.peakHoursEnabled,
+        };
+      });
 
       const { data, error } = await supabase.functions.invoke("user-process-engagement-order", {
         body: {
           user_bundle_id: bundle.id,
           link: link.trim(),
           base_quantity: baseQuantity,
-          is_organic_mode: organic,
+          is_organic_mode: true,
           items: payload,
         },
       });
@@ -109,7 +174,7 @@ function Inner() {
       return data;
     },
     onSuccess: (data: any) => {
-      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} aapke provider par bhej diya gaya.` });
+      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} provider par bhej diya gaya.` });
       qc.invalidateQueries({ queryKey: ["engagement-orders"] });
       navigate("/engagement-orders");
     },
@@ -117,95 +182,149 @@ function Inner() {
   });
 
   return (
-    <div className="max-w-4xl mx-auto px-4 space-y-5 pb-12">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Full Engagement Order</h1>
-        <p className="text-sm text-muted-foreground mt-1">Apne bundle se directly apne provider par order bhejo. AI organic ratios automatic calculate hote hain.</p>
-      </div>
-
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div>
-            <Label>Apna Bundle</Label>
-            {isLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
-            ) : !bundles || bundles.length === 0 ? (
-              <div className="p-4 bg-muted/30 rounded-md text-sm">
-                Pehle <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se ek bundle banao.
-              </div>
-            ) : (
-              <Select value={bundleId} onValueChange={setBundleId}>
-                <SelectTrigger><SelectValue placeholder="Select bundle" /></SelectTrigger>
-                <SelectContent>
-                  {bundles.map((b: any) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name} <span className="text-muted-foreground text-xs ml-1">({b.platform} • {b.user_bundle_items?.length || 0} items)</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <div>
-            <Label className="flex items-center gap-2"><LinkIcon className="w-4 h-4" /> Link</Label>
-            <Input placeholder="https://..." value={link} onChange={(e) => setLink(e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Base Quantity (e.g. Views)</Label>
-            <Input type="number" value={baseQuantity} min={1} onChange={(e) => setBaseQuantity(Math.max(1, Number(e.target.value) || 0))} />
-          </div>
-
-          {bundle && (
-            <div className="flex items-center gap-3 bg-muted/30 rounded-md p-3">
-              <Brain className="w-4 h-4 text-emerald-500" />
-              <Label className="cursor-pointer flex-1" onClick={() => setOrganicOverride(!organic)}>AI Organic Mode (slow natural delivery)</Label>
-              <Switch checked={organic} onCheckedChange={(v) => setOrganicOverride(v)} />
+    <div className="max-w-5xl mx-auto px-2 sm:px-6 lg:px-8 space-y-3 sm:space-y-6 pb-8">
+      {/* Bundle Selector */}
+      <Card className="glass-card border-2 border-border">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
             </div>
+            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Apna Bundle</Label>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+          ) : !bundles || bundles.length === 0 ? (
+            <div className="p-4 bg-muted/30 rounded-md text-sm">
+              Pehle <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se ek bundle banao.
+            </div>
+          ) : (
+            <Select value={bundleId} onValueChange={setBundleId}>
+              <SelectTrigger className="h-12"><SelectValue placeholder="Select bundle" /></SelectTrigger>
+              <SelectContent>
+                {bundles.map((b: any) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name} <span className="text-muted-foreground text-xs ml-1">({b.platform} • {b.user_bundle_items?.length || 0} items)</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </CardContent>
       </Card>
 
-      {bundle && calc.length > 0 && (
-        <Card>
-          <CardContent className="p-5 space-y-2">
-            <h3 className="font-semibold text-foreground flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Auto Breakdown (AI Organic Ratios)
-            </h3>
-            {calc.map(({ it, qty, price, ratio }) => (
-              <div key={it.id} className="flex items-center justify-between gap-2 bg-muted/30 rounded-md p-2.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Badge className="capitalize">{it.engagement_type}</Badge>
-                  <span className="text-xs text-muted-foreground truncate max-w-[260px]">{it.service_name || "service"} • #{it.provider_service_id}</span>
-                  <span className="text-[10px] text-muted-foreground">({ratio}%)</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold">{qty.toLocaleString()} qty</div>
-                  <div className="text-xs text-muted-foreground">${price.toFixed(4)}</div>
-                </div>
-              </div>
+      {/* Link */}
+      <Card className="glass-card border-2 border-border">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+              <LinkIcon className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
+            </div>
+            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Video/Post Link</Label>
+          </div>
+          <Input
+            placeholder={`https://${platform}.com/...`}
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            className="h-12 sm:h-14 text-base sm:text-lg rounded-xl border-2 border-border focus:border-foreground bg-secondary text-foreground font-medium"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Base Quantity */}
+      <Card className="glass-card border-2 border-border">
+        <CardContent className="p-4 sm:p-6">
+          <QuantitySelector
+            value={baseQuantity}
+            onChange={setBaseQuantity}
+            min={100}
+            max={10000000}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Engagement Breakdown */}
+      <div className="space-y-4 sm:space-y-5">
+        <div className="flex items-center justify-between px-1 gap-2">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">Engagement Breakdown</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 hidden sm:block">
+              Customize organic settings per type
+            </p>
+          </div>
+          <span className="text-xs sm:text-sm bg-foreground text-background px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold shrink-0">
+            {Object.values(engagements).filter(e => e.enabled).length} active
+          </span>
+        </div>
+
+        {activeEngagementTypes.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              Is bundle me koi linked service nahi hai. <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se service ID link karo.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:gap-4">
+            {activeEngagementTypes.map((type) => (
+              engagements[type] && (
+                <EngagementTypeCard
+                  key={type}
+                  type={type}
+                  config={engagements[type]}
+                  baseQuantity={baseQuantity}
+                  onChange={(config) => handleEngagementChange(type, config)}
+                  minQuantity={engagements[type]?.minQuantity}
+                  pricePerK={pricePerKMap[type]}
+                />
+              )
             ))}
-            {items.length > calc.length && (
-              <p className="text-xs text-amber-400">⚠ {items.length - calc.length} item(s) ke paas linked service nahi hai — skip honge.</p>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
+      </div>
+
+      {activeEngagementTypes.length > 0 && (
+        <LiveGrowthChart
+          engagements={engagements as Record<EngagementType, EngagementConfig>}
+          refreshKey={previewRefreshKey}
+          onRefresh={() => setPreviewRefreshKey(k => k + 1)}
+          platform={platform}
+        />
       )}
 
-      <Card className="border-2 border-primary/40">
-        <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-2xl font-bold text-primary">${totalPrice.toFixed(4)}</div>
-            <div className="text-xs text-muted-foreground">{totalQty.toLocaleString()} engagements • provider balance se katenge</div>
+      {activeEngagementTypes.length > 0 && (
+        <DeliveryPreview
+          engagements={engagements as Record<EngagementType, EngagementConfig>}
+          refreshKey={previewRefreshKey}
+          platform={platform}
+        />
+      )}
+
+      {/* Order Summary */}
+      <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1 sm:space-y-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary">${totalPrice.toFixed(4)}</span>
+                <span className="text-muted-foreground text-xs sm:text-sm">total (provider)</span>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {totalQty.toLocaleString()} engagements • aapke provider balance se katenge
+              </p>
+            </div>
+            <Button
+              size="lg"
+              onClick={() => place.mutate()}
+              disabled={!bundle || !link.trim() || place.isPending || totalQty === 0}
+              className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-bold rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
+            >
+              {place.isPending ? (
+                <><Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" /> Processing...</>
+              ) : (
+                <><Rocket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Place Order — ${totalPrice.toFixed(4)}</>
+              )}
+            </Button>
           </div>
-          <Button
-            size="lg"
-            disabled={!bundle || !link.trim() || place.isPending || totalQty === 0}
-            onClick={() => place.mutate()}
-          >
-            {place.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Placing...</> : <><Rocket className="w-4 h-4 mr-2" /> Place Order</>}
-          </Button>
         </CardContent>
       </Card>
     </div>
