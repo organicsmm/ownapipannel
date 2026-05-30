@@ -5,6 +5,7 @@ import {
   KeyRound, Layers, Boxes
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useCurrency, CURRENCIES } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
