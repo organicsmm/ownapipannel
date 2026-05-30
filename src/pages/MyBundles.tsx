@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Package } from "lucide-react";
+import { Plus, Loader2, Trash2, Package, Download } from "lucide-react";
 
 const PLATFORMS = ["Instagram", "YouTube", "TikTok", "Facebook", "Twitter", "Telegram", "Spotify", "Other"];
 const ENGAGEMENT_TYPES = ["views", "likes", "comments", "shares", "followers", "subscribers", "saves", "reposts"];
@@ -38,7 +38,7 @@ function MyBundlesInner() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_bundles")
-        .select("*, user_bundle_items(*, user_services(name, price))")
+        .select("*, user_bundle_items(*, user_provider_accounts(name))")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -81,7 +81,7 @@ function MyBundlesInner() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">My Bundles</h1>
-          <p className="text-sm text-muted-foreground mt-1">Apne services se engagement bundles banao (Instagram likes + views + comments, etc.).</p>
+          <p className="text-sm text-muted-foreground mt-1">Apne provider se directly service ID import karke bundle banao.</p>
         </div>
         <Button onClick={() => setCreating(!creating)}>
           <Plus className="w-4 h-4 mr-2" /> New Bundle
@@ -137,35 +137,76 @@ function BundleCard({ bundle, onDelete }: { bundle: any; onDelete: () => void })
   const qc = useQueryClient();
   const { user } = useAuth();
   const [addingItem, setAddingItem] = useState(false);
-  const [itemForm, setItemForm] = useState({ engagement_type: "likes", user_service_id: "", ratio_percent: 100, is_base: false });
+  const [itemForm, setItemForm] = useState({
+    engagement_type: "likes",
+    user_provider_account_id: "",
+    provider_service_id: "",
+    ratio_percent: 100,
+  });
+  const [importing, setImporting] = useState(false);
 
-  const { data: services } = useQuery({
-    queryKey: ["user-services-list", user?.id],
+  const { data: providers } = useQuery({
+    queryKey: ["user-providers-list", user?.id],
     enabled: !!user && addingItem,
     queryFn: async () => {
-      const { data } = await supabase.from("user_services").select("id, name, price, category").eq("is_active", true).order("name");
+      const { data } = await supabase
+        .from("user_provider_accounts")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
       return data || [];
     },
   });
 
+  const importService = async () => {
+    if (!itemForm.user_provider_account_id || !itemForm.provider_service_id) {
+      toast.error("Provider aur service ID select/enter karo");
+      return null;
+    }
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("user-import-services", {
+        body: {
+          user_provider_account_id: itemForm.user_provider_account_id,
+          service_ids: [itemForm.provider_service_id],
+        },
+      });
+      if (error) throw error;
+      const svc = data?.services?.[0];
+      if (!svc) throw new Error("Service nahi mili provider par");
+      return svc;
+    } catch (e: any) {
+      toast.error(e.message || "Import fail");
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const addItem = useMutation({
     mutationFn: async () => {
+      const svc = await importService();
+      if (!svc) throw new Error("aborted");
       const { error } = await supabase.from("user_bundle_items").insert({
         user_bundle_id: bundle.id,
         engagement_type: itemForm.engagement_type,
-        user_service_id: itemForm.user_service_id || null,
+        user_provider_account_id: itemForm.user_provider_account_id,
+        provider_service_id: itemForm.provider_service_id,
+        service_name: svc.name,
+        rate: svc.rate,
+        min_qty: svc.min,
+        max_qty: svc.max,
         ratio_percent: itemForm.ratio_percent,
-        is_base: itemForm.is_base,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Item added");
-      setItemForm({ engagement_type: "likes", user_service_id: "", ratio_percent: 100, is_base: false });
+      toast.success("Service imported & added to bundle");
+      setItemForm({ engagement_type: "likes", user_provider_account_id: "", provider_service_id: "", ratio_percent: 100 });
       setAddingItem(false);
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => { if (e.message !== "aborted") toast.error(e.message); },
   });
 
   const removeItem = useMutation({
@@ -197,32 +238,66 @@ function BundleCard({ bundle, onDelete }: { bundle: any; onDelete: () => void })
       </div>
 
       {addingItem && (
-        <div className="border border-border rounded-lg p-3 mb-3 grid sm:grid-cols-4 gap-2">
-          <Select value={itemForm.engagement_type} onValueChange={(v) => setItemForm({ ...itemForm, engagement_type: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{ENGAGEMENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={itemForm.user_service_id} onValueChange={(v) => setItemForm({ ...itemForm, user_service_id: v })}>
-            <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
-            <SelectContent>
-              {(services || []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name.slice(0, 50)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Input type="number" placeholder="Ratio %" value={itemForm.ratio_percent} onChange={(e) => setItemForm({ ...itemForm, ratio_percent: Number(e.target.value) })} />
-          <Button size="sm" onClick={() => addItem.mutate()} disabled={!itemForm.user_service_id || addItem.isPending}>Add</Button>
+        <div className="border border-border rounded-lg p-3 mb-3 space-y-2">
+          <div className="grid sm:grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Engagement Type</Label>
+              <Select value={itemForm.engagement_type} onValueChange={(v) => setItemForm({ ...itemForm, engagement_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{ENGAGEMENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Provider</Label>
+              <Select value={itemForm.user_provider_account_id} onValueChange={(v) => setItemForm({ ...itemForm, user_provider_account_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Apna provider" /></SelectTrigger>
+                <SelectContent>
+                  {(providers || []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Provider Service ID</Label>
+              <Input
+                placeholder="e.g. 1234"
+                value={itemForm.provider_service_id}
+                onChange={(e) => setItemForm({ ...itemForm, provider_service_id: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Ratio %</Label>
+              <Input
+                type="number"
+                value={itemForm.ratio_percent}
+                onChange={(e) => setItemForm({ ...itemForm, ratio_percent: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => addItem.mutate()}
+            disabled={!itemForm.user_provider_account_id || !itemForm.provider_service_id || addItem.isPending || importing}
+          >
+            {(addItem.isPending || importing) ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+            Import & Add
+          </Button>
         </div>
       )}
 
       <div className="space-y-1.5">
         {(bundle.user_bundle_items || []).length === 0 ? (
-          <p className="text-xs text-muted-foreground">No items yet. Add some services to make this bundle usable.</p>
+          <p className="text-xs text-muted-foreground">No items yet. Provider se service ID import karke add karo.</p>
         ) : (
           bundle.user_bundle_items.map((item: any) => (
             <div key={item.id} className="flex items-center justify-between text-sm py-2 px-3 rounded-md bg-muted/30">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <Badge className="capitalize">{item.engagement_type}</Badge>
-                <span className="text-xs text-muted-foreground truncate">{item.user_services?.name || "service deleted"}</span>
-                <span className="text-xs text-muted-foreground">• {item.ratio_percent}%</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                  {item.service_name || "service"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  • #{item.provider_service_id} • {item.user_provider_accounts?.name || "?"} • {item.ratio_percent}%
+                </span>
               </div>
               <Button size="sm" variant="ghost" onClick={() => removeItem.mutate(item.id)}>
                 <Trash2 className="w-3 h-3 text-destructive" />
