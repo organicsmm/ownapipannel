@@ -14,8 +14,8 @@ interface SidebarProps { onClose?: () => void; }
 
 const userNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW' },
-  { icon: Brain, label: 'AI Intelligence', path: '/intelligence', tag: 'AI' },
+  { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW', requiresSub: true },
+  { icon: Brain, label: 'AI Intelligence', path: '/intelligence' },
   { icon: Sparkles, label: 'Engagement Orders', path: '/engagement-orders' },
   { icon: Code2, label: 'API Access', path: '/api-access' },
   { icon: LifeBuoy, label: 'Support', path: '/support' },
@@ -25,6 +25,8 @@ const userNavItems = [
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
   const { isAdmin, signOut, profile } = useAuth();
+  const { hasActiveSubscription } = useSubscription();
+  const canUsePro = isAdmin || hasActiveSubscription;
   const { currency, setCurrency, currencyInfo } = useCurrency();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
