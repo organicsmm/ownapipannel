@@ -97,6 +97,8 @@ export default function EngagementOrderDetail() {
     queryKey: ['engagement-order-detail', orderNumber],
     queryFn: async () => {
       if (!orderNumber) return null;
+      // Only select fields the UI actually renders — keeps payload small
+      // even when an order has hundreds of thousands of runs.
       const { data, error } = await supabase
         .from('engagement_orders')
         .select(`
@@ -105,7 +107,11 @@ export default function EngagementOrderDetail() {
           items:engagement_order_items(
             *,
             service:services(name, price, min_quantity),
-            runs:organic_run_schedule(*)
+            runs:organic_run_schedule(
+              id, run_number, status, scheduled_at, quantity_to_send,
+              provider_order_id, provider_status, provider_remains,
+              provider_account_name, last_status_check, error_message
+            )
           )
         `)
         .eq('order_number', parseInt(orderNumber))

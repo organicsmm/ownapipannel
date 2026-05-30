@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { AdminGuard } from "@/components/admin/AdminGuard";
@@ -11,58 +11,59 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { toast } from "sonner";
 import { AppErrorBoundary } from "@/components/app/AppErrorBoundary";
 
-
-// ALL pages eager-loaded for instantaneous navigation
+// Eager — landing/auth/dashboard so first paint is instant
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Services from "./pages/Services";
-import Order from "./pages/Order";
-import Orders from "./pages/Orders";
-import Wallet from "./pages/Wallet";
-import Settings from "./pages/Settings";
-import Support from "./pages/Support";
-import ApiAccess from "./pages/ApiAccess";
-import Intelligence from "./pages/Intelligence";
-import MyProviders from "./pages/MyProviders";
 
-import MyBundles from "./pages/MyBundles";
+// Lazy — everything else is code-split so a single user's heavy workload
+// (millions of runs, bundles, admin tools) never blocks anyone else's UI.
+const Services = lazy(() => import("./pages/Services"));
+const Order = lazy(() => import("./pages/Order"));
+const Orders = lazy(() => import("./pages/Orders"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Support = lazy(() => import("./pages/Support"));
+const ApiAccess = lazy(() => import("./pages/ApiAccess"));
+const Intelligence = lazy(() => import("./pages/Intelligence"));
+const MyProviders = lazy(() => import("./pages/MyProviders"));
+const MyBundles = lazy(() => import("./pages/MyBundles"));
 
-// Engagement pages
-import EngagementOrder from "./pages/UserEngagementOrder";
-import EngagementOrders from "./pages/EngagementOrders";
-import EngagementOrderDetail from "./pages/EngagementOrderDetail";
+// Engagement pages — heaviest user-facing screens, always lazy
+const EngagementOrder = lazy(() => import("./pages/UserEngagementOrder"));
+const EngagementOrders = lazy(() => import("./pages/EngagementOrders"));
+const EngagementOrderDetail = lazy(() => import("./pages/EngagementOrderDetail"));
 
-// Admin pages
-import Admin from "./pages/admin/Admin";
-import AdminServices from "./pages/admin/AdminServices";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminOrders from "./pages/admin/AdminOrders";
-import AdminBundles from "./pages/admin/AdminBundles";
-import AdminCronMonitor from "./pages/admin/AdminCronMonitor";
+// Admin pages — only admins ever load these chunks
+const Admin = lazy(() => import("./pages/admin/Admin"));
+const AdminServices = lazy(() => import("./pages/admin/AdminServices"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
+const AdminBundles = lazy(() => import("./pages/admin/AdminBundles"));
+const AdminCronMonitor = lazy(() => import("./pages/admin/AdminCronMonitor"));
+const AdminChat = lazy(() => import("./pages/admin/AdminChat"));
+const AdminDeposits = lazy(() => import("./pages/admin/AdminDeposits"));
+const AdminProviderAccounts = lazy(() => import("./pages/admin/AdminProviderAccounts"));
+const AdminServiceProviderMapping = lazy(() => import("./pages/admin/AdminServiceProviderMapping"));
+const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
 
-import AdminChat from "./pages/admin/AdminChat";
-import AdminDeposits from "./pages/admin/AdminDeposits";
-import AdminProviderAccounts from "./pages/admin/AdminProviderAccounts";
-import AdminServiceProviderMapping from "./pages/admin/AdminServiceProviderMapping";
-import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
 import { SubscriptionGuard } from "./components/subscription/SubscriptionGuard";
 
-// Legal pages
-import TermsOfService from "./pages/legal/TermsOfService";
-import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
-import RefundPolicy from "./pages/legal/RefundPolicy";
-import CookiePolicy from "./pages/legal/CookiePolicy";
+// Legal — lazy
+const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const RefundPolicy = lazy(() => import("./pages/legal/RefundPolicy"));
+const CookiePolicy = lazy(() => import("./pages/legal/CookiePolicy"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,       // 5 min — use cache, don't refetch
-      gcTime: 15 * 60 * 1000,          // 15 min cache retention
-      refetchOnWindowFocus: false,      // Don't refetch on tab switch
-      refetchOnReconnect: false,        // Don't refetch on reconnect
-      refetchOnMount: false,            // Use cached data on navigation
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
       retry: 2,
       retryDelay: (i) => Math.min(1000 * 2 ** i, 10000),
     },
@@ -72,6 +73,12 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+  </div>
+);
 
 const App = () => {
   useEffect(() => {
@@ -101,7 +108,7 @@ const App = () => {
             <AppErrorBoundary>
               <BrowserRouter>
                 <ScrollToTop />
-                
+                <Suspense fallback={<RouteFallback />}>
                   <Routes>
                     {/* User pages */}
                     <Route path="/" element={<Index />} />
@@ -119,7 +126,6 @@ const App = () => {
 
                     {/* My Provider (per-user API system) */}
                     <Route path="/my-providers" element={<MyProviders />} />
-                    
                     <Route path="/my-bundles" element={<MyBundles />} />
 
                     {/* Engagement */}
@@ -146,7 +152,7 @@ const App = () => {
                     <Route path="/refund" element={<RefundPolicy />} />
                     <Route path="/cookies" element={<CookiePolicy />} />
                   </Routes>
-                
+                </Suspense>
               </BrowserRouter>
             </AppErrorBoundary>
           </TooltipProvider>
