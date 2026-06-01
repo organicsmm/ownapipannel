@@ -635,13 +635,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "organic_run_schedule_provider_account_id_fkey"
-            columns: ["provider_account_id"]
-            isOneToOne: false
-            referencedRelation: "provider_accounts"
-            referencedColumns: ["id"]
-          },
         ]
       }
       platform_settings: {

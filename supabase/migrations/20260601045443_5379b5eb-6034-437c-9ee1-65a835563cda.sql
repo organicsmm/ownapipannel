@@ -1,0 +1,2 @@
+ALTER TABLE public.organic_run_schedule
+DROP CONSTRAINT IF EXISTS organic_run_schedule_provider_account_id_fkey;
