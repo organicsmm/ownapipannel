@@ -1515,6 +1515,10 @@ export type Database = {
       cleanup_old_completed_engagement_orders: { Args: never; Returns: Json }
       get_admin_dashboard_stats: { Args: never; Returns: Json }
       get_admin_users_summary: { Args: never; Returns: Json }
+      get_engagement_order_run_stats: {
+        Args: { _order_id: string }
+        Returns: Json
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
