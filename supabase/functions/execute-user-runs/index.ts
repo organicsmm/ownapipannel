@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
       .lte("scheduled_at", nowIso)
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .order("scheduled_at", { ascending: true })
-      .limit(50);
+      .limit(200);
 
     if (error) {
       console.error("Fetch due runs error:", error);
