@@ -135,10 +135,25 @@ Deno.serve(async (req) => {
         let providerName: string
 
         if (run.provider_account) {
-          // Use the actual provider account that placed this order
+          // Use the actual admin provider account that placed this order
           apiKey = run.provider_account.api_key
           apiUrl = run.provider_account.api_url
           providerName = run.provider_account.name
+        } else if (run.provider_account_id) {
+          // User-API order: provider_account_id points to user_provider_accounts
+          const { data: userProv } = await supabase
+            .from('user_provider_accounts')
+            .select('id, name, api_key, api_url')
+            .eq('id', run.provider_account_id)
+            .maybeSingle()
+          if (userProv) {
+            apiKey = userProv.api_key
+            apiUrl = userProv.api_url
+            providerName = userProv.name
+          } else {
+            console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found in provider_accounts or user_provider_accounts`)
+            continue
+          }
         } else {
           // Fallback to default provider (legacy runs without provider_account_id)
           const providerId = run.engagement_order_item?.service?.provider_id
@@ -146,22 +161,20 @@ Deno.serve(async (req) => {
             console.error(`Run ${run.id} has no provider_account and no service provider_id`)
             continue
           }
-          
           const { data: provider } = await supabase
             .from('providers')
             .select('*')
             .eq('id', providerId)
             .single()
-            
           if (!provider) {
             console.error(`Provider ${providerId} not found for run ${run.id}`)
             continue
           }
-          
           apiKey = provider.api_key
           apiUrl = provider.api_url
           providerName = provider.name
         }
+
 
         console.log(`Checking ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id} on ${providerName}`)
 
