@@ -1509,6 +1509,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      claim_user_api_run_provider: {
+        Args: {
+          _engagement_type: string
+          _link: string
+          _provider_account_id: string
+          _provider_account_name: string
+          _run_id: string
+        }
+        Returns: boolean
+      }
       cleanup_old_completed_engagement_orders: { Args: never; Returns: Json }
       get_admin_dashboard_stats: { Args: never; Returns: Json }
       get_admin_users_summary: { Args: never; Returns: Json }
