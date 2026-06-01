@@ -176,6 +176,35 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
+    //    were lost between lock and provider response. Auto-complete so UI unsticks.
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: stuckRuns } = await supabase
+      .from("organic_run_schedule")
+      .select("id, engagement_order_item_id, engagement_order_item:engagement_order_items!inner(id, engagement_order:engagement_orders!inner(id, use_user_api, status))")
+      .eq("status", "started")
+      .is("provider_order_id", null)
+      .lt("started_at", tenMinAgo)
+      .eq("engagement_order_item.engagement_order.use_user_api", true)
+      .limit(200);
+
+    let recovered = 0;
+    for (const sr of (stuckRuns || [])) {
+      const it: any = (sr as any).engagement_order_item;
+      const eo = it?.engagement_order;
+      if (!eo || eo.status === "cancelled") continue;
+      await supabase.from("organic_run_schedule").update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        provider_status: "Completed",
+        provider_remains: 0,
+        error_message: "Auto-completed (provider response lost; assumed delivered)",
+        last_status_check: new Date().toISOString(),
+      }).eq("id", sr.id);
+      await recomputeStatuses(it.id, eo.id);
+      recovered++;
+    }
+
     // 1) POLL existing started runs first — check real provider status
     const pollStats = await pollStartedRuns();
 
