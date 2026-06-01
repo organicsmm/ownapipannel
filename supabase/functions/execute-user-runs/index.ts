@@ -283,6 +283,31 @@ Deno.serve(async (req) => {
         failed++; continue;
       }
 
+      // ===== BUSY-LINK ROTATION =====
+      // Skip providers currently busy on the SAME link (in-progress run on same engagement_type).
+      // First priority free provider gets the run. If all are busy, defer (keep pending) — next tick retries.
+      const { data: busyRuns } = await supabase
+        .from("organic_run_schedule")
+        .select("provider_account_id, engagement_order_item:engagement_order_items!inner(engagement_type, engagement_order:engagement_orders!inner(link))")
+        .eq("status", "started")
+        .not("provider_account_id", "is", null)
+        .eq("engagement_order_item.engagement_type", item.engagement_type)
+        .eq("engagement_order_item.engagement_order.link", eo.link);
+
+      const busyProviderIds = new Set(
+        (busyRuns || []).map((r: any) => r.provider_account_id).filter(Boolean)
+      );
+
+      const freeCandidates = candidates.filter(c => !busyProviderIds.has(c.provider.id));
+
+      if (freeCandidates.length === 0) {
+        console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
+        skipped++;
+        continue;
+      }
+
+      candidates = freeCandidates;
+
       const { data: locked, error: lockErr } = await supabase
         .from("organic_run_schedule")
         .update({ status: "started", started_at: new Date().toISOString(), provider_account_name: candidates[0].provider.name })
