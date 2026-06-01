@@ -283,47 +283,36 @@ Deno.serve(async (req) => {
         failed++; continue;
       }
 
-      // ===== BUSY-LINK ROTATION =====
-      // Skip providers currently busy on the SAME link (in-progress run on same engagement_type).
-      // First priority free provider gets the run. If all are busy, defer (keep pending) — next tick retries.
-      const { data: busyRuns } = await supabase
-        .from("organic_run_schedule")
-        .select("provider_account_id, engagement_order_item:engagement_order_items!inner(engagement_type, engagement_order:engagement_orders!inner(link))")
-        .eq("status", "started")
-        .not("provider_account_id", "is", null)
-        .eq("engagement_order_item.engagement_type", item.engagement_type)
-        .eq("engagement_order_item.engagement_order.link", eo.link);
-
-      const busyProviderIds = new Set(
-        (busyRuns || []).map((r: any) => r.provider_account_id).filter(Boolean)
-      );
-
-      const freeCandidates = candidates.filter(c => !busyProviderIds.has(c.provider.id));
-
-      if (freeCandidates.length === 0) {
-        console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
-        skipped++;
-        continue;
-      }
-
-      candidates = freeCandidates;
-
-      const { data: locked, error: lockErr } = await supabase
-        .from("organic_run_schedule")
-        .update({ status: "started", started_at: new Date().toISOString(), provider_account_name: candidates[0].provider.name })
-        .eq("id", run.id)
-        .eq("status", "pending")
-        .select("id")
-        .maybeSingle();
-      if (lockErr || !locked) { skipped++; continue; }
-
       let success = false;
       let lastErr = "";
       let lastResult: any = null;
       let usedProvider: any = candidates[0].provider;
       let usedOrderId: string | null = null;
+      let attemptedProvider = false;
 
       for (const cand of candidates) {
+        const { data: claimed, error: claimErr } = await supabase.rpc("claim_user_api_run_provider", {
+          _run_id: run.id,
+          _provider_account_id: cand.provider.id,
+          _provider_account_name: cand.provider.name,
+          _link: eo.link,
+          _engagement_type: item.engagement_type,
+        });
+
+        if (claimErr) {
+          lastErr = `Provider lock failed: ${claimErr.message || "unknown error"}`;
+          console.error(`Run ${run.id}: ${lastErr}`);
+          break;
+        }
+
+        if (!claimed) {
+          lastErr = `[${cand.provider.name}] busy on this link/service`;
+          continue;
+        }
+
+        attemptedProvider = true;
+        usedProvider = cand.provider;
+
         try {
           const form = new URLSearchParams();
           form.append("key", cand.provider.api_key);
@@ -348,15 +337,35 @@ Deno.serve(async (req) => {
 
           if (result?.error) {
             lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
+            await supabase.from("organic_run_schedule").update({
+              status: "pending",
+              provider_account_id: null,
+              provider_account_name: null,
+              error_message: lastErr,
+              provider_response: result,
+              last_status_check: new Date().toISOString(),
+            }).eq("id", run.id).eq("status", "started").eq("provider_account_id", cand.provider.id);
             continue;
           }
-          usedProvider = cand.provider;
           usedOrderId = (result.order ?? result.id)?.toString() || null;
           success = true;
           break;
         } catch (e: any) {
           lastErr = `[${cand.provider.name}] Network: ${e?.message || "unknown"}`;
+          await supabase.from("organic_run_schedule").update({
+            status: "pending",
+            provider_account_id: null,
+            provider_account_name: null,
+            error_message: lastErr,
+            last_status_check: new Date().toISOString(),
+          }).eq("id", run.id).eq("status", "started").eq("provider_account_id", cand.provider.id);
         }
+      }
+
+      if (!success && !attemptedProvider) {
+        console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
+        skipped++;
+        continue;
       }
 
       if (success) {
