@@ -13,17 +13,30 @@ const supabase = createClient(
 const TERMINAL_OK = ["completed", "complete", "success", "partial"];
 const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
 
-async function recomputeStatuses(itemId: string, engOrderId: string) {
-  const { data: runs } = await supabase
+// Use head:true count queries instead of pulling every row — O(1) regardless of run count.
+async function countRuns(itemId: string, status: string): Promise<number> {
+  const { count } = await supabase
     .from("organic_run_schedule")
-    .select("status")
+    .select("*", { count: "exact", head: true })
+    .eq("engagement_order_item_id", itemId)
+    .eq("status", status);
+  return count || 0;
+}
+
+async function recomputeStatuses(itemId: string, engOrderId: string) {
+  const { count: total } = await supabase
+    .from("organic_run_schedule")
+    .select("*", { count: "exact", head: true })
     .eq("engagement_order_item_id", itemId);
-  if (!runs || runs.length === 0) return;
-  const total = runs.length;
-  const done = runs.filter((r: any) => r.status === "completed").length;
-  const failed = runs.filter((r: any) => r.status === "failed").length;
-  const cancelled = runs.filter((r: any) => r.status === "cancelled").length;
-  const active = runs.filter((r: any) => r.status === "pending" || r.status === "started").length;
+  if (!total) return;
+  const [done, failed, cancelled, pending, started] = await Promise.all([
+    countRuns(itemId, "completed"),
+    countRuns(itemId, "failed"),
+    countRuns(itemId, "cancelled"),
+    countRuns(itemId, "pending"),
+    countRuns(itemId, "started"),
+  ]);
+  const active = pending + started;
   let itemStatus = "processing";
   if (active > 0) itemStatus = "processing";
   else if (done === total) itemStatus = "completed";
