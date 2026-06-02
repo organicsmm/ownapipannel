@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
       }
 
       for (let idx = entries.length - 1; idx >= 0; idx--) {
-        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < providerMin && entries.length > 1) {
+        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < minBatch && entries.length > 1) {
           const targetIdx = idx > 0 ? idx - 1 : 1;
           entries[targetIdx].quantity_to_send += entries[idx].quantity_to_send;
           entries[targetIdx].base_quantity += entries[idx].base_quantity;
