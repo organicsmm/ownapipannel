@@ -157,59 +157,53 @@ Deno.serve(async (req) => {
 
     for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
-      const providerMin = Math.max(1, Number(bi.min_qty || 1));
-      let batchCap = Math.max(c.batchCap, providerMin);
+      // Effective provider min — if stored bundle min looks stale (way above our drip cap),
+      // fall back to organic minBatch so we can actually drip in 100-400 chunks.
+      const rawProviderMin = Math.max(1, Number(bi.min_qty || 1));
+      const providerMin = rawProviderMin > c.maxBatch ? c.minBatch : rawProviderMin;
+      const minBatch = Math.max(providerMin, c.minBatch);
+      const maxBatch = Math.max(minBatch, c.maxBatch);
+      const avgBatch = (minBatch + maxBatch) / 2;
       const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
 
       let targetRuns: number;
       let intervalMinutes: number;
 
       if (time_limit_hours && time_limit_hours > 0) {
-        // User-set delivery window: distribute runs evenly across the window
+        // User-set delivery window
         const totalMinutes = time_limit_hours * 60;
-        const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
-        const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
-        const comfortableMax = quantity > providerMin
-          ? Math.max(1, Math.floor(quantity / Math.max(providerMin + 1, providerMin * 1.2)))
-          : 1;
-        targetRuns = Math.min(ideal, maxFeasible, comfortableMax, Math.max(1, Math.floor(totalMinutes / 5)));
+        const ideal = Math.max(1, Math.ceil(quantity / avgBatch));
+        targetRuns = Math.min(ideal, c.maxRuns, Math.max(1, Math.floor(totalMinutes / 3)));
         if (targetRuns < 1) targetRuns = 1;
         intervalMinutes = totalMinutes / targetRuns;
       } else if (is_organic_mode) {
-        const ideal = Math.max(c.minRuns, Math.min(c.maxRuns, Math.round((quantity / 1000) * c.runsPerThousand)));
-        const maxFeasible = Math.max(1, Math.floor(quantity / providerMin));
-        const comfortableMax = quantity > providerMin
-          ? Math.max(1, Math.floor(quantity / Math.max(providerMin + 1, providerMin * 1.2)))
-          : 1;
-        targetRuns = Math.min(ideal, maxFeasible, comfortableMax);
+        targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, Math.ceil(quantity / avgBatch)));
         if (targetRuns < 1) targetRuns = 1;
         intervalMinutes = c.baseInterval;
       } else {
-        targetRuns = Math.max(1, Math.ceil(quantity / batchCap));
+        targetRuns = Math.max(1, Math.ceil(quantity / maxBatch));
         intervalMinutes = c.baseInterval;
       }
-      batchCap = Math.max(batchCap, Math.ceil((quantity / Math.max(1, targetRuns)) * 2));
 
       const entries: any[] = [];
       let remaining = quantity;
-      let currentTime = new Date(startTime.getTime() + (5 + Math.random() * 10) * 60 * 1000);
+      let currentTime = new Date(startTime.getTime() + (3 + Math.random() * 7) * 60 * 1000);
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
-        const baseQty = remaining / runsLeft;
-        // Apply user variance to per-run quantity
-        const varianceFactor = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : 1;
-        let qty = Math.round(baseQty * varianceFactor);
-        const minNeededAfter = (runsLeft - 1) * providerMin;
-        const maxAllowedNow = Math.max(providerMin, remaining - minNeededAfter);
-        qty = Math.max(providerMin, Math.min(qty, maxAllowedNow, batchCap));
-        if (i === targetRuns) qty = remaining;
+        // Random batch in [minBatch, maxBatch] — true organic drip
+        let qty = Math.floor(minBatch + Math.random() * (maxBatch - minBatch + 1));
+        // Ensure remaining runs can still each hit their min
+        const minNeededAfter = (runsLeft - 1) * minBatch;
+        const maxAllowedNow = Math.max(minBatch, remaining - minNeededAfter);
+        qty = Math.max(minBatch, Math.min(qty, maxAllowedNow, maxBatch));
+        // Last run = everything left
+        if (i === targetRuns || remaining - qty < minBatch) qty = remaining;
 
-        // Peak hours: bias toward 6-11pm IST (UTC+5:30) — shift scheduled_at slightly into peak window
+        // Peak hours: bias toward 6-11pm IST
         let scheduled = new Date(currentTime);
         if (peak_hours_enabled) {
           const istHour = (scheduled.getUTCHours() + 5 + Math.floor((scheduled.getUTCMinutes() + 30) / 60)) % 24;
           if (istHour < 18 || istHour > 23) {
-            // Pull forward/back into 18-23 IST by adding random hours within peak window
             const targetHourIST = 18 + Math.floor(Math.random() * 6);
             const deltaHours = ((targetHourIST - istHour) + 24) % 24;
             if (deltaHours <= 6) scheduled = new Date(scheduled.getTime() + deltaHours * 60 * 60 * 1000);
@@ -225,9 +219,9 @@ Deno.serve(async (req) => {
           status: "pending",
         });
         remaining -= qty;
-        // Interval variance: ±variance around configured interval
+        if (remaining <= 0) break;
         const intervalJitter = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : (1 + (Math.random() * 0.4 - 0.2));
-        currentTime = new Date(currentTime.getTime() + Math.max(5, intervalMinutes * intervalJitter) * 60 * 1000);
+        currentTime = new Date(currentTime.getTime() + Math.max(3, intervalMinutes * intervalJitter) * 60 * 1000);
       }
       if (remaining > 0 && entries.length > 0) {
         entries[entries.length - 1].quantity_to_send += remaining;
@@ -235,7 +229,7 @@ Deno.serve(async (req) => {
       }
 
       for (let idx = entries.length - 1; idx >= 0; idx--) {
-        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < providerMin && entries.length > 1) {
+        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < minBatch && entries.length > 1) {
           const targetIdx = idx > 0 ? idx - 1 : 1;
           entries[targetIdx].quantity_to_send += entries[idx].quantity_to_send;
           entries[targetIdx].base_quantity += entries[idx].base_quantity;
