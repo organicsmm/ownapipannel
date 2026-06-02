@@ -157,11 +157,10 @@ Deno.serve(async (req) => {
 
     for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
-      // Effective provider min — if stored bundle min looks stale (way above our drip cap),
-      // fall back to organic minBatch so we can actually drip in 100-400 chunks.
-      const rawProviderMin = Math.max(1, Number(bi.min_qty || 1));
-      const providerMin = rawProviderMin > c.maxBatch ? c.minBatch : rawProviderMin;
-      const minBatch = Math.max(providerMin, c.minBatch);
+      // ALWAYS respect provider's real min_qty for the linked service —
+      // sending below provider min causes the order to fail at the panel.
+      const providerMin = Math.max(1, Number(bi.min_qty || 1));
+      const minBatch = providerMin;
       const maxBatch = Math.max(minBatch, c.maxBatch);
       const avgBatch = (minBatch + maxBatch) / 2;
       const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
