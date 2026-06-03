@@ -108,11 +108,11 @@ Deno.serve(async (req) => {
       .select("engagement_type, engagement_order:engagement_orders!inner(order_number)")
       .in("engagement_type", requestedTypes)
       .neq("status", "cancelled")
-      .eq("user_id", user.id)
-      .eq("user_bundle_id", bundle.id)
-      .eq("link", normalizedLink)
-      .eq("use_user_api", true)
-      .in("status", ["pending", "processing"])
+      .eq("engagement_order.user_id", user.id)
+      .eq("engagement_order.user_bundle_id", bundle.id)
+      .eq("engagement_order.link", normalizedLink)
+      .eq("engagement_order.use_user_api", true)
+      .in("engagement_order.status", ["pending", "processing"])
       .limit(1);
     if (duplicateItems && duplicateItems.length > 0) {
       const dup: any = duplicateItems[0];
