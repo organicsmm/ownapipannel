@@ -101,6 +101,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    const normalizedLink = link.trim();
+    const requestedTypes = resolved.map((r) => r.engagement_type);
+    const { data: activeOrders } = await supabase
+      .from("engagement_orders")
+      .select("id, order_number")
+      .eq("user_id", user.id)
+      .eq("user_bundle_id", bundle.id)
+      .eq("link", normalizedLink)
+      .eq("use_user_api", true)
+      .in("status", ["pending", "processing"]);
+    const activeOrderIds = (activeOrders || []).map((o: any) => o.id);
+    const { data: duplicateItems } = activeOrderIds.length > 0 ? await supabase
+      .from("engagement_order_items")
+      .select("engagement_type, engagement_order_id")
+      .in("engagement_order_id", activeOrderIds)
+      .in("engagement_type", requestedTypes)
+      .neq("status", "cancelled")
+      .limit(1) : { data: [] } as any;
+    if (duplicateItems && duplicateItems.length > 0) {
+      const dup: any = duplicateItems[0];
+      const dupOrder = (activeOrders || []).find((o: any) => o.id === dup.engagement_order_id);
+      return new Response(JSON.stringify({ error: `Same link ka ${dup.engagement_type} order already active hai: #${dupOrder?.order_number}` }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const total_price = resolved.reduce((s, r) => s + r.price, 0);
     // Primary provider — for the engagement_orders.user_provider_account_id stamp
     const primaryProviderId = resolved[0].bi.user_provider_account_id;
@@ -110,7 +134,7 @@ Deno.serve(async (req) => {
       .from("engagement_orders")
       .insert({
         user_id: user.id,
-        link: link.trim(),
+        link: normalizedLink,
         base_quantity,
         total_price,
         is_organic_mode,
@@ -143,7 +167,8 @@ Deno.serve(async (req) => {
         .single();
       if (itemErr || !item) {
         console.error("Failed to create item:", itemErr);
-        continue;
+        await supabase.from("engagement_orders").update({ status: "cancelled", error_message: itemErr?.message || "Failed to create order item" }).eq("id", order.id);
+        return new Response(JSON.stringify({ error: itemErr?.message || "Failed to create order item" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       createdItems.push({
         itemId: item.id,
@@ -190,13 +215,17 @@ Deno.serve(async (req) => {
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
         // Random batch in [minBatch, maxBatch] — true organic drip
-        let qty = Math.floor(minBatch + Math.random() * (maxBatch - minBatch + 1));
-        // Ensure remaining runs can still each hit their min
-        const minNeededAfter = (runsLeft - 1) * minBatch;
-        const maxAllowedNow = Math.max(minBatch, remaining - minNeededAfter);
-        qty = Math.max(minBatch, Math.min(qty, maxAllowedNow, maxBatch));
-        // Last run = everything left
-        if (i === targetRuns || remaining - qty < minBatch) qty = remaining;
+        let qty: number;
+        if (i === targetRuns || remaining <= maxBatch) {
+          qty = remaining;
+        } else {
+          const minNeededAfter = (runsLeft - 1) * minBatch;
+          const maxAllowedNow = Math.min(maxBatch, Math.max(minBatch, remaining - minNeededAfter));
+          qty = Math.floor(minBatch + Math.random() * (maxAllowedNow - minBatch + 1));
+          if (remaining - qty > 0 && remaining - qty < minBatch) {
+            qty = Math.min(maxBatch, Math.max(minBatch, remaining - minBatch));
+          }
+        }
 
         // Peak hours: bias toward 6-11pm IST
         let scheduled = new Date(currentTime);
@@ -227,12 +256,20 @@ Deno.serve(async (req) => {
         entries[entries.length - 1].base_quantity += remaining;
       }
 
-      for (let idx = entries.length - 1; idx >= 0; idx--) {
-        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < minBatch && entries.length > 1) {
-          const targetIdx = idx > 0 ? idx - 1 : 1;
-          entries[targetIdx].quantity_to_send += entries[idx].quantity_to_send;
-          entries[targetIdx].base_quantity += entries[idx].base_quantity;
-          entries.splice(idx, 1);
+      for (let idx = entries.length - 1; idx > 0; idx--) {
+        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < minBatch) {
+          const deficit = minBatch - entries[idx].quantity_to_send;
+          const prev = entries[idx - 1];
+          if (prev.quantity_to_send - deficit >= minBatch) {
+            prev.quantity_to_send -= deficit;
+            prev.base_quantity -= deficit;
+            entries[idx].quantity_to_send += deficit;
+            entries[idx].base_quantity += deficit;
+          } else if (prev.quantity_to_send + entries[idx].quantity_to_send <= maxBatch) {
+            prev.quantity_to_send += entries[idx].quantity_to_send;
+            prev.base_quantity += entries[idx].base_quantity;
+            entries.splice(idx, 1);
+          }
         }
       }
       entries.forEach((entry, idx) => { entry.run_number = idx + 1; });

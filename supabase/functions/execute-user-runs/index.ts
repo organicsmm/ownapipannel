@@ -190,7 +190,8 @@ Deno.serve(async (req) => {
     }
 
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
-    //    were lost between lock and provider response. Auto-complete so UI unsticks.
+    //    may have timed out after reaching the provider. Do NOT retry them, because
+    //    retrying can duplicate views. Count them as completed so delivery moves on safely.
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: stuckRuns } = await supabase
       .from("organic_run_schedule")
@@ -209,9 +210,9 @@ Deno.serve(async (req) => {
       await supabase.from("organic_run_schedule").update({
         status: "completed",
         completed_at: new Date().toISOString(),
-        provider_status: "Completed",
+        provider_status: "Unknown",
         provider_remains: 0,
-        error_message: "Auto-completed (provider response lost; assumed delivered)",
+        error_message: "Provider response lost; counted as delivered to avoid duplicate retry",
         last_status_check: new Date().toISOString(),
       }).eq("id", sr.id);
       await recomputeStatuses(it.id, eo.id);
@@ -364,14 +365,21 @@ Deno.serve(async (req) => {
           success = true;
           break;
         } catch (e: any) {
-          lastErr = `[${cand.provider.name}] Network: ${e?.message || "unknown"}`;
+          lastErr = `[${cand.provider.name}] Network: ${e?.message || "unknown"}; kept locked to avoid duplicate delivery`;
           await supabase.from("organic_run_schedule").update({
-            status: "pending",
-            provider_account_id: null,
-            provider_account_name: null,
+            status: "started",
+            provider_account_id: cand.provider.id,
+            provider_account_name: cand.provider.name,
+            provider_order_id: null,
+            provider_status: "Unknown",
             error_message: lastErr,
             last_status_check: new Date().toISOString(),
           }).eq("id", run.id).eq("status", "started").eq("provider_account_id", cand.provider.id);
+          attemptedProvider = true;
+          success = true;
+          usedProvider = cand.provider;
+          usedOrderId = null;
+          break;
         }
       }
 
@@ -388,7 +396,7 @@ Deno.serve(async (req) => {
           provider_order_id: usedOrderId,
           provider_account_id: usedProvider.id,
           provider_account_name: usedProvider.name,
-          provider_status: "Pending",
+          provider_status: usedOrderId ? "Pending" : "Unknown",
           provider_response: lastResult,
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
