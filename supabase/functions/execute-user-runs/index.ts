@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
 
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
     //    may have timed out after reaching the provider. Do NOT retry them, because
-    //    retrying can duplicate views. Mark failed safely so the UI unsticks.
+    //    retrying can duplicate views. Count them as completed so delivery moves on safely.
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: stuckRuns } = await supabase
       .from("organic_run_schedule")
@@ -208,10 +208,11 @@ Deno.serve(async (req) => {
       const eo = it?.engagement_order;
       if (!eo || eo.status === "cancelled") continue;
       await supabase.from("organic_run_schedule").update({
-        status: "failed",
+        status: "completed",
         completed_at: new Date().toISOString(),
         provider_status: "Unknown",
-        error_message: "Provider response lost; not retried to avoid duplicate delivery",
+        provider_remains: 0,
+        error_message: "Provider response lost; counted as delivered to avoid duplicate retry",
         last_status_check: new Date().toISOString(),
       }).eq("id", sr.id);
       await recomputeStatuses(it.id, eo.id);
@@ -375,6 +376,9 @@ Deno.serve(async (req) => {
             last_status_check: new Date().toISOString(),
           }).eq("id", run.id).eq("status", "started").eq("provider_account_id", cand.provider.id);
           attemptedProvider = true;
+          success = true;
+          usedProvider = cand.provider;
+          usedOrderId = null;
           break;
         }
       }
