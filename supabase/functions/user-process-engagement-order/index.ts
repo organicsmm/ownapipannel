@@ -102,17 +102,21 @@ Deno.serve(async (req) => {
     }
 
     const normalizedLink = link.trim();
-    const { data: duplicateOrder } = await supabase
-      .from("engagement_orders")
-      .select("id, order_number")
+    const requestedTypes = resolved.map((r) => r.engagement_type);
+    const { data: duplicateItems } = await supabase
+      .from("engagement_order_items")
+      .select("engagement_type, engagement_order:engagement_orders!inner(order_number)")
+      .in("engagement_type", requestedTypes)
+      .neq("status", "cancelled")
       .eq("user_id", user.id)
       .eq("user_bundle_id", bundle.id)
       .eq("link", normalizedLink)
       .eq("use_user_api", true)
       .in("status", ["pending", "processing"])
-      .maybeSingle();
-    if (duplicateOrder) {
-      return new Response(JSON.stringify({ error: `Same link ka active order already chal raha hai: #${duplicateOrder.order_number}` }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      .limit(1);
+    if (duplicateItems && duplicateItems.length > 0) {
+      const dup: any = duplicateItems[0];
+      return new Response(JSON.stringify({ error: `Same link ka ${dup.engagement_type} order already active hai: #${dup.engagement_order?.order_number}` }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const total_price = resolved.reduce((s, r) => s + r.price, 0);
@@ -157,7 +161,8 @@ Deno.serve(async (req) => {
         .single();
       if (itemErr || !item) {
         console.error("Failed to create item:", itemErr);
-        continue;
+        await supabase.from("engagement_orders").update({ status: "cancelled", error_message: itemErr?.message || "Failed to create order item" }).eq("id", order.id);
+        return new Response(JSON.stringify({ error: itemErr?.message || "Failed to create order item" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       createdItems.push({
         itemId: item.id,
