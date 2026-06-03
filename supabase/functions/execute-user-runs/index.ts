@@ -396,7 +396,7 @@ Deno.serve(async (req) => {
           provider_order_id: usedOrderId,
           provider_account_id: usedProvider.id,
           provider_account_name: usedProvider.name,
-          provider_status: "Pending",
+          provider_status: usedOrderId ? "Pending" : "Unknown",
           provider_response: lastResult,
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
