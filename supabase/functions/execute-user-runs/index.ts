@@ -13,6 +13,19 @@ const supabase = createClient(
 const TERMINAL_OK = ["completed", "complete", "success", "partial"];
 const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
 
+function deferBusyRunMinutes(runId: string, message: string, minMinutes = 4, spreadMinutes = 6) {
+  const retryAt = new Date(Date.now() + (minMinutes + Math.random() * spreadMinutes) * 60 * 1000).toISOString();
+  return supabase
+    .from("organic_run_schedule")
+    .update({
+      scheduled_at: retryAt,
+      error_message: message,
+      last_status_check: new Date().toISOString(),
+    })
+    .eq("id", runId)
+    .eq("status", "pending");
+}
+
 // Use head:true count queries instead of pulling every row — O(1) regardless of run count.
 async function countRuns(itemId: string, status: string): Promise<number> {
   const { count } = await supabase
@@ -245,12 +258,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    let processed = 0, failed = 0, skipped = 0;
+    let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
+    const busyKeysThisPass = new Set<string>();
 
     for (const run of (dueRuns || [])) {
       const item = (run as any).engagement_order_item;
       const eo = item?.engagement_order;
       if (!eo || !item) { skipped++; continue; }
+      const busyKey = `${eo.link || ""}|${item.engagement_type || ""}`;
+      if (busyKeysThisPass.has(busyKey)) {
+        await deferBusyRunMinutes(run.id, "Same link/service already busy in this runner pass; deferred safely");
+        deferredBusy++;
+        skipped++;
+        continue;
+      }
       if (eo.status === "cancelled" || item.status === "cancelled") {
         await supabase.from("organic_run_schedule").update({ status: "cancelled", error_message: "Order/item cancelled", completed_at: new Date().toISOString() }).eq("id", run.id);
         skipped++; continue;
@@ -385,6 +406,9 @@ Deno.serve(async (req) => {
 
       if (!success && !attemptedProvider) {
         console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
+        busyKeysThisPass.add(busyKey);
+        await deferBusyRunMinutes(run.id, lastErr || "All providers busy on this link/service; deferred safely");
+        deferredBusy++;
         skipped++;
         continue;
       }
@@ -447,6 +471,7 @@ Deno.serve(async (req) => {
       processed,
       failed,
       skipped,
+      deferredBusy,
       due: (dueRuns || []).length,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
