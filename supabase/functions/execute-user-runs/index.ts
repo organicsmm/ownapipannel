@@ -202,6 +202,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    let requestBody: any = {};
+    try { requestBody = await req.json(); } catch { requestBody = {}; }
+    if (requestBody?.chained === true) {
+      return new Response(JSON.stringify({ success: true, ignored: "legacy self-trigger disabled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
     //    may have timed out after reaching the provider. Do NOT retry them, because
     //    retrying can duplicate views. Count them as completed so delivery moves on safely.
