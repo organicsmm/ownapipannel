@@ -236,27 +236,35 @@ Deno.serve(async (req) => {
     const pollStats = await pollStartedRuns();
 
     const nowIso = new Date().toISOString();
-    // 2) Pull due pending runs for user-API engagement orders
-    const { data: dueRuns, error } = await supabase
+    // 2) Pull due pending runs fairly per engagement type.
+    // A large views backlog must not starve likes/comments/shares/reposts/saves.
+    const runSelect = `
+      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
+      engagement_order_item:engagement_order_items!inner(
+        id, engagement_type, quantity, status,
+        engagement_order:engagement_orders!inner(id, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
+      )
+    `;
+    const dueTypes = ["views", "likes", "comments", "shares", "reposts", "saves", "followers", "subscribers", "retweets", "watch_hours"];
+    const dueBatches = await Promise.all(dueTypes.map((engagementType) => supabase
       .from("organic_run_schedule")
-      .select(`
-        id, run_number, quantity_to_send, engagement_order_item_id, retry_count,
-        engagement_order_item:engagement_order_items!inner(
-          id, engagement_type, quantity, status,
-          engagement_order:engagement_orders!inner(id, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
-        )
-      `)
+      .select(runSelect)
       .eq("status", "pending")
       .not("engagement_order_item_id", "is", null)
       .lte("scheduled_at", nowIso)
       .eq("engagement_order_item.engagement_order.use_user_api", true)
+      .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(200);
+      .limit(30)));
 
-    if (error) {
-      console.error("Fetch due runs error:", error);
-      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const fetchError = dueBatches.find((batch) => batch.error)?.error;
+    if (fetchError) {
+      console.error("Fetch due runs error:", fetchError);
+      return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const dueRuns = dueBatches.flatMap((batch) => batch.data || [])
+      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+      .slice(0, 200);
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
     const busyKeysThisPass = new Set<string>();
