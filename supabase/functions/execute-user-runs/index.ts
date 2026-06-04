@@ -418,7 +418,7 @@ Deno.serve(async (req) => {
 
           if (result?.error) {
             lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
-            if (/less than min|minimal|min quantity|minimum|below/i.test(lastErr)) {
+            if (/less than min|minimal|min quantity|minimum|below|busy|already active|try again|temporar/i.test(lastErr)) {
               temporaryBlocked = true;
             } else {
               hardProviderError = true;
