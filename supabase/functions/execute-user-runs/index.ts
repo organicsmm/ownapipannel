@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
         .eq("is_active", true)
         .order("priority", { ascending: true });
 
-      let candidates: Array<{ provider: any; providerServiceId: string }> = (mappings || [])
+      let candidates: Array<{ provider: any; providerServiceId: string; minQuantity?: number; maxQuantity?: number }> = (mappings || [])
         .map((m: any) => ({ provider: m.user_provider_accounts, providerServiceId: m.provider_service_id }))
         .filter(c => c.provider && c.provider.is_active);
 
@@ -321,6 +321,28 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (candidates.length > 0) {
+        const providerIds = [...new Set(candidates.map((c) => c.provider.id))];
+        const serviceIds = [...new Set(candidates.map((c) => c.providerServiceId))];
+        const { data: serviceLimits } = await supabase
+          .from("user_services")
+          .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+          .in("user_provider_account_id", providerIds)
+          .in("provider_service_id", serviceIds);
+        const limits = new Map<string, any>();
+        for (const svc of (serviceLimits || [])) {
+          limits.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+        }
+        candidates = candidates.map((c) => {
+          const svc = limits.get(`${c.provider.id}|${c.providerServiceId}`);
+          return {
+            ...c,
+            minQuantity: Number(svc?.min_quantity || 0),
+            maxQuantity: Number(svc?.max_quantity || 0),
+          };
+        });
+      }
+
       if (candidates.length === 0) {
         await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "No active provider available" }).eq("id", run.id);
         failed++; continue;
@@ -332,8 +354,23 @@ Deno.serve(async (req) => {
       let usedProvider: any = candidates[0].provider;
       let usedOrderId: string | null = null;
       let attemptedProvider = false;
+      let temporaryBlocked = false;
+      let hardProviderError = false;
 
       for (const cand of candidates) {
+        const minQuantity = Number(cand.minQuantity || 0);
+        const maxQuantity = Number(cand.maxQuantity || 0);
+        if (minQuantity > 0 && Number(run.quantity_to_send) < minQuantity) {
+          lastErr = `[${cand.provider.name}] quantity ${run.quantity_to_send} below provider min ${minQuantity}; waiting for a suitable provider`;
+          temporaryBlocked = true;
+          continue;
+        }
+        if (maxQuantity > 0 && Number(run.quantity_to_send) > maxQuantity) {
+          lastErr = `[${cand.provider.name}] quantity ${run.quantity_to_send} above provider max ${maxQuantity}`;
+          hardProviderError = true;
+          continue;
+        }
+
         const { data: claimed, error: claimErr } = await supabase.rpc("claim_user_api_run_provider", {
           _run_id: run.id,
           _provider_account_id: cand.provider.id,
@@ -350,6 +387,7 @@ Deno.serve(async (req) => {
 
         if (!claimed) {
           lastErr = `[${cand.provider.name}] busy on this link/service`;
+          temporaryBlocked = true;
           continue;
         }
 
@@ -380,6 +418,11 @@ Deno.serve(async (req) => {
 
           if (result?.error) {
             lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
+            if (/less than min|minimal|min quantity|minimum|below/i.test(lastErr)) {
+              temporaryBlocked = true;
+            } else {
+              hardProviderError = true;
+            }
             await supabase.from("organic_run_schedule").update({
               status: "pending",
               provider_account_id: null,
@@ -433,6 +476,11 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
         processed++;
+      } else if (temporaryBlocked && !hardProviderError) {
+        busyKeysThisPass.add(busyKey);
+        await deferBusyRunMinutes(run.id, lastErr || "Provider temporarily unavailable for this run quantity; deferred safely");
+        deferredBusy++;
+        skipped++;
       } else {
         await supabase.from("organic_run_schedule").update({
           status: "failed",
