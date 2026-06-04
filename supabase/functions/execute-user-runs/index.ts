@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
     }
     const dueRuns = dueBatches.flatMap((batch) => batch.data || [])
       .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
-      .slice(0, 200);
+      .slice(0, 100);
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
     const busyKeysThisPass = new Set<string>();
@@ -446,33 +446,7 @@ Deno.serve(async (req) => {
       await recomputeStatuses(item.id, eo.id);
     }
 
-    // Self-trigger to keep polling if anything is still running or upcoming
-    const { data: upcoming } = await supabase
-      .from("organic_run_schedule")
-      .select("id, engagement_order_item:engagement_order_items!inner(engagement_order:engagement_orders!inner(use_user_api,status))")
-      .in("status", ["pending", "started"])
-      .eq("engagement_order_item.engagement_order.use_user_api", true)
-      .not("engagement_order_item.engagement_order.status", "in", '("cancelled","completed")')
-      .limit(1);
-
-    if (upcoming && upcoming.length > 0) {
-      const trigger = async () => {
-        await new Promise(r => setTimeout(r, 55_000));
-        try {
-          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            },
-            body: JSON.stringify({ chained: true }),
-          });
-        } catch (e) { console.error("self-trigger failed:", e); }
-      };
-      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
-        (globalThis as any).EdgeRuntime.waitUntil(trigger());
-      }
-    }
+    // Cron invokes this every minute. Avoid self-trigger overlap, which can hammer providers.
 
     return new Response(JSON.stringify({
       success: true,
