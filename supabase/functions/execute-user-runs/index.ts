@@ -13,6 +13,19 @@ const supabase = createClient(
 const TERMINAL_OK = ["completed", "complete", "success", "partial"];
 const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
 
+function deferBusyRunMinutes(runId: string, message: string, minMinutes = 4, spreadMinutes = 6) {
+  const retryAt = new Date(Date.now() + (minMinutes + Math.random() * spreadMinutes) * 60 * 1000).toISOString();
+  return supabase
+    .from("organic_run_schedule")
+    .update({
+      scheduled_at: retryAt,
+      error_message: message,
+      last_status_check: new Date().toISOString(),
+    })
+    .eq("id", runId)
+    .eq("status", "pending");
+}
+
 // Use head:true count queries instead of pulling every row — O(1) regardless of run count.
 async function countRuns(itemId: string, status: string): Promise<number> {
   const { count } = await supabase
@@ -189,6 +202,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    let requestBody: any = {};
+    try { requestBody = await req.json(); } catch { requestBody = {}; }
+    if (requestBody?.chained === true) {
+      return new Response(JSON.stringify({ success: true, ignored: "legacy self-trigger disabled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
     //    may have timed out after reaching the provider. Do NOT retry them, because
     //    retrying can duplicate views. Count them as completed so delivery moves on safely.
@@ -223,34 +242,50 @@ Deno.serve(async (req) => {
     const pollStats = await pollStartedRuns();
 
     const nowIso = new Date().toISOString();
-    // 2) Pull due pending runs for user-API engagement orders
-    const { data: dueRuns, error } = await supabase
+    // 2) Pull due pending runs fairly per engagement type.
+    // A large views backlog must not starve likes/comments/shares/reposts/saves.
+    const runSelect = `
+      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
+      engagement_order_item:engagement_order_items!inner(
+        id, engagement_type, quantity, status,
+        engagement_order:engagement_orders!inner(id, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
+      )
+    `;
+    const dueTypes = ["views", "likes", "comments", "shares", "reposts", "saves", "followers", "subscribers", "retweets", "watch_hours"];
+    const dueBatches = await Promise.all(dueTypes.map((engagementType) => supabase
       .from("organic_run_schedule")
-      .select(`
-        id, run_number, quantity_to_send, engagement_order_item_id, retry_count,
-        engagement_order_item:engagement_order_items!inner(
-          id, engagement_type, quantity, status,
-          engagement_order:engagement_orders!inner(id, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
-        )
-      `)
+      .select(runSelect)
       .eq("status", "pending")
       .not("engagement_order_item_id", "is", null)
       .lte("scheduled_at", nowIso)
       .eq("engagement_order_item.engagement_order.use_user_api", true)
+      .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(200);
+      .limit(30)));
 
-    if (error) {
-      console.error("Fetch due runs error:", error);
-      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const fetchError = dueBatches.find((batch) => batch.error)?.error;
+    if (fetchError) {
+      console.error("Fetch due runs error:", fetchError);
+      return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const dueRuns = dueBatches.flatMap((batch) => batch.data || [])
+      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+      .slice(0, 100);
 
-    let processed = 0, failed = 0, skipped = 0;
+    let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
+    const busyKeysThisPass = new Set<string>();
 
     for (const run of (dueRuns || [])) {
       const item = (run as any).engagement_order_item;
       const eo = item?.engagement_order;
       if (!eo || !item) { skipped++; continue; }
+      const busyKey = `${eo.link || ""}|${item.engagement_type || ""}`;
+      if (busyKeysThisPass.has(busyKey)) {
+        await deferBusyRunMinutes(run.id, "Same link/service already busy in this runner pass; deferred safely");
+        deferredBusy++;
+        skipped++;
+        continue;
+      }
       if (eo.status === "cancelled" || item.status === "cancelled") {
         await supabase.from("organic_run_schedule").update({ status: "cancelled", error_message: "Order/item cancelled", completed_at: new Date().toISOString() }).eq("id", run.id);
         skipped++; continue;
@@ -277,7 +312,7 @@ Deno.serve(async (req) => {
         .eq("is_active", true)
         .order("priority", { ascending: true });
 
-      let candidates: Array<{ provider: any; providerServiceId: string }> = (mappings || [])
+      let candidates: Array<{ provider: any; providerServiceId: string; minQuantity?: number; maxQuantity?: number }> = (mappings || [])
         .map((m: any) => ({ provider: m.user_provider_accounts, providerServiceId: m.provider_service_id }))
         .filter(c => c.provider && c.provider.is_active);
 
@@ -292,6 +327,28 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (candidates.length > 0) {
+        const providerIds = [...new Set(candidates.map((c) => c.provider.id))];
+        const serviceIds = [...new Set(candidates.map((c) => c.providerServiceId))];
+        const { data: serviceLimits } = await supabase
+          .from("user_services")
+          .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+          .in("user_provider_account_id", providerIds)
+          .in("provider_service_id", serviceIds);
+        const limits = new Map<string, any>();
+        for (const svc of (serviceLimits || [])) {
+          limits.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+        }
+        candidates = candidates.map((c) => {
+          const svc = limits.get(`${c.provider.id}|${c.providerServiceId}`);
+          return {
+            ...c,
+            minQuantity: Number(svc?.min_quantity || 0),
+            maxQuantity: Number(svc?.max_quantity || 0),
+          };
+        });
+      }
+
       if (candidates.length === 0) {
         await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "No active provider available" }).eq("id", run.id);
         failed++; continue;
@@ -303,8 +360,23 @@ Deno.serve(async (req) => {
       let usedProvider: any = candidates[0].provider;
       let usedOrderId: string | null = null;
       let attemptedProvider = false;
+      let temporaryBlocked = false;
+      let hardProviderError = false;
 
       for (const cand of candidates) {
+        const minQuantity = Number(cand.minQuantity || 0);
+        const maxQuantity = Number(cand.maxQuantity || 0);
+        if (minQuantity > 0 && Number(run.quantity_to_send) < minQuantity) {
+          lastErr = `[${cand.provider.name}] quantity ${run.quantity_to_send} below provider min ${minQuantity}; waiting for a suitable provider`;
+          temporaryBlocked = true;
+          continue;
+        }
+        if (maxQuantity > 0 && Number(run.quantity_to_send) > maxQuantity) {
+          lastErr = `[${cand.provider.name}] quantity ${run.quantity_to_send} above provider max ${maxQuantity}`;
+          hardProviderError = true;
+          continue;
+        }
+
         const { data: claimed, error: claimErr } = await supabase.rpc("claim_user_api_run_provider", {
           _run_id: run.id,
           _provider_account_id: cand.provider.id,
@@ -321,6 +393,7 @@ Deno.serve(async (req) => {
 
         if (!claimed) {
           lastErr = `[${cand.provider.name}] busy on this link/service`;
+          temporaryBlocked = true;
           continue;
         }
 
@@ -351,6 +424,11 @@ Deno.serve(async (req) => {
 
           if (result?.error) {
             lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
+            if (/less than min|minimal|min quantity|minimum|below|busy|already active|try again|temporar/i.test(lastErr)) {
+              temporaryBlocked = true;
+            } else {
+              hardProviderError = true;
+            }
             await supabase.from("organic_run_schedule").update({
               status: "pending",
               provider_account_id: null,
@@ -385,6 +463,9 @@ Deno.serve(async (req) => {
 
       if (!success && !attemptedProvider) {
         console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
+        busyKeysThisPass.add(busyKey);
+        await deferBusyRunMinutes(run.id, lastErr || "All providers busy on this link/service; deferred safely");
+        deferredBusy++;
         skipped++;
         continue;
       }
@@ -401,6 +482,11 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
         processed++;
+      } else if (temporaryBlocked && !hardProviderError) {
+        busyKeysThisPass.add(busyKey);
+        await deferBusyRunMinutes(run.id, lastErr || "Provider temporarily unavailable for this run quantity; deferred safely");
+        deferredBusy++;
+        skipped++;
       } else {
         await supabase.from("organic_run_schedule").update({
           status: "failed",
@@ -414,39 +500,14 @@ Deno.serve(async (req) => {
       await recomputeStatuses(item.id, eo.id);
     }
 
-    // Self-trigger to keep polling if anything is still running or upcoming
-    const { data: upcoming } = await supabase
-      .from("organic_run_schedule")
-      .select("id, engagement_order_item:engagement_order_items!inner(engagement_order:engagement_orders!inner(use_user_api,status))")
-      .in("status", ["pending", "started"])
-      .eq("engagement_order_item.engagement_order.use_user_api", true)
-      .not("engagement_order_item.engagement_order.status", "in", '("cancelled","completed")')
-      .limit(1);
-
-    if (upcoming && upcoming.length > 0) {
-      const trigger = async () => {
-        await new Promise(r => setTimeout(r, 55_000));
-        try {
-          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            },
-            body: JSON.stringify({ chained: true }),
-          });
-        } catch (e) { console.error("self-trigger failed:", e); }
-      };
-      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
-        (globalThis as any).EdgeRuntime.waitUntil(trigger());
-      }
-    }
+    // Cron invokes this every minute. Avoid self-trigger overlap, which can hammer providers.
 
     return new Response(JSON.stringify({
       success: true,
       processed,
       failed,
       skipped,
+      deferredBusy,
       due: (dueRuns || []).length,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
