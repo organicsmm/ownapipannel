@@ -74,6 +74,7 @@ async function recomputeStatuses(itemId: string, engOrderId: string) {
 // ===== POLL STARTED RUNS (check real provider status) =====
 async function pollStartedRuns() {
   let polled = 0, finished = 0, stillRunning = 0, reFailed = 0;
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
   const { data: startedRuns } = await supabase
     .from("organic_run_schedule")
@@ -88,7 +89,9 @@ async function pollStartedRuns() {
     .not("provider_order_id", "is", null)
     .not("provider_account_id", "is", null)
     .eq("engagement_order_item.engagement_order.use_user_api", true)
-    .limit(100);
+    .or(`last_status_check.is.null,last_status_check.lt.${fiveMinAgo}`)
+    .order("last_status_check", { ascending: true, nullsFirst: true })
+    .limit(20);
 
   for (const run of (startedRuns || [])) {
     const item = (run as any).engagement_order_item;
@@ -119,7 +122,7 @@ async function pollStartedRuns() {
       form.append("order", String(run.provider_order_id));
 
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 15000);
+      const tid = setTimeout(() => ctrl.abort(), 6000);
       const resp = await fetch(acc.api_url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -187,7 +190,7 @@ async function pollStartedRuns() {
       }).eq("id", run.id);
       stillRunning++;
     }
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 50));
   }
 
   return { polled, finished, stillRunning, reFailed };
