@@ -244,11 +244,23 @@ Deno.serve(async (req) => {
     const nowIso = new Date().toISOString();
     // 2) Pull due pending runs fairly per engagement type.
     // A large views backlog must not starve likes/comments/shares/reposts/saves.
+    const priorityOrderIds = new Set<string>();
+    const requestedOrderNumbers = Array.isArray(requestBody?.orders) ? requestBody.orders.map((n: any) => Number(n)).filter(Number.isFinite) : [];
+    if (requestBody?.order_id) priorityOrderIds.add(String(requestBody.order_id));
+    if (requestedOrderNumbers.length > 0) {
+      const { data: requestedOrders } = await supabase
+        .from("engagement_orders")
+        .select("id")
+        .in("order_number", requestedOrderNumbers)
+        .eq("use_user_api", true);
+      for (const requestedOrder of (requestedOrders || [])) priorityOrderIds.add(String(requestedOrder.id));
+    }
+
     const runSelect = `
       id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
       engagement_order_item:engagement_order_items!inner(
         id, engagement_type, quantity, status,
-        engagement_order:engagement_orders!inner(id, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
+        engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
       )
     `;
     const dueTypes = ["views", "likes", "comments", "shares", "reposts", "saves", "followers", "subscribers", "retweets", "watch_hours"];
@@ -261,7 +273,7 @@ Deno.serve(async (req) => {
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(300)));
+      .limit(2500)));
 
     const fetchError = dueBatches.find((batch) => batch.error)?.error;
     if (fetchError) {
@@ -270,9 +282,15 @@ Deno.serve(async (req) => {
     }
     const allDueRuns = dueBatches.flatMap((batch) => batch.data || [])
       .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    const priorityRuns = priorityOrderIds.size > 0
+      ? allDueRuns.filter((dueRun: any) => priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
+      : [];
+    const regularRuns = priorityOrderIds.size > 0
+      ? allDueRuns.filter((dueRun: any) => !priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
+      : allDueRuns;
     const runsPerLinkType = new Map<string, number>();
     const dueRuns: any[] = [];
-    for (const dueRun of allDueRuns) {
+    for (const dueRun of [...priorityRuns, ...regularRuns]) {
       const item = (dueRun as any).engagement_order_item;
       const eo = item?.engagement_order;
       const fairKey = `${eo?.link || ""}|${item?.engagement_type || ""}`;
