@@ -261,31 +261,37 @@ Deno.serve(async (req) => {
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(30)));
+      .limit(300)));
 
     const fetchError = dueBatches.find((batch) => batch.error)?.error;
     if (fetchError) {
       console.error("Fetch due runs error:", fetchError);
       return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const dueRuns = dueBatches.flatMap((batch) => batch.data || [])
-      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
-      .slice(0, 100);
+    const allDueRuns = dueBatches.flatMap((batch) => batch.data || [])
+      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    const runsPerLinkType = new Map<string, number>();
+    const dueRuns: any[] = [];
+    for (const dueRun of allDueRuns) {
+      const item = (dueRun as any).engagement_order_item;
+      const eo = item?.engagement_order;
+      const fairKey = `${eo?.link || ""}|${item?.engagement_type || ""}`;
+      const pickedForKey = runsPerLinkType.get(fairKey) || 0;
+      // Allow rotation to multiple providers for the same link/service, but stop
+      // one massive backlog from consuming the whole minute and starving others.
+      if (pickedForKey >= 5) continue;
+      runsPerLinkType.set(fairKey, pickedForKey + 1);
+      dueRuns.push(dueRun);
+      if (dueRuns.length >= 120) break;
+    }
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
-    const busyKeysThisPass = new Set<string>();
 
     for (const run of (dueRuns || [])) {
       const item = (run as any).engagement_order_item;
       const eo = item?.engagement_order;
       if (!eo || !item) { skipped++; continue; }
       const busyKey = `${eo.link || ""}|${item.engagement_type || ""}`;
-      if (busyKeysThisPass.has(busyKey)) {
-        await deferBusyRunMinutes(run.id, "Same link/service already busy in this runner pass; deferred safely");
-        deferredBusy++;
-        skipped++;
-        continue;
-      }
       if (eo.status === "cancelled" || item.status === "cancelled") {
         await supabase.from("organic_run_schedule").update({ status: "cancelled", error_message: "Order/item cancelled", completed_at: new Date().toISOString() }).eq("id", run.id);
         skipped++; continue;
@@ -463,7 +469,6 @@ Deno.serve(async (req) => {
 
       if (!success && !attemptedProvider) {
         console.log(`Run ${run.id}: all providers busy on link "${eo.link}" (${item.engagement_type}), deferring`);
-        busyKeysThisPass.add(busyKey);
         await deferBusyRunMinutes(run.id, lastErr || "All providers busy on this link/service; deferred safely");
         deferredBusy++;
         skipped++;
@@ -483,7 +488,6 @@ Deno.serve(async (req) => {
         }).eq("id", run.id);
         processed++;
       } else if (temporaryBlocked && !hardProviderError) {
-        busyKeysThisPass.add(busyKey);
         await deferBusyRunMinutes(run.id, lastErr || "Provider temporarily unavailable for this run quantity; deferred safely");
         deferredBusy++;
         skipped++;
