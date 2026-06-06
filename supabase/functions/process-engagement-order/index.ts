@@ -325,6 +325,19 @@ serve(async (req) => {
             if (targetRuns < 2 && engagement.quantity >= providerMin * 2) targetRuns = 2
           }
 
+          // CRITICAL: Capacity guarantee — never let any single run exceed maxBatchCap.
+          // If the planned targetRuns can't cover the total quantity at maxBatchCap, raise it.
+          // For time-limit mode we instead raise maxBatchCap so we still finish on time.
+          const capacity = targetRuns * maxBatchCap
+          if (capacity < engagement.quantity) {
+            if (timeLimitApplied) {
+              maxBatchCap = Math.ceil(engagement.quantity / targetRuns * 1.4)
+            } else {
+              const needed = Math.ceil(engagement.quantity / maxBatchCap)
+              targetRuns = Math.min(needed, 5000)
+            }
+          }
+
           let remaining = engagement.quantity
           let currentTime: Date
           if (isViewType && viewsStartTime) currentTime = new Date(viewsStartTime.getTime())
@@ -333,8 +346,9 @@ serve(async (req) => {
 
           let runNumber = 1
           const scheduleEntries = []
+          const HARD_RUN_LIMIT = 5000
 
-          while (remaining > 0 && (!timeLimitApplied || runNumber <= targetRuns)) {
+          while (remaining > 0 && runNumber <= HARD_RUN_LIMIT) {
             const interval = (baseInterval + (Math.random() * 2 - 1) * intervalRange) * (timeLimitApplied ? 1 : (Math.random() < 0.2 ? 1.5 : 1))
             const scheduledAt = new Date(currentTime.getTime() + (Math.random() * 2 - 1) * 2 * 60 * 1000)
             if (scheduledAt < new Date(startTime.getTime() + 5*60*1000)) scheduledAt.setTime(startTime.getTime() + 5*60*1000)
@@ -345,17 +359,17 @@ serve(async (req) => {
             const runsLeft = Math.max(1, targetRuns - runNumber + 1)
             let qty = Math.round((remaining / runsLeft) * (0.8 + Math.random() * 0.4) * multiplier)
             
-            // ATOMIC CLAMP: Each run must be at least providerMin if possible
+            // ATOMIC CLAMP: provider min on the low side, maxBatchCap on the high side.
+            // NEVER dump >maxBatchCap in a single run — that was causing 880K final-run dumps.
             qty = Math.max(providerMin, Math.min(qty, remaining, maxBatchCap))
-            
-            // Final adjustments: if last run or remaining too small, take it all
-            if (runNumber === targetRuns || remaining <= providerMin) {
-              qty = remaining
-            }
 
-            // HARD STOP: Don't create more runs than absoluteMaxRuns (prevents too many small runs)
-            if (!timeLimitApplied && runNumber > absoluteMaxRuns && remaining > 0) {
-              qty = remaining // Dump all remaining into this last run
+            // Last planned run — if remaining fits in one batch, take it all; else cap and continue.
+            if (remaining - qty > 0 && remaining - qty < providerMin) {
+              // would leave an undersized leftover — merge it in if still within cap
+              if (qty + (remaining - qty) <= maxBatchCap) qty = remaining
+            }
+            if (remaining <= maxBatchCap && (runNumber >= targetRuns || remaining <= providerMin)) {
+              qty = remaining
             }
 
             scheduleEntries.push({
@@ -370,12 +384,23 @@ serve(async (req) => {
             remaining -= qty
             runNumber++
             currentTime = new Date(currentTime.getTime() + Math.max(5, interval) * 60000)
-            if (runNumber > 1000) break
           }
 
-          if (remaining > 0 && scheduleEntries.length > 0) {
-            scheduleEntries[scheduleEntries.length - 1].quantity_to_send += remaining
-            scheduleEntries[scheduleEntries.length - 1].base_quantity += remaining
+          // SPREAD overflow — if any quantity is still left (loop hit HARD_RUN_LIMIT or
+          // rounding), append additional runs of maxBatchCap each. NEVER dump into the last run.
+          while (remaining > 0 && scheduleEntries.length < HARD_RUN_LIMIT) {
+            const qty = Math.min(remaining, maxBatchCap)
+            const scheduledAt = new Date(currentTime.getTime())
+            scheduleEntries.push({
+              engagement_order_item_id: itemId,
+              run_number: scheduleEntries.length + 1,
+              scheduled_at: scheduledAt.toISOString(),
+              quantity_to_send: qty,
+              base_quantity: qty,
+              status: 'pending'
+            })
+            remaining -= qty
+            currentTime = new Date(currentTime.getTime() + Math.max(5, baseInterval) * 60000)
           }
           
           // Re-normalize and ensure providerMin is respected for ALL runs
