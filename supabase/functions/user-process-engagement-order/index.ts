@@ -212,11 +212,15 @@ Deno.serve(async (req) => {
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + (3 + Math.random() * 7) * 60 * 1000);
+      // Capacity guarantee — never let a single run dump more than maxBatch.
+      const minRunsForCapacity = Math.ceil(quantity / maxBatch);
+      if (targetRuns < minRunsForCapacity) targetRuns = Math.min(minRunsForCapacity, c.maxRuns);
+
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
         // Random batch in [minBatch, maxBatch] — true organic drip
         let qty: number;
-        if (i === targetRuns || remaining <= maxBatch) {
+        if (remaining <= maxBatch && (i === targetRuns || remaining <= minBatch)) {
           qty = remaining;
         } else {
           const minNeededAfter = (runsLeft - 1) * minBatch;
@@ -226,6 +230,8 @@ Deno.serve(async (req) => {
             qty = Math.min(maxBatch, Math.max(minBatch, remaining - minBatch));
           }
         }
+        // Hard cap: NEVER exceed maxBatch in a single run (prevents last-run dump).
+        if (qty > maxBatch) qty = maxBatch;
 
         // Peak hours: bias toward 6-11pm IST
         let scheduled = new Date(currentTime);
@@ -251,9 +257,19 @@ Deno.serve(async (req) => {
         const intervalJitter = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : (1 + (Math.random() * 0.4 - 0.2));
         currentTime = new Date(currentTime.getTime() + Math.max(3, intervalMinutes * intervalJitter) * 60 * 1000);
       }
-      if (remaining > 0 && entries.length > 0) {
-        entries[entries.length - 1].quantity_to_send += remaining;
-        entries[entries.length - 1].base_quantity += remaining;
+      // SPREAD overflow — append extra maxBatch-sized runs instead of dumping into last run.
+      while (remaining > 0 && entries.length < 5000) {
+        const qty = Math.min(remaining, maxBatch);
+        entries.push({
+          engagement_order_item_id: itemId,
+          run_number: entries.length + 1,
+          scheduled_at: new Date(currentTime).toISOString(),
+          quantity_to_send: qty,
+          base_quantity: qty,
+          status: "pending",
+        });
+        remaining -= qty;
+        currentTime = new Date(currentTime.getTime() + Math.max(3, intervalMinutes) * 60 * 1000);
       }
 
       for (let idx = entries.length - 1; idx > 0; idx--) {
