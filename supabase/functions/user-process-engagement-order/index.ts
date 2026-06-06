@@ -182,60 +182,94 @@ Deno.serve(async (req) => {
 
     for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
-      // ALWAYS respect provider's real min_qty for the linked service —
-      // sending below provider min causes the order to fail at the panel.
+      // ALWAYS respect provider's real min/max for the linked service.
       const providerMin = Math.max(1, Number(bi.min_qty || 1));
-      const minBatch = providerMin;
-      const maxBatch = Math.max(minBatch, c.maxBatch);
-      const avgBatch = (minBatch + maxBatch) / 2;
+      const providerMax = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
       const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
+      const MIN_INTERVAL = 3; // minutes — organic floor between runs
 
+      const baseMaxBatch = Math.max(providerMin, Math.min(providerMax, c.maxBatch));
+      let effectiveMaxBatch = baseMaxBatch;
+      let effectiveMinBatch = Math.min(baseMaxBatch, Math.max(providerMin, c.minBatch || providerMin));
       let targetRuns: number;
       let intervalMinutes: number;
 
       if (time_limit_hours && time_limit_hours > 0) {
-        // User-set delivery window
+        // ===== USER-SET DELIVERY WINDOW =====
+        // Must finish within totalMinutes. Scale batch size up if base maxBatch can't deliver in time.
         const totalMinutes = time_limit_hours * 60;
-        const ideal = Math.max(1, Math.ceil(quantity / avgBatch));
-        targetRuns = Math.min(ideal, c.maxRuns, Math.max(1, Math.floor(totalMinutes / 3)));
-        if (targetRuns < 1) targetRuns = 1;
-        intervalMinutes = totalMinutes / targetRuns;
+        const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
+        const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
+        const idealRuns = Math.max(1, Math.floor(totalMinutes / Math.max(MIN_INTERVAL, c.baseInterval / 2)));
+
+        if (runsAtBaseBatch <= idealRuns) {
+          // Base batch size fits comfortably — no scaling needed
+          targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
+        } else {
+          // Need larger batches OR more runs (whichever the time window allows)
+          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, maxRunsByTime));
+          const avgRequired = quantity / targetRuns;
+          effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
+          effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
+        }
+        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / targetRuns);
       } else if (is_organic_mode) {
-        targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, Math.ceil(quantity / avgBatch)));
-        if (targetRuns < 1) targetRuns = 1;
+        // ===== ORGANIC MODE, NO USER TIME LIMIT =====
+        const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
+        if (runsAtBaseBatch <= c.maxRuns) {
+          targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
+        } else {
+          // Order is too large for base batch — scale batch up so it fits maxRuns
+          targetRuns = c.maxRuns;
+          const avgRequired = quantity / targetRuns;
+          effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
+          effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
+        }
         intervalMinutes = c.baseInterval;
       } else {
-        targetRuns = Math.max(1, Math.ceil(quantity / maxBatch));
+        targetRuns = Math.max(1, Math.ceil(quantity / baseMaxBatch));
         intervalMinutes = c.baseInterval;
       }
+
+      // Final safety: ensure capacity (avgBatch * targetRuns >= quantity)
+      const safetyAvg = quantity / Math.max(1, targetRuns);
+      if (safetyAvg > effectiveMaxBatch) {
+        effectiveMaxBatch = Math.min(providerMax, Math.ceil(safetyAvg * 1.4));
+        effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(safetyAvg * 0.6)));
+      }
+      if (effectiveMinBatch > effectiveMaxBatch) effectiveMinBatch = effectiveMaxBatch;
+
+      const minBatch = effectiveMinBatch;
+      const maxBatch = effectiveMaxBatch;
 
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + (3 + Math.random() * 7) * 60 * 1000);
-      // Capacity guarantee — never let a single run dump more than maxBatch.
-      const minRunsForCapacity = Math.ceil(quantity / maxBatch);
-      if (targetRuns < minRunsForCapacity) targetRuns = Math.min(minRunsForCapacity, c.maxRuns);
 
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
-        // Random batch in [minBatch, maxBatch] — true organic drip
         let qty: number;
-        if (remaining <= maxBatch && (i === targetRuns || remaining <= minBatch)) {
-          qty = remaining;
+        if (runsLeft === 1) {
+          // Last run — must finish remaining, but never exceed providerMax
+          qty = Math.min(remaining, providerMax);
         } else {
-          const minNeededAfter = (runsLeft - 1) * minBatch;
-          const maxAllowedNow = Math.min(maxBatch, Math.max(minBatch, remaining - minNeededAfter));
-          qty = Math.floor(minBatch + Math.random() * (maxAllowedNow - minBatch + 1));
-          if (remaining - qty > 0 && remaining - qty < minBatch) {
-            qty = Math.min(maxBatch, Math.max(minBatch, remaining - minBatch));
+          // Ensure we can finish: each later run can carry up to maxBatch.
+          // Floor for this run = remaining - (runsLeft-1)*maxBatch  (must send at least this much)
+          const mustSendNow = Math.max(minBatch, remaining - (runsLeft - 1) * maxBatch);
+          // Ceil for this run = min(maxBatch, remaining - (runsLeft-1)*minBatch)
+          const canSendNow = Math.min(maxBatch, Math.max(mustSendNow, remaining - (runsLeft - 1) * minBatch));
+          if (canSendNow <= mustSendNow) {
+            qty = canSendNow;
+          } else {
+            qty = Math.floor(mustSendNow + Math.random() * (canSendNow - mustSendNow + 1));
           }
         }
-        // Hard cap: NEVER exceed maxBatch in a single run (prevents last-run dump).
-        if (qty > maxBatch) qty = maxBatch;
+        if (qty > maxBatch && runsLeft > 1) qty = maxBatch;
+        if (qty < 1) qty = 1;
 
-        // Peak hours: bias toward 6-11pm IST
+        // Peak hours: bias toward 6-11pm IST (only when no strict time limit)
         let scheduled = new Date(currentTime);
-        if (peak_hours_enabled) {
+        if (peak_hours_enabled && !(time_limit_hours && time_limit_hours > 0)) {
           const istHour = (scheduled.getUTCHours() + 5 + Math.floor((scheduled.getUTCMinutes() + 30) / 60)) % 24;
           if (istHour < 18 || istHour > 23) {
             const targetHourIST = 18 + Math.floor(Math.random() * 6);
@@ -255,9 +289,9 @@ Deno.serve(async (req) => {
         remaining -= qty;
         if (remaining <= 0) break;
         const intervalJitter = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : (1 + (Math.random() * 0.4 - 0.2));
-        currentTime = new Date(currentTime.getTime() + Math.max(3, intervalMinutes * intervalJitter) * 60 * 1000);
+        currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes * intervalJitter) * 60 * 1000);
       }
-      // SPREAD overflow — append extra maxBatch-sized runs instead of dumping into last run.
+      // Safety net (should rarely trigger now): spread any leftover within deadline if possible
       while (remaining > 0 && entries.length < 5000) {
         const qty = Math.min(remaining, maxBatch);
         entries.push({
@@ -269,7 +303,7 @@ Deno.serve(async (req) => {
           status: "pending",
         });
         remaining -= qty;
-        currentTime = new Date(currentTime.getTime() + Math.max(3, intervalMinutes) * 60 * 1000);
+        currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes) * 60 * 1000);
       }
 
       for (let idx = entries.length - 1; idx > 0; idx--) {
