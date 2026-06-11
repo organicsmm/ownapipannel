@@ -225,38 +225,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* FOUNDER NOTE */}
-      <section className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#070d1a]">
-        <div className="max-w-[900px] mx-auto">
-          <Quote className="w-10 h-10 text-white/25 mb-8" />
-          <p className="font-serif text-[clamp(1.5rem,3.5vw,2.5rem)] leading-[1.35] tracking-tight text-white/90">
-            "I built Boostly Pro after watching creator after creator get burned by panels that promise growth and deliver bans. Every line of this platform exists to do one thing — make algorithms feel safe with you. <span className="italic text-white">Quiet. Patient. Human.</span>"
-          </p>
-          <div className="mt-10 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full border border-white/15 bg-white/[0.04] flex items-center justify-center font-serif text-lg text-white italic">D</div>
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/85">Daniel Brooks · founder</p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40 mt-0.5">building boostly since 2024</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="px-6 lg:px-14 py-32 border-t border-white/10 bg-[#0B1120] relative overflow-hidden">
-        <div aria-hidden className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(59,130,246,0.10), transparent 70%)' }} />
-        <div className="max-w-[1400px] mx-auto text-center relative">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-8">— Commence</p>
-          <h2 className="font-serif text-[clamp(3rem,9vw,8rem)] leading-[0.92] tracking-[-0.03em] mb-12 text-white">
-            Quiet power.<br />
-            <span className="italic">Loud results.</span>
-          </h2>
-          <Link to="/auth" className="inline-flex items-center gap-2 px-10 h-14 rounded-full bg-white text-[#0B1120] font-mono text-xs uppercase tracking-[0.25em] hover:bg-white/90 transition-all">
-            Begin with Boostly Pro <ArrowUpRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
 
       {/* FOOTER */}
       <footer className="px-6 lg:px-14 py-12 border-t border-white/10 bg-[#070d1a]">
