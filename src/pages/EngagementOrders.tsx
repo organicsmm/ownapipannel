@@ -246,7 +246,7 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
           </div>
           <div className="p-3 bg-secondary rounded-xl border border-border">
             <Clock className="h-4 w-4 mx-auto mb-1 text-foreground" />
-            <p className="text-sm font-bold text-foreground">{pendingRuns.length}</p>
+            <p className="text-sm font-bold text-foreground">{items.reduce((s: number, it: any) => s + (it.pending_runs || 0), 0)}</p>
             <p className="text-[10px] text-muted-foreground">Pending</p>
           </div>
           <div className="p-3 bg-secondary rounded-xl border border-border">
