@@ -10,55 +10,53 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 @layer base {
   :root {
-    /* ═══ VOTING PRO — OBSIDIAN LUXURY ═══ */
-    /* Monochrome near-black with single chartreuse accent */
-    --background: 0 0% 4%;              /* #0a0a0a obsidian */
-    --foreground: 36 8% 92%;            /* #ece9e3 warm off-white */
+    /* ═══ LIGHT VIOLET — SOFT LAVENDER ═══ */
+    --background: 300 50% 98%;          /* #fdf6fd soft lavender white */
+    --foreground: 280 25% 18%;          /* deep plum text */
 
-    --card: 30 4% 7%;                   /* #131211 */
-    --card-foreground: 36 8% 92%;
+    --card: 0 0% 100%;
+    --card-foreground: 280 25% 18%;
 
-    --popover: 30 4% 9%;
-    --popover-foreground: 36 8% 92%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 280 25% 18%;
 
-    --primary: 66 70% 60%;              /* #d4e157 chartreuse */
-    --primary-foreground: 0 0% 4%;
+    --primary: 290 70% 72%;             /* #d99bee soft violet */
+    --primary-foreground: 0 0% 100%;
 
-    --primary-glow: 66 70% 60%;
+    --primary-glow: 290 80% 82%;
 
-    --secondary: 30 4% 10%;
-    --secondary-foreground: 36 8% 85%;
+    --secondary: 290 50% 95%;
+    --secondary-foreground: 280 30% 25%;
 
-    --muted: 30 4% 12%;
-    --muted-foreground: 30 4% 50%;      /* #807e7a */
+    --muted: 290 35% 94%;
+    --muted-foreground: 280 12% 45%;
 
-    --accent: 66 70% 60%;
-    --accent-foreground: 0 0% 4%;
+    --accent: 290 70% 72%;
+    --accent-foreground: 0 0% 100%;
 
-    --success: 140 40% 55%;
-    --success-foreground: 0 0% 4%;
+    --success: 145 55% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 36 70% 60%;
-    --warning-foreground: 0 0% 4%;
+    --warning: 36 90% 55%;
+    --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 60% 55%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 30 4% 14%;                /* #232220 */
-    --input: 30 4% 11%;
-    --ring: 66 70% 60%;
+    --border: 290 40% 90%;
+    --input: 290 40% 96%;
+    --ring: 290 70% 72%;
 
     --radius: 0.5rem;
 
-    /* Sidebar — even deeper */
-    --sidebar-background: 0 0% 3%;      /* #080808 */
-    --sidebar-foreground: 36 8% 75%;
-    --sidebar-primary: 66 70% 60%;
-    --sidebar-primary-foreground: 0 0% 4%;
-    --sidebar-accent: 30 4% 9%;
-    --sidebar-accent-foreground: 36 8% 92%;
-    --sidebar-border: 30 4% 11%;
-    --sidebar-ring: 66 70% 60%;
+    --sidebar-background: 295 55% 97%;
+    --sidebar-foreground: 280 20% 30%;
+    --sidebar-primary: 290 70% 72%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 290 45% 93%;
+    --sidebar-accent-foreground: 280 30% 25%;
+    --sidebar-border: 290 40% 90%;
+    --sidebar-ring: 290 70% 72%;
   }
 }
 
