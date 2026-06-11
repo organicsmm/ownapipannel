@@ -43,12 +43,15 @@ const Index = () => {
           autoPlay
           loop
           muted
+          defaultMuted
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-60"
-          poster=""
-        >
-          {/* <source src="/hero.mp4" type="video/mp4" /> */}
-        </video>
+          preload="auto"
+          disablePictureInPicture
+          disableRemotePlayback
+          controls={false}
+          className="absolute inset-0 w-full h-full object-cover opacity-70 pointer-events-none"
+          src={heroVideo.url}
+        />
         {/* Dark overlays for legibility */}
         <div aria-hidden className="absolute inset-0 bg-black/55" />
         <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.7) 100%)' }} />
