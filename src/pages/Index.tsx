@@ -77,73 +77,70 @@ const Index = () => {
 
 
 
-      {/* HERO */}
-      <section className="min-h-screen flex flex-col justify-center px-6 lg:px-14 pt-32 pb-20 relative">
-        <div aria-hidden className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(var(--primary) / 0.12), transparent 70%)' }} />
-        <div className="relative max-w-[1400px] mx-auto w-full text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-card/60 backdrop-blur mb-10">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-primary animate-ping opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-            <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
-              live — 2,400+ creators growing now
-            </span>
-          </div>
-
-          <h1 className="font-serif text-[clamp(3rem,11vw,10rem)] leading-[0.92] tracking-[-0.04em]">
-            Boostly <span className="italic text-primary">Pro</span>
-          </h1>
-          <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.3em] text-primary">
-            · premium engagement engine ·
-          </p>
-          <p className="mt-10 max-w-xl mx-auto text-[16px] leading-[1.7] text-muted-foreground font-light">
-            Organic, undetectable growth across Instagram, YouTube, TikTok and beyond.
-            Built for creators who demand quiet machinery and loud results.
-          </p>
-
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/auth" className="inline-flex items-center gap-2 px-7 h-12 rounded-md bg-primary text-primary-foreground font-mono text-xs uppercase tracking-[0.2em] hover:shadow-[0_20px_60px_-20px_hsl(var(--primary)/0.7)] transition-all">
-              Start free trial <ArrowUpRight className="w-4 h-4" />
-            </Link>
-            <Link to="/services" className="inline-flex items-center gap-2 px-7 h-12 rounded-md border border-border bg-card/40 font-mono text-xs uppercase tracking-[0.2em] hover:bg-card hover:border-primary/40 transition-all">
-              Explore services
-            </Link>
-          </div>
-
-          <div className="mt-10 flex items-center justify-center gap-6 flex-wrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3 text-primary" /> zero bans</span>
-            <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> instant start</span>
-            <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> ai-organic</span>
-          </div>
-
-          <div className="mt-20 overflow-hidden border-y border-border py-6 bg-card/30">
-            <div className="flex items-center justify-around gap-12 font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-2"><Instagram className="w-4 h-4 text-primary" /> Instagram</span>
-              <span className="flex items-center gap-2"><Youtube className="w-4 h-4 text-primary" /> YouTube</span>
-              <span className="flex items-center gap-2"><Music2 className="w-4 h-4 text-primary" /> TikTok</span>
-              <span className="flex items-center gap-2"><Facebook className="w-4 h-4 text-primary" /> Facebook</span>
-              <span className="flex items-center gap-2"><Twitter className="w-4 h-4 text-primary" /> Twitter / X</span>
-            </div>
-          </div>
-
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
-            {[
-              { k: 'Orders', v: '50K+', sub: 'delivered' },
-              { k: 'Creators', v: '2,400+', sub: 'active' },
-              { k: 'Bans', v: '00', sub: 'zero reported' },
-              { k: 'Uptime', v: '99.9%', sub: 'guaranteed' },
-            ].map((s) => (
-              <div key={s.k} className="bg-background p-6 lg:p-8 text-left">
-                <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-primary mb-3">:{s.k.toLowerCase()}</p>
-                <p className="font-serif text-[40px] lg:text-[56px] leading-none">{s.v}</p>
-                <p className="mt-2 text-[11px] text-muted-foreground font-mono uppercase tracking-wider">{s.sub}</p>
+      {/* BOOSTLY PRO CARD */}
+      <section className="relative px-6 lg:px-14 py-24 bg-[#0a0a0a]">
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-3xl bg-white text-[#111] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.6)] p-8 sm:p-12">
+            {/* Header */}
+            <div className="flex items-start gap-5 mb-8">
+              <div className="w-14 h-14 rounded-xl bg-[#f4f4f4] flex items-center justify-center shrink-0">
+                <TrendingUp className="w-6 h-6 text-[#111]" />
               </div>
-            ))}
+              <div>
+                <h3 className="font-serif text-[32px] leading-tight tracking-tight">Boostly Pro</h3>
+                <p className="font-mono text-[11px] tracking-[0.22em] uppercase text-[#666] mt-1">Premium Engagement Engine</p>
+              </div>
+            </div>
+
+            <p className="text-[15px] leading-[1.7] text-[#444] font-light mb-10">
+              Organic, undetectable growth across Instagram, YouTube, TikTok &amp; more. S-curve
+              modelling, ±50% variance, peak-hour weighting &amp; LRU provider rotation.
+            </p>
+
+            {/* Feature grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 mb-10">
+              {['S-Curve Modelling','Peak-Hour Weighting','Multi-Panel Failover','Bring Your Own Panel API'].map((f)=>(
+                <div key={f} className="flex items-center gap-3">
+                  <CheckCircle2 className="w-4 h-4 text-[#111] shrink-0" strokeWidth={2.5} />
+                  <span className="font-mono text-[12px] tracking-[0.12em] uppercase text-[#111]">{f}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="h-px bg-[#eee] mb-8" />
+
+            {/* Access / pricing */}
+            <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
+              <div>
+                <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-[#888] mb-2">Access</p>
+                <p className="font-serif text-[44px] leading-none tracking-tight">FROM <span className="italic">$20</span></p>
+              </div>
+              <a href="#pricing" className="inline-flex items-center px-5 h-11 rounded-md border border-[#ddd] font-mono text-[11px] tracking-[0.2em] uppercase text-[#111] hover:bg-[#f7f7f7] transition-all">
+                View Pricing
+              </a>
+            </div>
+
+            {/* Checkout tiles */}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Link to="/auth" className="group relative rounded-xl bg-[#0a0a0a] text-white p-5 hover:bg-black transition-all">
+                <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-white/70 text-center">Monthly · $20/mo</p>
+                <p className="font-serif italic text-[15px] text-center mt-2 text-white inline-flex items-center justify-center gap-1.5 w-full">
+                  Checkout <ArrowUpRight className="w-3.5 h-3.5" />
+                </p>
+              </Link>
+              <Link to="/auth" className="group relative rounded-xl bg-[#0a0a0a] text-white p-5 hover:bg-black transition-all">
+                <span className="absolute -top-2 right-3 px-2 py-0.5 rounded bg-white text-[#0a0a0a] font-mono text-[8px] tracking-[0.2em] uppercase">Best Value</span>
+                <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-white/70 text-center">Lifetime · $100 Once</p>
+                <p className="font-serif italic text-[15px] text-center mt-2 text-white inline-flex items-center justify-center gap-1.5 w-full">
+                  Checkout <ArrowUpRight className="w-3.5 h-3.5" />
+                </p>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
+
+
 
       {/* FEATURES */}
       <section id="features" className="px-6 lg:px-14 py-32 border-t border-border">
