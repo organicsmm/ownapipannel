@@ -10,28 +10,28 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 @layer base {
   :root {
-    /* ═══ SOFT VIOLET — DARKER TONE ═══ */
-    --background: 300 30% 92%;          /* muted lavender, not pure white */
-    --foreground: 280 25% 18%;          /* deep plum text */
+    /* ═══ DEEP OCEAN NAVY ═══ */
+    --background: 216 45% 8%;           /* deep navy #0B1120 */
+    --foreground: 210 20% 96%;          /* soft white */
 
-    --card: 300 25% 95%;
-    --card-foreground: 280 25% 18%;
+    --card: 216 40% 10%;
+    --card-foreground: 210 20% 96%;
 
-    --popover: 300 25% 95%;
-    --popover-foreground: 280 25% 18%;
+    --popover: 216 40% 10%;
+    --popover-foreground: 210 20% 96%;
 
-    --primary: 290 70% 68%;             /* slightly deeper violet */
+    --primary: 217 90% 58%;             /* electric blue #3B82F6 */
     --primary-foreground: 0 0% 100%;
 
-    --primary-glow: 290 80% 78%;
+    --primary-glow: 217 100% 68%;
 
-    --secondary: 290 40% 90%;
-    --secondary-foreground: 280 30% 25%;
+    --secondary: 216 35% 18%;
+    --secondary-foreground: 210 20% 96%;
 
-    --muted: 290 30% 88%;
-    --muted-foreground: 280 12% 42%;
+    --muted: 216 30% 20%;
+    --muted-foreground: 215 15% 55%;
 
-    --accent: 290 70% 68%;
+    --accent: 217 90% 58%;
     --accent-foreground: 0 0% 100%;
 
     --success: 145 55% 45%;
@@ -43,20 +43,20 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 290 30% 85%;
-    --input: 290 35% 90%;
-    --ring: 290 70% 68%;
+    --border: 216 30% 18%;
+    --input: 216 30% 16%;
+    --ring: 217 90% 58%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 295 30% 94%;
-    --sidebar-foreground: 280 20% 30%;
-    --sidebar-primary: 290 70% 68%;
+    --sidebar-background: 216 45% 8%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 217 90% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 290 40% 90%;
-    --sidebar-accent-foreground: 280 30% 25%;
-    --sidebar-border: 290 30% 85%;
-    --sidebar-ring: 290 70% 68%;
+    --sidebar-accent: 216 35% 18%;
+    --sidebar-accent-foreground: 210 20% 96%;
+    --sidebar-border: 216 30% 18%;
+    --sidebar-ring: 217 90% 58%;
   }
 }
 
