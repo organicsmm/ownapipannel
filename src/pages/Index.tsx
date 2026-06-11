@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Shield, Sparkles, TrendingUp, Crown, Quote } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
+import heroVideo from '@/assets/hero-money.mp4.asset.json';
 
 const Index = () => {
   return (
@@ -42,12 +43,15 @@ const Index = () => {
           autoPlay
           loop
           muted
+          {...({ 'webkit-playsinline': 'true' } as any)}
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-60"
-          poster=""
-        >
-          {/* <source src="/hero.mp4" type="video/mp4" /> */}
-        </video>
+          preload="auto"
+          disablePictureInPicture
+          disableRemotePlayback
+          controls={false}
+          className="absolute inset-0 w-full h-full object-cover opacity-70 pointer-events-none"
+          src={heroVideo.url}
+        />
         {/* Dark overlays for legibility */}
         <div aria-hidden className="absolute inset-0 bg-black/55" />
         <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.7) 100%)' }} />
