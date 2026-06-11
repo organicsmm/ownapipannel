@@ -172,27 +172,21 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
   const StatusIcon = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.icon || Clock;
   const statusColor = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.color || "";
 
-  // Calculate progress
-  const allRuns = order.items?.flatMap((item: any) => item.runs || []) || [];
-  const completedRuns = allRuns.filter((r: any) => r.status === 'completed').length;
-  const totalRuns = allRuns.length;
+  // Aggregates already precomputed server-side by get_user_engagement_orders_list
+  const items = order.items || [];
+  const totalRuns      = items.reduce((s: number, it: any) => s + (it.total_runs || 0), 0);
+  const completedRuns  = items.reduce((s: number, it: any) => s + (it.completed_runs || 0), 0);
+  const activeRuns     = items.reduce((s: number, it: any) => s + (it.started_runs || 0), 0);
+  const totalDelivered = items.reduce((s: number, it: any) => s + (it.delivered || 0), 0);
+  const totalQuantity  = items.reduce((s: number, it: any) => s + (it.quantity || 0), 0);
   const progressPercent = totalRuns > 0 ? (completedRuns / totalRuns) * 100 : 0;
 
-  // Calculate totals
-  const totalDelivered = allRuns
-    .filter((r: any) => r.status === 'completed')
-    .reduce((sum: number, r: any) => sum + r.quantity_to_send, 0);
-
-  const totalQuantity = order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-
-  // Find next run
-  const pendingRuns = allRuns
-    .filter((r: any) => r.status === 'pending')
-    .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-  const nextRun = pendingRuns[0];
-
-  // Active runs
-  const activeRuns = allRuns.filter((r: any) => r.status === 'started').length;
+  // Earliest pending across items
+  const nextPendingAt = items
+    .map((it: any) => it.next_pending_at)
+    .filter(Boolean)
+    .sort()[0];
+  const nextRun = nextPendingAt ? { scheduled_at: nextPendingAt } : null;
 
   return (
     <Card 
