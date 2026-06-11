@@ -59,11 +59,11 @@ const Index = () => {
           disablePictureInPicture
           disableRemotePlayback
           controls={false}
-          className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none mix-blend-luminosity"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           src={heroVideo.url}
         />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(234,240,255,0.7) 0%, rgba(220,230,255,0.6) 50%, rgba(241,244,255,0.85) 100%)' }} />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, transparent 0%, rgba(220,230,255,0.6) 100%)' }} />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(234,240,255,0.25) 0%, rgba(220,230,255,0.15) 50%, rgba(241,244,255,0.55) 100%)' }} />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, rgba(220,230,255,0.35) 100%)' }} />
 
         <div className="relative z-10 max-w-5xl mx-auto pt-24">
           <p className="font-mono text-[11px] tracking-[0.4em] uppercase mb-10" style={{ color: `${INK}99` }}>
