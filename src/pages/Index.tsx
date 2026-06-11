@@ -197,7 +197,7 @@ const Index = () => {
               </div>
               <h3 className="font-serif text-2xl mb-2">Monthly Access</h3>
               <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-serif text-5xl">$20</span>
+                <span className="font-serif text-5xl">$35</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">/ month</span>
               </div>
               <ul className="space-y-3 mb-8">
