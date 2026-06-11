@@ -8,17 +8,17 @@ const corsHeaders = {
 // Lightweight organic scheduling parameters
 // minBatch/maxBatch = random per-run quantity range (organic drip)
 const CONFIG: Record<string, { baseInterval: number; intervalVariance: number; runsPerThousand: number; minRuns: number; maxRuns: number; batchCap: number; minBatch: number; maxBatch: number }> = {
-  views:       { baseInterval: 45,  intervalVariance: 25, runsPerThousand: 20,   minRuns: 12, maxRuns: 5000, batchCap: 400, minBatch: 100, maxBatch: 400 },
-  likes:       { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 150,  minRuns: 8,  maxRuns: 2000, batchCap: 40,  minBatch: 10,  maxBatch: 40  },
-  comments:    { baseInterval: 140, intervalVariance: 70, runsPerThousand: 200,  minRuns: 6,  maxRuns: 500,  batchCap: 5,   minBatch: 1,   maxBatch: 5   },
-  shares:      { baseInterval: 100, intervalVariance: 50, runsPerThousand: 180,  minRuns: 5,  maxRuns: 1000, batchCap: 25,  minBatch: 5,   maxBatch: 25  },
-  saves:       { baseInterval: 110, intervalVariance: 55, runsPerThousand: 160,  minRuns: 5,  maxRuns: 1000, batchCap: 25,  minBatch: 5,   maxBatch: 25  },
-  followers:   { baseInterval: 280, intervalVariance: 140, runsPerThousand: 80,  minRuns: 6,  maxRuns: 500,  batchCap: 10,  minBatch: 2,   maxBatch: 10  },
-  subscribers: { baseInterval: 340, intervalVariance: 170, runsPerThousand: 100, minRuns: 6,  maxRuns: 500,  batchCap: 8,   minBatch: 2,   maxBatch: 8   },
-  reposts:     { baseInterval: 90,  intervalVariance: 45, runsPerThousand: 120,  minRuns: 5,  maxRuns: 1000, batchCap: 30,  minBatch: 5,   maxBatch: 30  },
-  retweets:    { baseInterval: 70,  intervalVariance: 35, runsPerThousand: 65,   minRuns: 6,  maxRuns: 1000, batchCap: 35,  minBatch: 5,   maxBatch: 35  },
-  watch_hours: { baseInterval: 480, intervalVariance: 240, runsPerThousand: 800, minRuns: 4,  maxRuns: 200,  batchCap: 1,   minBatch: 1,   maxBatch: 1   },
-  generic:     { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 60,   minRuns: 4,  maxRuns: 1000, batchCap: 50,  minBatch: 10,  maxBatch: 50  },
+  views:       { baseInterval: 45,  intervalVariance: 25, runsPerThousand: 20,   minRuns: 12, maxRuns: 5000, batchCap: 400,  minBatch: 100, maxBatch: 400  },
+  likes:       { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 20,   minRuns: 8,  maxRuns: 2000, batchCap: 500,  minBatch: 50,  maxBatch: 500  },
+  comments:    { baseInterval: 140, intervalVariance: 70, runsPerThousand: 50,   minRuns: 6,  maxRuns: 500,  batchCap: 50,   minBatch: 5,   maxBatch: 50   },
+  shares:      { baseInterval: 100, intervalVariance: 50, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
+  saves:       { baseInterval: 110, intervalVariance: 55, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
+  followers:   { baseInterval: 280, intervalVariance: 140, runsPerThousand: 30,  minRuns: 6,  maxRuns: 500,  batchCap: 200,  minBatch: 20,  maxBatch: 200  },
+  subscribers: { baseInterval: 340, intervalVariance: 170, runsPerThousand: 40,  minRuns: 6,  maxRuns: 500,  batchCap: 150,  minBatch: 15,  maxBatch: 150  },
+  reposts:     { baseInterval: 90,  intervalVariance: 45, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
+  retweets:    { baseInterval: 70,  intervalVariance: 35, runsPerThousand: 20,   minRuns: 6,  maxRuns: 1000, batchCap: 350,  minBatch: 35,  maxBatch: 350  },
+  watch_hours: { baseInterval: 480, intervalVariance: 240, runsPerThousand: 200, minRuns: 4,  maxRuns: 200,  batchCap: 10,   minBatch: 1,   maxBatch: 10   },
+  generic:     { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 20,   minRuns: 4,  maxRuns: 1000, batchCap: 500,  minBatch: 50,  maxBatch: 500  },
 };
 
 const cfg = (t: string) => CONFIG[t] || CONFIG.generic;
