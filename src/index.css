@@ -10,53 +10,53 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 @layer base {
   :root {
-    /* ═══ DEEP OCEAN NAVY ═══ */
-    --background: 216 45% 8%;           /* deep navy #0B1120 */
-    --foreground: 210 20% 96%;          /* soft white */
+    /* ═══ LIGHT BLUE — matches landing page ═══ */
+    --background: 222 100% 96%;          /* #EAF0FF */
+    --foreground: 225 60% 15%;           /* deep ink #0F1B3D */
 
-    --card: 216 40% 10%;
-    --card-foreground: 210 20% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 225 60% 15%;
 
-    --popover: 216 40% 10%;
-    --popover-foreground: 210 20% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 60% 15%;
 
-    --primary: 217 90% 58%;             /* electric blue #3B82F6 */
+    --primary: 224 100% 65%;             /* #4F7CFF */
     --primary-foreground: 0 0% 100%;
 
-    --primary-glow: 217 100% 68%;
+    --primary-glow: 224 100% 75%;
 
-    --secondary: 216 35% 18%;
-    --secondary-foreground: 210 20% 96%;
+    --secondary: 222 80% 92%;            /* #DCE6FF */
+    --secondary-foreground: 225 60% 15%;
 
-    --muted: 216 30% 20%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 222 70% 94%;
+    --muted-foreground: 225 25% 45%;
 
-    --accent: 217 90% 58%;
+    --accent: 224 100% 65%;
     --accent-foreground: 0 0% 100%;
 
-    --success: 145 55% 45%;
+    --success: 145 55% 42%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 36 90% 55%;
+    --warning: 36 90% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 70% 55%;
+    --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 216 30% 18%;
-    --input: 216 30% 16%;
-    --ring: 217 90% 58%;
+    --border: 222 50% 88%;
+    --input: 0 0% 100%;
+    --ring: 224 100% 65%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 216 45% 8%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 217 90% 58%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 225 40% 25%;
+    --sidebar-primary: 224 100% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 216 35% 18%;
-    --sidebar-accent-foreground: 210 20% 96%;
-    --sidebar-border: 216 30% 18%;
-    --sidebar-ring: 217 90% 58%;
+    --sidebar-accent: 222 80% 95%;
+    --sidebar-accent-foreground: 225 60% 15%;
+    --sidebar-border: 222 50% 88%;
+    --sidebar-ring: 224 100% 65%;
   }
 }
 
