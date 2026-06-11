@@ -90,7 +90,7 @@ html { font-size: 16px; }
 
   .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-  ::selection { background: hsla(66, 70%, 60%, 0.3); color: hsl(var(--foreground)); }
+  ::selection { background: hsla(290, 70%, 72%, 0.3); color: hsl(var(--foreground)); }
 }
 
 @layer components {
