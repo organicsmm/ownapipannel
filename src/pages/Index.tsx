@@ -7,7 +7,7 @@ import heroVideo from '@/assets/hero-money.mp4.asset.json';
 
 const Index = () => {
   return (
-    <div className="min-h-screen w-full bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#0B1120] text-white font-sans antialiased overflow-x-hidden">
       <PageMeta
         title="Boostly Pro — Premium Social Growth Engine"
         description="Boostly Pro delivers organic, undetectable engagement for serious creators. Multi-platform growth with AI-organic delivery and zero compromise."
@@ -53,8 +53,8 @@ const Index = () => {
           src={heroVideo.url}
         />
         {/* Dark overlays for legibility */}
-        <div aria-hidden className="absolute inset-0 bg-black/55" />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.7) 100%)' }} />
+        <div aria-hidden className="absolute inset-0 bg-[#070d1a]/60" />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(11,17,32,0.8) 100%)' }} />
 
         <div className="relative z-10 max-w-5xl mx-auto pt-24">
           <p className="font-mono text-[11px] tracking-[0.4em] uppercase text-white/60 mb-10">
