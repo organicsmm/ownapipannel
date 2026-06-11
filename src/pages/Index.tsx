@@ -6,7 +6,7 @@ import logo from '@/assets/logo.png';
 
 const Index = () => {
   return (
-    <div className="min-h-screen w-full bg-background text-foreground font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
       <PageMeta
         title="Boostly Pro — Premium Social Growth Engine"
         description="Boostly Pro delivers organic, undetectable engagement for serious creators. Multi-platform growth with AI-organic delivery and zero compromise."
