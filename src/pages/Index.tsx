@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
-import heroVideo from '@/assets/hero-money.mp4.asset.json';
 
 const INK = '#0F1B3D';
 const ACCENT = '#4F7CFF';
@@ -49,21 +48,9 @@ const Index = () => {
 
       {/* HERO */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          {...({ 'webkit-playsinline': 'true' } as any)}
-          playsInline
-          preload="auto"
-          disablePictureInPicture
-          disableRemotePlayback
-          controls={false}
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          src={heroVideo.url}
-        />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(234,240,255,0.25) 0%, rgba(220,230,255,0.15) 50%, rgba(241,244,255,0.55) 100%)' }} />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, rgba(220,230,255,0.35) 100%)' }} />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #F3F7FF 0%, #DCE8FF 48%, #CFE0FF 100%)' }} />
+        <div aria-hidden className="absolute inset-0 opacity-60" style={{ background: 'radial-gradient(ellipse 55% 45% at 25% 18%, #FFFFFF 0%, transparent 70%), radial-gradient(ellipse 70% 55% at 80% 80%, rgba(79,124,255,0.18) 0%, transparent 70%)' }} />
+        <div aria-hidden className="absolute inset-x-0 bottom-0 h-36" style={{ background: 'linear-gradient(180deg, transparent 0%, #EAF0FF 100%)' }} />
 
         <div className="relative z-10 max-w-5xl mx-auto pt-24">
           <p className="font-mono text-[11px] tracking-[0.4em] uppercase mb-10" style={{ color: `${INK}99` }}>
