@@ -55,30 +55,19 @@ export default function EngagementOrders() {
   const { formatPrice } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Instant load with cache + moderate refresh
+  // Fast aggregated load — server-side summary RPC (no nested run fetches)
   const { data: orders, refetch } = useQuery({
     queryKey: ['engagement-orders', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('engagement_orders')
-        .select(`
-          id, order_number, status, total_price, link, base_quantity, created_at, updated_at, is_organic_mode,
-          items:engagement_order_items(
-            id, engagement_type, quantity, status,
-            runs:organic_run_schedule(id, status, quantity_to_send, scheduled_at, run_number)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { data, error } = await supabase.rpc('get_user_engagement_orders_list', { _limit: 100 });
       if (error) throw error;
-      return data;
+      return (data as any[]) || [];
     },
     enabled: !!user,
-    staleTime: 15000, // Cache for 15s
+    staleTime: 15000,
     refetchOnWindowFocus: false,
-    refetchInterval: 15000, // Refresh every 15s (was 5s)
+    refetchInterval: 15000,
   });
 
   // Filter orders based on search query
@@ -183,27 +172,21 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
   const StatusIcon = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.icon || Clock;
   const statusColor = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.color || "";
 
-  // Calculate progress
-  const allRuns = order.items?.flatMap((item: any) => item.runs || []) || [];
-  const completedRuns = allRuns.filter((r: any) => r.status === 'completed').length;
-  const totalRuns = allRuns.length;
+  // Aggregates already precomputed server-side by get_user_engagement_orders_list
+  const items = order.items || [];
+  const totalRuns      = items.reduce((s: number, it: any) => s + (it.total_runs || 0), 0);
+  const completedRuns  = items.reduce((s: number, it: any) => s + (it.completed_runs || 0), 0);
+  const activeRuns     = items.reduce((s: number, it: any) => s + (it.started_runs || 0), 0);
+  const totalDelivered = items.reduce((s: number, it: any) => s + (it.delivered || 0), 0);
+  const totalQuantity  = items.reduce((s: number, it: any) => s + (it.quantity || 0), 0);
   const progressPercent = totalRuns > 0 ? (completedRuns / totalRuns) * 100 : 0;
 
-  // Calculate totals
-  const totalDelivered = allRuns
-    .filter((r: any) => r.status === 'completed')
-    .reduce((sum: number, r: any) => sum + r.quantity_to_send, 0);
-
-  const totalQuantity = order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-
-  // Find next run
-  const pendingRuns = allRuns
-    .filter((r: any) => r.status === 'pending')
-    .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-  const nextRun = pendingRuns[0];
-
-  // Active runs
-  const activeRuns = allRuns.filter((r: any) => r.status === 'started').length;
+  // Earliest pending across items
+  const nextPendingAt = items
+    .map((it: any) => it.next_pending_at)
+    .filter(Boolean)
+    .sort()[0];
+  const nextRun = nextPendingAt ? { scheduled_at: nextPendingAt } : null;
 
   return (
     <Card 
@@ -263,7 +246,7 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
           </div>
           <div className="p-3 bg-secondary rounded-xl border border-border">
             <Clock className="h-4 w-4 mx-auto mb-1 text-foreground" />
-            <p className="text-sm font-bold text-foreground">{pendingRuns.length}</p>
+            <p className="text-sm font-bold text-foreground">{items.reduce((s: number, it: any) => s + (it.pending_runs || 0), 0)}</p>
             <p className="text-[10px] text-muted-foreground">Pending</p>
           </div>
           <div className="p-3 bg-secondary rounded-xl border border-border">
@@ -298,11 +281,9 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
         <div className="flex flex-wrap gap-2">
           {order.items?.map((item: any) => {
             const Icon = ENGAGEMENT_ICONS[item.engagement_type as keyof typeof ENGAGEMENT_ICONS] || Eye;
-            const itemRuns = item.runs || [];
-            const itemCompleted = itemRuns.filter((r: any) => r.status === 'completed').length;
-            const itemDelivered = itemRuns
-              .filter((r: any) => r.status === 'completed')
-              .reduce((sum: number, r: any) => sum + r.quantity_to_send, 0);
+            const itemCompleted = item.completed_runs || 0;
+            const itemTotalRuns = item.total_runs || 0;
+            const itemDelivered = item.delivered || 0;
 
             return (
               <Badge 
@@ -313,7 +294,7 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
                 <Icon className="h-3.5 w-3.5" />
                 <span className="capitalize">{item.engagement_type}:</span>
                 <span className="font-mono">{itemDelivered.toLocaleString()}/{item.quantity.toLocaleString()}</span>
-                <span className="text-muted-foreground">({itemCompleted}/{itemRuns.length})</span>
+                <span className="text-muted-foreground">({itemCompleted}/{itemTotalRuns})</span>
               </Badge>
             );
           })}
