@@ -81,7 +81,7 @@ const Index = () => {
             className="mt-10 inline-flex items-center justify-center px-10 h-14 rounded-full text-[13px] font-semibold tracking-[0.25em] uppercase transition-all"
             style={{ background: INK, color: 'white' }}
           >
-            Join Now
+            Start Now
           </Link>
           <p className="mt-8 font-mono text-[10px] tracking-[0.35em] uppercase" style={{ color: `${INK}66` }}>
             Members Only · By Invitation
