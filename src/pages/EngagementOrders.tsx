@@ -281,11 +281,9 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
         <div className="flex flex-wrap gap-2">
           {order.items?.map((item: any) => {
             const Icon = ENGAGEMENT_ICONS[item.engagement_type as keyof typeof ENGAGEMENT_ICONS] || Eye;
-            const itemRuns = item.runs || [];
-            const itemCompleted = itemRuns.filter((r: any) => r.status === 'completed').length;
-            const itemDelivered = itemRuns
-              .filter((r: any) => r.status === 'completed')
-              .reduce((sum: number, r: any) => sum + r.quantity_to_send, 0);
+            const itemCompleted = item.completed_runs || 0;
+            const itemTotalRuns = item.total_runs || 0;
+            const itemDelivered = item.delivered || 0;
 
             return (
               <Badge 
@@ -296,7 +294,7 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
                 <Icon className="h-3.5 w-3.5" />
                 <span className="capitalize">{item.engagement_type}:</span>
                 <span className="font-mono">{itemDelivered.toLocaleString()}/{item.quantity.toLocaleString()}</span>
-                <span className="text-muted-foreground">({itemCompleted}/{itemRuns.length})</span>
+                <span className="text-muted-foreground">({itemCompleted}/{itemTotalRuns})</span>
               </Badge>
             );
           })}
