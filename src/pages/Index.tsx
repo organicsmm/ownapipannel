@@ -43,7 +43,7 @@ const Index = () => {
           autoPlay
           loop
           muted
-          defaultMuted
+          {...({ 'webkit-playsinline': 'true' } as any)}
           playsInline
           preload="auto"
           disablePictureInPicture
