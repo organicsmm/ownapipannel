@@ -80,46 +80,90 @@ const Index = () => {
       </section>
 
 
+      {/* HOW IT WORKS — flow diagram */}
       <section id="features" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#0B1120]">
         <div className="max-w-[1400px] mx-auto">
-          <div className="grid lg:grid-cols-12 gap-10 mb-16">
-            <div className="lg:col-span-5">
-              <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">— Engine</p>
-              <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.02em] text-white">
-                Built <span className="italic">precisely.</span><br />
-                Delivered <span className="italic">quietly.</span>
-              </h2>
-            </div>
-            <div className="lg:col-span-7 lg:pt-14">
-              <p className="text-[16px] leading-[1.8] text-white/60 font-light max-w-xl">
-                Every order is choreographed against thousands of invisible signals — peak hours,
-                organic variance, dwell intervals, regional drift. Reads as life, never as labor.
-              </p>
-            </div>
+          <div className="text-center mb-20">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">— How it works</p>
+            <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.02em] text-white">
+              Panel ka pura <span className="italic">flow.</span>
+            </h2>
+            <p className="mt-6 max-w-2xl mx-auto text-[15px] leading-[1.7] text-white/55 font-light">
+              Provider API se lekar organic delivery tak — har step transparent. Niche diagram dekho aur samjho kaise tumhara order behind the scenes chalta hai.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-2xl overflow-hidden">
-            {[
-              { icon: TrendingUp, n: '01', t: 'S-curve modelling', d: 'Mathematical growth mirroring organic virality — slow ignition, viral middle, gentle taper.' },
-              { icon: Sparkles, n: '02', t: '±50% variance', d: 'No two intervals identical. Quantity, cadence, and timing fluctuate within human bounds.' },
-              { icon: Zap, n: '03', t: 'Peak-hour weighting', d: 'Activity weighted to 6–10 PM local. Night slowdowns mimic real audience sleep.' },
-              { icon: Shield, n: '04', t: 'LRU provider rotation', d: 'Multiple providers, rotating priority, automatic failover. Never single-point-fragile.' },
-            ].map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.n} className="bg-[#0B1120] p-8 lg:p-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <Icon className="w-5 h-5 text-white" />
-                    <p className="font-mono text-[10px] tracking-[0.25em] text-white/40">:{f.n}</p>
-                  </div>
-                  <h3 className="font-serif text-[24px] leading-tight mb-3 text-white">{f.t}</h3>
-                  <p className="text-[13px] leading-[1.7] text-white/55 font-light">{f.d}</p>
+          {/* Flow diagram */}
+          <div className="relative max-w-[1100px] mx-auto">
+            {/* STEP 1: Providers */}
+            <div className="grid md:grid-cols-3 gap-4 mb-3">
+              {['Provider A', 'Provider B', 'Provider C'].map((p, i) => (
+                <div key={p} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center">
+                  <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/40 mb-2">SMM Panel #{i + 1}</p>
+                  <p className="font-serif text-[18px] text-white">{p}</p>
+                  <p className="text-[11px] text-white/50 mt-1">API key + balance</p>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Step 1 · Connect provider API keys in admin panel</p>
+
+            {/* Arrow down */}
+            <div className="flex justify-center my-6"><div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" /></div>
+
+            {/* STEP 2: LRU Rotation Engine */}
+            <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-8 text-center mb-3">
+              <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/40 mb-3">Core Engine</p>
+              <h3 className="font-serif text-[28px] text-white mb-2">LRU Rotation + Auto Failover</h3>
+              <p className="text-[13px] text-white/60 max-w-lg mx-auto">Har order ke liye sabse fresh provider chuna jaata hai. Ek down ho jaaye to dusra automatic le leta hai.</p>
+            </div>
+            <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Step 2 · Smart routing, no single point of failure</p>
+
+            <div className="flex justify-center my-6"><div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" /></div>
+
+            {/* STEP 3: Service Mapping & Bundles */}
+            <div className="grid md:grid-cols-2 gap-4 mb-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/40 mb-2">Service Mapping</p>
+                <h3 className="font-serif text-[22px] text-white mb-2">Provider services → Your services</h3>
+                <p className="text-[12px] text-white/55 leading-relaxed">Admin har provider ki service ko apni catalog se map karta hai. Pricing, quality, speed sab control me.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/40 mb-2">Bundle Builder</p>
+                <h3 className="font-serif text-[22px] text-white mb-2">Likes + Views + Followers</h3>
+                <p className="text-[12px] text-white/55 leading-relaxed">Multiple services ko ek bundle me pack karo. User ek hi click me poora growth package le.</p>
+              </div>
+            </div>
+            <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Step 3 · Build catalog & bundles inside admin</p>
+
+            <div className="flex justify-center my-6"><div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" /></div>
+
+            {/* STEP 4: Order Modes */}
+            <div className="grid md:grid-cols-2 gap-4 mb-3">
+              <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-6">
+                <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/45 mb-2">Mode A · Instant</p>
+                <h3 className="font-serif text-[22px] text-white mb-2">Engagement Orders</h3>
+                <p className="text-[12px] text-white/55 leading-relaxed">User place karta hai → provider ko forward → fast delivery. Direct, sidha, quick.</p>
+              </div>
+              <div className="rounded-2xl border border-white/25 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-6">
+                <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/45 mb-2">Mode B · Natural</p>
+                <h3 className="font-serif text-[22px] text-white mb-2">Organic Delivery</h3>
+                <p className="text-[12px] text-white/60 leading-relaxed">S-curve, ±50% variance, peak-hour weighting. Order chhote chunks me schedule hota hai — algorithm ko lagta hai real audience aa rahi hai.</p>
+              </div>
+            </div>
+            <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Step 4 · User chooses delivery style</p>
+
+            <div className="flex justify-center my-6"><div className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" /></div>
+
+            {/* STEP 5: Result */}
+            <div className="rounded-2xl border border-white/20 bg-white text-[#0B1120] p-8 text-center">
+              <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-[#666] mb-3">Final</p>
+              <h3 className="font-serif text-[28px] mb-2">Safe, quiet, undetectable growth</h3>
+              <p className="text-[13px] text-[#444] max-w-lg mx-auto">Wallet deduct → order tracked → live status → refill if drop. Full automation.</p>
+            </div>
           </div>
         </div>
       </section>
+
 
       {/* PLATFORMS */}
       <section id="platforms" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#070d1a]">
