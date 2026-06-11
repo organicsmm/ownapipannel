@@ -7,7 +7,7 @@ import heroVideo from '@/assets/hero-money.mp4.asset.json';
 
 const Index = () => {
   return (
-    <div className="min-h-screen w-full bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#0B1120] text-white font-sans antialiased overflow-x-hidden">
       <PageMeta
         title="Boostly Pro — Premium Social Growth Engine"
         description="Boostly Pro delivers organic, undetectable engagement for serious creators. Multi-platform growth with AI-organic delivery and zero compromise."
@@ -53,8 +53,8 @@ const Index = () => {
           src={heroVideo.url}
         />
         {/* Dark overlays for legibility */}
-        <div aria-hidden className="absolute inset-0 bg-black/55" />
-        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.7) 100%)' }} />
+        <div aria-hidden className="absolute inset-0 bg-[#070d1a]/60" />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(11,17,32,0.8) 100%)' }} />
 
         <div className="relative z-10 max-w-5xl mx-auto pt-24">
           <p className="font-mono text-[11px] tracking-[0.4em] uppercase text-white/60 mb-10">
@@ -80,7 +80,7 @@ const Index = () => {
       </section>
 
 
-      <section id="features" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#0a0a0a]">
+      <section id="features" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#0B1120]">
         <div className="max-w-[1400px] mx-auto">
           <div className="grid lg:grid-cols-12 gap-10 mb-16">
             <div className="lg:col-span-5">
@@ -107,7 +107,7 @@ const Index = () => {
             ].map((f) => {
               const Icon = f.icon;
               return (
-                <div key={f.n} className="bg-[#0a0a0a] p-8 lg:p-10">
+                <div key={f.n} className="bg-[#0B1120] p-8 lg:p-10">
                   <div className="flex items-center justify-between mb-6">
                     <Icon className="w-5 h-5 text-white" />
                     <p className="font-mono text-[10px] tracking-[0.25em] text-white/40">:{f.n}</p>
@@ -122,7 +122,7 @@ const Index = () => {
       </section>
 
       {/* PLATFORMS */}
-      <section id="platforms" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#080808]">
+      <section id="platforms" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#070d1a]">
         <div className="max-w-[1400px] mx-auto">
           <div className="text-center mb-14">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">— Coverage</p>
@@ -152,7 +152,7 @@ const Index = () => {
       </section>
 
       {/* PRICING */}
-      <section id="pricing" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#0a0a0a]">
+      <section id="pricing" className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#0B1120]">
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-16">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">— Membership</p>
@@ -192,11 +192,11 @@ const Index = () => {
 
             {/* Lifetime */}
             <div className="relative rounded-2xl border border-white/30 bg-white text-[#0a0a0a] p-8 lg:p-10 shadow-[0_40px_100px_-30px_rgba(255,255,255,0.25)]">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#0a0a0a] text-white font-mono text-[9px] uppercase tracking-[0.25em] border border-white/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#0B1120] text-white font-mono text-[9px] uppercase tracking-[0.25em] border border-white/10">
                 Best Value
               </div>
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[#0a0a0a]/5 border border-[#0a0a0a]/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-[#0B1120]/5 border border-[#0B1120]/10 flex items-center justify-center">
                   <Crown className="w-4 h-4 text-[#0a0a0a]" />
                 </div>
                 <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-[#666]">Lifetime</p>
@@ -209,11 +209,11 @@ const Index = () => {
               <ul className="space-y-3 mb-8">
                 {['Everything in monthly', 'Pay once, use forever', 'All future updates included', 'Priority support'].map((t) => (
                   <li key={t} className="flex gap-3 text-[13px] font-light">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-[#0a0a0a] shrink-0" />{t}
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-[#0B1120] shrink-0" />{t}
                   </li>
                 ))}
               </ul>
-              <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-full bg-[#0a0a0a] text-white font-mono text-[11px] uppercase tracking-[0.2em] hover:bg-black transition-all">
+              <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-full bg-[#0B1120] text-white font-mono text-[11px] uppercase tracking-[0.2em] hover:bg-[#070d1a] transition-all">
                 Claim Lifetime <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -226,7 +226,7 @@ const Index = () => {
       </section>
 
       {/* FOUNDER NOTE */}
-      <section className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#080808]">
+      <section className="px-6 lg:px-14 py-28 border-t border-white/10 bg-[#070d1a]">
         <div className="max-w-[900px] mx-auto">
           <Quote className="w-10 h-10 text-white/25 mb-8" />
           <p className="font-serif text-[clamp(1.5rem,3.5vw,2.5rem)] leading-[1.35] tracking-tight text-white/90">
@@ -243,23 +243,23 @@ const Index = () => {
       </section>
 
       {/* CTA */}
-      <section className="px-6 lg:px-14 py-32 border-t border-white/10 bg-[#0a0a0a] relative overflow-hidden">
+      <section className="px-6 lg:px-14 py-32 border-t border-white/10 bg-[#0B1120] relative overflow-hidden">
         <div aria-hidden className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255,255,255,0.06), transparent 70%)' }} />
+          style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(59,130,246,0.10), transparent 70%)' }} />
         <div className="max-w-[1400px] mx-auto text-center relative">
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-8">— Commence</p>
           <h2 className="font-serif text-[clamp(3rem,9vw,8rem)] leading-[0.92] tracking-[-0.03em] mb-12 text-white">
             Quiet power.<br />
             <span className="italic">Loud results.</span>
           </h2>
-          <Link to="/auth" className="inline-flex items-center gap-2 px-10 h-14 rounded-full bg-white text-[#0a0a0a] font-mono text-xs uppercase tracking-[0.25em] hover:bg-white/90 transition-all">
+          <Link to="/auth" className="inline-flex items-center gap-2 px-10 h-14 rounded-full bg-white text-[#0B1120] font-mono text-xs uppercase tracking-[0.25em] hover:bg-white/90 transition-all">
             Begin with Boostly Pro <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="px-6 lg:px-14 py-12 border-t border-white/10 bg-[#080808]">
+      <footer className="px-6 lg:px-14 py-12 border-t border-white/10 bg-[#070d1a]">
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-[10px] tracking-[0.2em] uppercase text-white/40">
           <Link to="/" className="flex items-center gap-2">
             <img src={logo} alt="Boostly Pro" className="w-7 h-7 rounded-full object-cover ring-1 ring-white/15" />
