@@ -157,7 +157,7 @@ const Index = () => {
             {/* STEP 5: Result */}
             <div className="rounded-2xl border border-white/20 bg-white text-[#0B1120] p-8 text-center">
               <p className="font-mono text-[9px] tracking-[0.25em] uppercase text-[#666] mb-3">Final</p>
-              <h3 className="font-serif text-[28px] mb-2">Safe, quiet, undetectable growth</h3>
+              <h3 className="font-serif text-[28px] mb-2 text-[#0B1120]">Safe, quiet, undetectable growth</h3>
               <p className="text-[13px] text-[#444] max-w-lg mx-auto">Wallet deduct → order tracked → live status → refill if drop. Full automation.</p>
             </div>
           </div>
