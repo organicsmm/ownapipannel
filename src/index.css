@@ -10,28 +10,28 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 @layer base {
   :root {
-    /* ═══ LIGHT VIOLET — SOFT LAVENDER ═══ */
-    --background: 300 50% 98%;          /* #fdf6fd soft lavender white */
+    /* ═══ SOFT VIOLET — DARKER TONE ═══ */
+    --background: 300 30% 92%;          /* muted lavender, not pure white */
     --foreground: 280 25% 18%;          /* deep plum text */
 
-    --card: 0 0% 100%;
+    --card: 300 25% 95%;
     --card-foreground: 280 25% 18%;
 
-    --popover: 0 0% 100%;
+    --popover: 300 25% 95%;
     --popover-foreground: 280 25% 18%;
 
-    --primary: 290 70% 72%;             /* #d99bee soft violet */
+    --primary: 290 70% 68%;             /* slightly deeper violet */
     --primary-foreground: 0 0% 100%;
 
-    --primary-glow: 290 80% 82%;
+    --primary-glow: 290 80% 78%;
 
-    --secondary: 290 50% 95%;
+    --secondary: 290 40% 90%;
     --secondary-foreground: 280 30% 25%;
 
-    --muted: 290 35% 94%;
-    --muted-foreground: 280 12% 45%;
+    --muted: 290 30% 88%;
+    --muted-foreground: 280 12% 42%;
 
-    --accent: 290 70% 72%;
+    --accent: 290 70% 68%;
     --accent-foreground: 0 0% 100%;
 
     --success: 145 55% 45%;
@@ -43,20 +43,20 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 290 40% 90%;
-    --input: 290 40% 96%;
-    --ring: 290 70% 72%;
+    --border: 290 30% 85%;
+    --input: 290 35% 90%;
+    --ring: 290 70% 68%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 295 55% 97%;
+    --sidebar-background: 295 30% 94%;
     --sidebar-foreground: 280 20% 30%;
-    --sidebar-primary: 290 70% 72%;
+    --sidebar-primary: 290 70% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 290 45% 93%;
+    --sidebar-accent: 290 40% 90%;
     --sidebar-accent-foreground: 280 30% 25%;
-    --sidebar-border: 290 40% 90%;
-    --sidebar-ring: 290 70% 72%;
+    --sidebar-border: 290 30% 85%;
+    --sidebar-ring: 290 70% 68%;
   }
 }
 
