@@ -180,13 +180,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Organic start-offset per engagement type so views fire first, then others slowly join.
+    const TYPE_START_DELAY_MIN: Record<string, [number, number]> = {
+      views:       [0, 2],
+      likes:       [6, 14],
+      saves:       [12, 22],
+      shares:      [10, 20],
+      reposts:     [9, 18],
+      retweets:    [8, 16],
+      comments:    [16, 28],
+      followers:   [10, 20],
+      subscribers: [12, 22],
+      watch_hours: [4, 10],
+      generic:     [5, 12],
+    };
+
+    // helper: random int in [lo, hi]
+    const ri = (lo: number, hi: number) => Math.floor(lo + Math.random() * (hi - lo + 1));
+    // helper: turn round numbers into organic ones (e.g. 150 -> 147 / 152 / 161, never trailing zero)
+    const organicize = (n: number, min: number, max: number) => {
+      if (n <= min) return Math.max(min, n);
+      // ±9% jitter
+      const jitter = Math.round(n * (Math.random() * 0.18 - 0.09));
+      let v = n + jitter;
+      // if rounded to multiple of 10, nudge to non-round
+      if (v % 10 === 0) v += ri(1, 9) * (Math.random() < 0.5 ? -1 : 1);
+      if (v < min) v = min + ri(0, 4);
+      if (v > max) v = max - ri(0, 4);
+      return Math.max(1, v);
+    };
+
     for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
       const c = cfg(bi.engagement_type);
-      // ALWAYS respect provider's real min/max for the linked service.
       const providerMin = Math.max(1, Number(bi.min_qty || 1));
       const providerMax = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
-      const variance = Math.max(0, Math.min(50, variance_percent || 0)) / 100;
-      const MIN_INTERVAL = 3; // minutes — organic floor between runs
+      const variance = Math.max(0, Math.min(50, variance_percent || 25)) / 100;
+      const MIN_INTERVAL = 3; // minutes
 
       const baseMaxBatch = Math.max(providerMin, Math.min(providerMax, c.maxBatch));
       let effectiveMaxBatch = baseMaxBatch;
@@ -195,18 +224,13 @@ Deno.serve(async (req) => {
       let intervalMinutes: number;
 
       if (time_limit_hours && time_limit_hours > 0) {
-        // ===== USER-SET DELIVERY WINDOW =====
-        // Must finish within totalMinutes. Scale batch size up if base maxBatch can't deliver in time.
         const totalMinutes = time_limit_hours * 60;
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
         const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
         const idealRuns = Math.max(1, Math.floor(totalMinutes / Math.max(MIN_INTERVAL, c.baseInterval / 2)));
-
         if (runsAtBaseBatch <= idealRuns) {
-          // Base batch size fits comfortably — no scaling needed
           targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
         } else {
-          // Need larger batches OR more runs (whichever the time window allows)
           targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, maxRunsByTime));
           const avgRequired = quantity / targetRuns;
           effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
@@ -214,12 +238,10 @@ Deno.serve(async (req) => {
         }
         intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / targetRuns);
       } else if (is_organic_mode) {
-        // ===== ORGANIC MODE, NO USER TIME LIMIT =====
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
         if (runsAtBaseBatch <= c.maxRuns) {
           targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
         } else {
-          // Order is too large for base batch — scale batch up so it fits maxRuns
           targetRuns = c.maxRuns;
           const avgRequired = quantity / targetRuns;
           effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
@@ -231,7 +253,6 @@ Deno.serve(async (req) => {
         intervalMinutes = c.baseInterval;
       }
 
-      // Final safety: ensure capacity (avgBatch * targetRuns >= quantity)
       const safetyAvg = quantity / Math.max(1, targetRuns);
       if (safetyAvg > effectiveMaxBatch) {
         effectiveMaxBatch = Math.min(providerMax, Math.ceil(safetyAvg * 1.4));
@@ -239,35 +260,43 @@ Deno.serve(async (req) => {
       }
       if (effectiveMinBatch > effectiveMaxBatch) effectiveMinBatch = effectiveMaxBatch;
 
-      const minBatch = effectiveMinBatch;
+      const minBatch = Math.max(providerMin, effectiveMinBatch);
       const maxBatch = effectiveMaxBatch;
+
+      // Per-type start offset: views first, others delayed
+      const delayRange = TYPE_START_DELAY_MIN[bi.engagement_type] || TYPE_START_DELAY_MIN.generic;
+      const typeStartOffsetMin = ri(delayRange[0], delayRange[1]) + Math.random();
 
       const entries: any[] = [];
       let remaining = quantity;
-      let currentTime = new Date(startTime.getTime() + (3 + Math.random() * 7) * 60 * 1000);
+      let currentTime = new Date(startTime.getTime() + typeStartOffsetMin * 60 * 1000);
 
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
         let qty: number;
         if (runsLeft === 1) {
-          // Last run — must finish remaining, but never exceed providerMax
+          // Last run delivers EXACT remaining → guarantees total == entered quantity
           qty = Math.min(remaining, providerMax);
         } else {
-          // Ensure we can finish: each later run can carry up to maxBatch.
-          // Floor for this run = remaining - (runsLeft-1)*maxBatch  (must send at least this much)
           const mustSendNow = Math.max(minBatch, remaining - (runsLeft - 1) * maxBatch);
-          // Ceil for this run = min(maxBatch, remaining - (runsLeft-1)*minBatch)
           const canSendNow = Math.min(maxBatch, Math.max(mustSendNow, remaining - (runsLeft - 1) * minBatch));
+          // Pick a raw qty in [mustSendNow, canSendNow], then organicize it
+          let rawQty: number;
           if (canSendNow <= mustSendNow) {
-            qty = canSendNow;
+            rawQty = canSendNow;
           } else {
-            qty = Math.floor(mustSendNow + Math.random() * (canSendNow - mustSendNow + 1));
+            rawQty = ri(mustSendNow, canSendNow);
           }
+          qty = organicize(rawQty, Math.max(providerMin, mustSendNow), canSendNow);
+          // Re-clamp so future runs still fit
+          const minNeededLater = remaining - qty;
+          const maxCapacityLater = (runsLeft - 1) * maxBatch;
+          if (minNeededLater > maxCapacityLater) qty = Math.min(canSendNow, remaining - maxCapacityLater);
+          if (qty < providerMin) qty = providerMin;
         }
-        if (qty > maxBatch && runsLeft > 1) qty = maxBatch;
         if (qty < 1) qty = 1;
+        if (qty > remaining) qty = remaining;
 
-        // Peak hours: bias toward 6-11pm IST (only when no strict time limit)
         let scheduled = new Date(currentTime);
         if (peak_hours_enabled && !(time_limit_hours && time_limit_hours > 0)) {
           const istHour = (scheduled.getUTCHours() + 5 + Math.floor((scheduled.getUTCMinutes() + 30) / 60)) % 24;
@@ -288,10 +317,15 @@ Deno.serve(async (req) => {
         });
         remaining -= qty;
         if (remaining <= 0) break;
-        const intervalJitter = variance > 0 ? (1 - variance) + Math.random() * (2 * variance) : (1 + (Math.random() * 0.4 - 0.2));
-        currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes * intervalJitter) * 60 * 1000);
+        // Strong random spacing — true organic, never fixed cadence
+        const vlow = Math.max(0.4, 1 - Math.max(variance, 0.35));
+        const vhigh = 1 + Math.max(variance, 0.4);
+        const intervalJitter = vlow + Math.random() * (vhigh - vlow);
+        // Extra small chance of a longer pause (mimics human idle)
+        const pauseBoost = Math.random() < 0.12 ? 1.5 + Math.random() * 1.5 : 1;
+        currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes * intervalJitter * pauseBoost) * 60 * 1000);
       }
-      // Safety net (should rarely trigger now): spread any leftover within deadline if possible
+      // Safety net: spread any leftover
       while (remaining > 0 && entries.length < 5000) {
         const qty = Math.min(remaining, maxBatch);
         entries.push({
@@ -305,24 +339,8 @@ Deno.serve(async (req) => {
         remaining -= qty;
         currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes) * 60 * 1000);
       }
-
-      for (let idx = entries.length - 1; idx > 0; idx--) {
-        if (entries[idx].quantity_to_send > 0 && entries[idx].quantity_to_send < minBatch) {
-          const deficit = minBatch - entries[idx].quantity_to_send;
-          const prev = entries[idx - 1];
-          if (prev.quantity_to_send - deficit >= minBatch) {
-            prev.quantity_to_send -= deficit;
-            prev.base_quantity -= deficit;
-            entries[idx].quantity_to_send += deficit;
-            entries[idx].base_quantity += deficit;
-          } else if (prev.quantity_to_send + entries[idx].quantity_to_send <= maxBatch) {
-            prev.quantity_to_send += entries[idx].quantity_to_send;
-            prev.base_quantity += entries[idx].base_quantity;
-            entries.splice(idx, 1);
-          }
-        }
-      }
       entries.forEach((entry, idx) => { entry.run_number = idx + 1; });
+
 
       if (entries.length > 0) {
         const { error: schedErr } = await supabase.from("organic_run_schedule").insert(entries);
