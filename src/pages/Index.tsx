@@ -15,22 +15,67 @@ const Index = () => {
       />
 
       {/* NAV */}
-      <nav className="fixed top-0 inset-x-0 z-50 px-6 lg:px-14 py-5 flex items-center justify-between backdrop-blur-xl bg-background/70 border-b border-border/50">
+      <nav className="fixed top-0 inset-x-0 z-50 px-6 lg:px-14 py-5 flex items-center justify-between bg-transparent">
         <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo} alt="Boostly Pro" className="w-9 h-9 rounded-lg object-contain" />
-          <span className="font-serif text-[18px] tracking-tight">
-            Boostly<span className="text-primary italic"> Pro</span>
-          </span>
+          <img src={logo} alt="Boostly Pro" className="w-10 h-10 rounded-full object-cover ring-1 ring-white/20" />
+          <div className="leading-tight">
+            <div className="font-serif text-[20px] tracking-tight text-white">Boostly <span className="italic">Pro</span></div>
+            <div className="font-mono text-[9px] tracking-[0.22em] uppercase text-white/50">by daniel brooks</div>
+          </div>
         </Link>
-        <div className="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-[0.18em] uppercase">
-          <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">features</a>
-          <a href="#platforms" className="text-muted-foreground hover:text-foreground transition-colors">platforms</a>
-          <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">pricing</a>
+        <div className="hidden md:flex items-center gap-10 text-[14px] text-white/90">
+          <a href="#features" className="hover:text-white transition-colors">Home</a>
+          <a href="#features" className="hover:text-white transition-colors">Features</a>
+          <a href="#platforms" className="hover:text-white transition-colors">Platforms</a>
+          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          <Link to="/support" className="hover:text-white transition-colors">Support</Link>
         </div>
-        <Link to="/auth" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-[12px] font-mono uppercase tracking-[0.15em] hover:shadow-[0_10px_40px_-10px_hsl(var(--primary)/0.6)] transition-all">
-          start free <ArrowUpRight className="w-3.5 h-3.5" />
+        <Link to="/auth" className="inline-flex items-center px-6 h-10 rounded-full bg-white text-black text-[13px] font-medium hover:bg-white/90 transition-all">
+          Log in
         </Link>
       </nav>
+
+      {/* HERO — dark cinematic with video bg */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center overflow-hidden">
+        {/* Video background (transparent placeholder — drop your video src here) */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-60"
+          poster=""
+        >
+          {/* <source src="/hero.mp4" type="video/mp4" /> */}
+        </video>
+        {/* Dark overlays for legibility */}
+        <div aria-hidden className="absolute inset-0 bg-black/55" />
+        <div aria-hidden className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.7) 100%)' }} />
+
+        <div className="relative z-10 max-w-5xl mx-auto pt-24">
+          <p className="font-mono text-[11px] tracking-[0.4em] uppercase text-white/60 mb-10">
+            Boostly Pro — Private Circle
+          </p>
+          <h1 className="font-serif text-[clamp(3rem,9vw,7rem)] leading-[0.95] tracking-[-0.02em] text-white">
+            Built Different.
+          </h1>
+          <h1 className="font-serif italic text-[clamp(3rem,9vw,7rem)] leading-[0.95] tracking-[-0.02em] text-white/95 mt-2">
+            Paid Different.
+          </h1>
+          <p className="mt-10 text-[17px] text-white/75 font-light">Quiet money. Loud results.</p>
+          <Link
+            to="/auth"
+            className="mt-10 inline-flex items-center justify-center px-10 h-14 rounded-full bg-white text-black text-[13px] font-semibold tracking-[0.25em] uppercase hover:bg-white/90 transition-all"
+          >
+            Join Now
+          </Link>
+          <p className="mt-8 font-mono text-[10px] tracking-[0.35em] uppercase text-white/40">
+            Members Only · By Invitation
+          </p>
+        </div>
+      </section>
+
+
 
       {/* HERO */}
       <section className="min-h-screen flex flex-col justify-center px-6 lg:px-14 pt-32 pb-20 relative">
