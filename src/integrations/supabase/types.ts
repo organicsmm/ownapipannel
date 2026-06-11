@@ -1519,6 +1519,10 @@ export type Database = {
         Args: { _order_id: string }
         Returns: Json
       }
+      get_user_engagement_orders_list: {
+        Args: { _limit?: number }
+        Returns: Json
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
