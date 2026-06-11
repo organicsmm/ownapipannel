@@ -55,30 +55,19 @@ export default function EngagementOrders() {
   const { formatPrice } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Instant load with cache + moderate refresh
+  // Fast aggregated load — server-side summary RPC (no nested run fetches)
   const { data: orders, refetch } = useQuery({
     queryKey: ['engagement-orders', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('engagement_orders')
-        .select(`
-          id, order_number, status, total_price, link, base_quantity, created_at, updated_at, is_organic_mode,
-          items:engagement_order_items(
-            id, engagement_type, quantity, status,
-            runs:organic_run_schedule(id, status, quantity_to_send, scheduled_at, run_number)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { data, error } = await supabase.rpc('get_user_engagement_orders_list', { _limit: 100 });
       if (error) throw error;
-      return data;
+      return (data as any[]) || [];
     },
     enabled: !!user,
-    staleTime: 15000, // Cache for 15s
+    staleTime: 15000,
     refetchOnWindowFocus: false,
-    refetchInterval: 15000, // Refresh every 15s (was 5s)
+    refetchInterval: 15000,
   });
 
   // Filter orders based on search query
