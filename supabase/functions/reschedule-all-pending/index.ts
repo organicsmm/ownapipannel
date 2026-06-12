@@ -18,11 +18,11 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  try {
-    const body = await req.json().catch(() => ({} as any));
-    const onlyOrderId: string | undefined = body?.order_id;
-    const onlyUserId: string | undefined = body?.user_id;
+  const body = await req.json().catch(() => ({} as any));
+  const onlyOrderId: string | undefined = body?.order_id;
+  const onlyUserId: string | undefined = body?.user_id;
 
+  const work = async () => {
     // Fetch active orders
     let orderQ = supabase
       .from("engagement_orders")
@@ -31,7 +31,8 @@ Deno.serve(async (req) => {
     if (onlyOrderId) orderQ = orderQ.eq("id", onlyOrderId);
     if (onlyUserId) orderQ = orderQ.eq("user_id", onlyUserId);
     const { data: orders, error: oErr } = await orderQ;
-    if (oErr) throw oErr;
+    if (oErr) { console.error("orders fetch", oErr); return; }
+
 
     let totalItems = 0;
     let totalNewRuns = 0;
