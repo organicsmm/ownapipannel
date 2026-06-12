@@ -152,22 +152,23 @@ Deno.serve(async (req) => {
         }
 
 
-        // If last collides with prior, try shifting by ±1
-        if (qtys.length >= 2) {
-          const last = qtys[qtys.length - 1];
-          const prevSet = new Set(qtys.slice(0, -1));
-          if (prevSet.has(last)) {
-            for (let t = 0; t < 12; t++) {
-              const shift = Math.random() < 0.5 ? -1 : 1;
-              const np = qtys[qtys.length - 2] + shift;
-              const nl = last - shift;
-              if (np >= providerMin && np <= providerMax && nl >= providerMin && nl <= providerMax && np !== nl && !prevSet.has(nl)) {
-                qtys[qtys.length - 2] = np;
-                qtys[qtys.length - 1] = nl;
-                break;
-              }
+        // If last run is below provider minimum, merge into a previous run
+        while (qtys.length >= 2 && qtys[qtys.length - 1] < providerMin) {
+          const last = qtys.pop()!;
+          // Try to add to a run that still has room under qHi
+          let absorbed = false;
+          for (let j = qtys.length - 1; j >= 0; j--) {
+            if (qtys[j] + last <= Math.min(providerMax, qHi + Math.ceil(qHi * 0.5))) {
+              qtys[j] += last;
+              absorbed = true;
+              break;
             }
           }
+          if (!absorbed) qtys[qtys.length - 1] += last;
+        }
+        // Ensure no quantity below providerMin
+        for (let i = 0; i < qtys.length; i++) {
+          if (qtys[i] < providerMin) qtys[i] = providerMin;
         }
 
         // Generate randomized timestamps within [startMs, endMs]
