@@ -95,23 +95,25 @@ Deno.serve(async (req) => {
         // Tight window near provider minimum
         // Views: min..min+50% (e.g. 100..150). Others: min..min+30 (e.g. 10..40, mostly 10-20)
         const qLo = providerMin;
-        const qHiRaw = isViews
+        let qHiRaw = isViews
           ? Math.ceil(providerMin * 1.5)
           : providerMin + 30;
-        const qHi = Math.min(providerMax, Math.max(qLo + 5, qHiRaw));
+        let qHi = Math.min(providerMax, Math.max(qLo + 5, qHiRaw));
 
         // Target avg batch toward the lower end of the window so most runs are small
-        const avgBatch = Math.max(providerMin, Math.floor(qLo + (qHi - qLo) * 0.35));
-        // Max ~500 runs safety cap
-        let numRuns = Math.min(500, Math.max(1, Math.floor(remaining / avgBatch)));
-        // Recompute effective avg batch
+        let avgBatch = Math.max(providerMin, Math.floor(qLo + (qHi - qLo) * 0.35));
+        const MAX_RUNS = 500;
+        let numRuns = Math.min(MAX_RUNS, Math.max(1, Math.floor(remaining / avgBatch)));
         let effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
-        // If effectiveBatch exceeds qHi (very large order), allow more runs
-        while (effectiveBatch > qHi && numRuns < 500) {
-          numRuns = Math.min(500, numRuns + Math.ceil((effectiveBatch - qHi) * numRuns / qHi) + 1);
+
+        // For very large remaining (would exceed MAX_RUNS cap), grow qHi so batches stay balanced
+        if (effectiveBatch > qHi) {
+          qHi = Math.min(providerMax, Math.ceil(effectiveBatch * 1.3));
+          avgBatch = Math.max(providerMin, Math.floor((qLo + qHi) / 2));
+          numRuns = Math.min(MAX_RUNS, Math.max(1, Math.ceil(remaining / avgBatch)));
           effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
         }
-        numRuns = Math.max(1, Math.ceil(remaining / Math.max(providerMin, effectiveBatch)));
+        numRuns = Math.max(1, Math.min(MAX_RUNS, Math.ceil(remaining / Math.max(providerMin, effectiveBatch))));
 
         // Ensure end window is at least numRuns * 3 minutes from start
         const minSpanMs = numRuns * 3 * 60 * 1000;
