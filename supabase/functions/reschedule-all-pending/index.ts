@@ -90,24 +90,22 @@ Deno.serve(async (req) => {
         const providerMin = pm?.min || 10;
         const providerMax = pm?.max || Number.MAX_SAFE_INTEGER;
 
-        // Use provider minimum as batch size to MAXIMIZE number of runs
-        const baseBatch = providerMin;
+        // Target avg batch slightly above providerMin so each run has room for unique random variation
+        const avgBatch = Math.max(providerMin + 5, Math.ceil(providerMin * 1.5));
         // Max ~500 runs safety cap
-        let numRuns = Math.min(500, Math.max(1, Math.floor(remaining / baseBatch)));
-        // If we'd cap at 500 and still leave a lot, increase batch
+        let numRuns = Math.min(500, Math.max(1, Math.floor(remaining / avgBatch)));
+        // Recompute effective avg batch
         let effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
-        // Recompute numRuns based on effectiveBatch
         numRuns = Math.max(1, Math.ceil(remaining / effectiveBatch));
 
         // Ensure end window is at least numRuns * 3 minutes from start
         const minSpanMs = numRuns * 3 * 60 * 1000;
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
 
-        // Window for random qty per run — wide enough to give numRuns unique integers
-        // Centered around effectiveBatch, scales with run count so no duplicates needed
-        const windowSpan = Math.max(numRuns * 2 + 20, Math.ceil(effectiveBatch * 1.2));
+        // Window for random qty per run — wide enough to give numRuns unique integers + slack
         const qLo = providerMin;
-        const qHi = Math.min(providerMax, Math.max(qLo + numRuns + 10, effectiveBatch + Math.floor(windowSpan / 2)));
+        const qHi = Math.min(providerMax, Math.max(qLo + numRuns + 20, effectiveBatch * 2));
+
 
         // Generate unique random quantities summing to `remaining`
         const used = new Set<number>();
