@@ -103,6 +103,12 @@ Deno.serve(async (req) => {
         const minSpanMs = numRuns * 3 * 60 * 1000;
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
 
+        // Window for random qty per run — wide enough to give numRuns unique integers
+        // Centered around effectiveBatch, scales with run count so no duplicates needed
+        const windowSpan = Math.max(numRuns * 2 + 20, Math.ceil(effectiveBatch * 1.2));
+        const qLo = providerMin;
+        const qHi = Math.min(providerMax, Math.max(qLo + numRuns + 10, effectiveBatch + Math.floor(windowSpan / 2)));
+
         // Generate unique random quantities summing to `remaining`
         const used = new Set<number>();
         const qtys: number[] = [];
@@ -114,25 +120,18 @@ Deno.serve(async (req) => {
             q = Math.max(1, Math.min(providerMax, left));
           } else {
             const runsLeft = numRuns - i;
-            // Center around providerMin with small ±jitter (0..9) to keep uniqueness
-            const lo = providerMin;
-            const hi = Math.min(providerMax, providerMin + 30, Math.max(lo, left - (runsLeft - 1) * providerMin));
-            const base = ri(lo, Math.max(lo, hi));
-            // Make unique
-            let cand = base;
-            for (let k = 0; k < 60 && used.has(cand); k++) {
-              const delta = ri(1, 9) * (Math.random() < 0.5 ? -1 : 1);
-              cand = Math.min(hi, Math.max(lo, base + delta));
+            // Window for this slot, also feasibility-constrained
+            const lo = Math.max(qLo, left - (runsLeft - 1) * qHi);
+            const hi = Math.min(qHi, Math.max(lo, left - (runsLeft - 1) * qLo));
+            let cand = ri(lo, Math.max(lo, hi));
+            // Make unique within window
+            for (let k = 0; k < 80 && used.has(cand); k++) {
+              const delta = ri(1, Math.max(2, Math.min(numRuns, hi - lo))) * (Math.random() < 0.5 ? -1 : 1);
+              cand = Math.min(hi, Math.max(lo, cand + delta));
             }
             if (used.has(cand)) {
-              // linear scan
               for (let v = lo; v <= hi; v++) if (!used.has(v)) { cand = v; break; }
             }
-            // feasibility re-clamp
-            const maxLater = (runsLeft - 1) * providerMax;
-            const minLater = (runsLeft - 1) * providerMin;
-            if (left - cand > maxLater) cand = Math.max(lo, left - maxLater);
-            if (left - cand < minLater) cand = Math.min(hi, left - minLater);
             q = cand;
           }
           if (q < 1) q = 1;
@@ -142,6 +141,7 @@ Deno.serve(async (req) => {
           left -= q;
           if (left <= 0) break;
         }
+
 
         // If last collides with prior, try shifting by ±1
         if (qtys.length >= 2) {
