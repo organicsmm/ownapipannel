@@ -271,16 +271,53 @@ Deno.serve(async (req) => {
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + typeStartOffsetMin * 60 * 1000);
 
+      // Track used quantities so no two runs share the same number per engagement type
+      const usedQtys = new Set<number>();
+      const pickUnique = (base: number, lo: number, hi: number): number => {
+        if (hi < lo) return base;
+        if (!usedQtys.has(base) && base >= lo && base <= hi) return base;
+        for (let k = 0; k < 60; k++) {
+          const span = Math.max(2, Math.min(15, hi - lo));
+          const delta = ri(1, span) * (Math.random() < 0.5 ? -1 : 1);
+          const cand = Math.min(hi, Math.max(lo, base + delta));
+          if (!usedQtys.has(cand)) return cand;
+        }
+        for (let v = lo; v <= hi; v++) if (!usedQtys.has(v)) return v;
+        return base;
+      };
+
       for (let i = 1; i <= targetRuns && remaining > 0; i++) {
         const runsLeft = targetRuns - i + 1;
         let qty: number;
         if (runsLeft === 1) {
           // Last run delivers EXACT remaining → guarantees total == entered quantity
           qty = Math.min(remaining, providerMax);
+          // If collides with a prior run, shift previous entry by ±1 to free a unique number
+          if (usedQtys.has(qty) && entries.length > 0) {
+            for (let tries = 0; tries < 12; tries++) {
+              const prev = entries[entries.length - 1];
+              const shift = Math.random() < 0.5 ? -1 : 1;
+              const newPrev = prev.quantity_to_send + shift;
+              const newLast = qty - shift;
+              if (
+                newPrev >= providerMin && newPrev <= maxBatch &&
+                newLast >= providerMin && newLast <= providerMax &&
+                newPrev !== newLast &&
+                !usedQtys.has(newLast) &&
+                (newPrev === prev.quantity_to_send || !usedQtys.has(newPrev))
+              ) {
+                usedQtys.delete(prev.quantity_to_send);
+                prev.quantity_to_send = newPrev;
+                prev.base_quantity = newPrev;
+                usedQtys.add(newPrev);
+                qty = newLast;
+                break;
+              }
+            }
+          }
         } else {
           const mustSendNow = Math.max(minBatch, remaining - (runsLeft - 1) * maxBatch);
           const canSendNow = Math.min(maxBatch, Math.max(mustSendNow, remaining - (runsLeft - 1) * minBatch));
-          // Pick a raw qty in [mustSendNow, canSendNow], then organicize it
           let rawQty: number;
           if (canSendNow <= mustSendNow) {
             rawQty = canSendNow;
@@ -288,11 +325,14 @@ Deno.serve(async (req) => {
             rawQty = ri(mustSendNow, canSendNow);
           }
           qty = organicize(rawQty, Math.max(providerMin, mustSendNow), canSendNow);
-          // Re-clamp so future runs still fit
           const minNeededLater = remaining - qty;
           const maxCapacityLater = (runsLeft - 1) * maxBatch;
           if (minNeededLater > maxCapacityLater) qty = Math.min(canSendNow, remaining - maxCapacityLater);
           if (qty < providerMin) qty = providerMin;
+          // Enforce uniqueness within the valid window
+          const loU = Math.max(providerMin, mustSendNow);
+          const hiU = Math.max(loU, canSendNow);
+          qty = pickUnique(qty, loU, hiU);
         }
         if (qty < 1) qty = 1;
         if (qty > remaining) qty = remaining;
@@ -315,15 +355,21 @@ Deno.serve(async (req) => {
           base_quantity: qty,
           status: "pending",
         });
+        usedQtys.add(qty);
         remaining -= qty;
         if (remaining <= 0) break;
         // Strong random spacing — true organic, never fixed cadence
         const vlow = Math.max(0.4, 1 - Math.max(variance, 0.35));
         const vhigh = 1 + Math.max(variance, 0.4);
         const intervalJitter = vlow + Math.random() * (vhigh - vlow);
-        // Extra small chance of a longer pause (mimics human idle)
         const pauseBoost = Math.random() < 0.12 ? 1.5 + Math.random() * 1.5 : 1;
-        currentTime = new Date(currentTime.getTime() + Math.max(MIN_INTERVAL, intervalMinutes * intervalJitter * pauseBoost) * 60 * 1000);
+        // Add per-run second-level jitter so two runs never align to the same minute
+        const secondJitter = Math.floor(Math.random() * 59);
+        currentTime = new Date(
+          currentTime.getTime()
+          + Math.max(MIN_INTERVAL, intervalMinutes * intervalJitter * pauseBoost) * 60 * 1000
+          + secondJitter * 1000
+        );
       }
       // Safety net: spread any leftover
       while (remaining > 0 && entries.length < 5000) {
