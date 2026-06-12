@@ -20,6 +20,8 @@ import {
 } from "@/lib/engagement-types";
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
+import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
+import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 
 
 import { useDebounce } from "@/hooks/useDebounce";
@@ -371,7 +373,24 @@ function Inner() {
         )}
       </div>
 
+      {/* Live Organic Growth Preview - updates with quantity/time changes */}
+      {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
+        <LiveGrowthChart
+          engagements={engagements as Record<EngagementType, EngagementConfig>}
+          refreshKey={previewRefreshKey}
+          onRefresh={() => setPreviewRefreshKey(k => k + 1)}
+          platform={platform}
+        />
+      )}
 
+      {/* Per-Type Organic Delivery Preview */}
+      {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
+        <DeliveryPreview
+          engagements={engagements as Record<EngagementType, EngagementConfig>}
+          refreshKey={previewRefreshKey}
+          platform={platform}
+        />
+      )}
 
 
       {/* Place Order */}
