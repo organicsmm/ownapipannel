@@ -87,24 +87,35 @@ Deno.serve(async (req) => {
         let endMs = Math.max(pendingTimes[pendingTimes.length - 1] || startMs, startMs);
 
         const pm = minByType[String(item.engagement_type)];
-        const providerMin = pm?.min || 10;
+        const isViews = String(item.engagement_type).toLowerCase() === "views";
+        // Enforce floor: views >= 100, everything else >= 10 (or provider min if higher)
+        const providerMin = Math.max(isViews ? 100 : 10, pm?.min || (isViews ? 100 : 10));
         const providerMax = pm?.max || Number.MAX_SAFE_INTEGER;
 
-        // Target avg batch slightly above providerMin so each run has room for unique random variation
-        const avgBatch = Math.max(providerMin + 5, Math.ceil(providerMin * 1.5));
+        // Tight window near provider minimum
+        // Views: min..min+50% (e.g. 100..150). Others: min..min+30 (e.g. 10..40, mostly 10-20)
+        const qLo = providerMin;
+        const qHiRaw = isViews
+          ? Math.ceil(providerMin * 1.5)
+          : providerMin + 30;
+        const qHi = Math.min(providerMax, Math.max(qLo + 5, qHiRaw));
+
+        // Target avg batch toward the lower end of the window so most runs are small
+        const avgBatch = Math.max(providerMin, Math.floor(qLo + (qHi - qLo) * 0.35));
         // Max ~500 runs safety cap
         let numRuns = Math.min(500, Math.max(1, Math.floor(remaining / avgBatch)));
         // Recompute effective avg batch
         let effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
-        numRuns = Math.max(1, Math.ceil(remaining / effectiveBatch));
+        // If effectiveBatch exceeds qHi (very large order), allow more runs
+        while (effectiveBatch > qHi && numRuns < 500) {
+          numRuns = Math.min(500, numRuns + Math.ceil((effectiveBatch - qHi) * numRuns / qHi) + 1);
+          effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
+        }
+        numRuns = Math.max(1, Math.ceil(remaining / Math.max(providerMin, effectiveBatch)));
 
         // Ensure end window is at least numRuns * 3 minutes from start
         const minSpanMs = numRuns * 3 * 60 * 1000;
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
-
-        // Window for random qty per run — wide enough to give numRuns unique integers + slack
-        const qLo = providerMin;
-        const qHi = Math.min(providerMax, Math.max(qLo + numRuns + 20, effectiveBatch * 2));
 
 
         // Generate unique random quantities summing to `remaining`
