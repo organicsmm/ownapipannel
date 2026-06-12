@@ -220,22 +220,21 @@ Deno.serve(async (req) => {
         }
       }
     }
+    console.log(JSON.stringify({
+      done: true,
+      orders_scanned: orders?.length || 0,
+      items_rescheduled: totalItems,
+      runs_deleted: totalDeleted,
+      runs_created: totalNewRuns,
+    }));
+  };
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        orders_scanned: orders?.length || 0,
-        items_rescheduled: totalItems,
-        runs_deleted: totalDeleted,
-        runs_created: totalNewRuns,
-        details,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ ok: false, error: (e as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  }
+  // @ts-ignore EdgeRuntime global
+  EdgeRuntime.waitUntil(work().catch((e) => console.error("reschedule fatal:", e)));
+
+  return new Response(
+    JSON.stringify({ ok: true, started: true, message: "Rescheduling in background" }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 });
+
