@@ -87,24 +87,37 @@ Deno.serve(async (req) => {
         let endMs = Math.max(pendingTimes[pendingTimes.length - 1] || startMs, startMs);
 
         const pm = minByType[String(item.engagement_type)];
-        const providerMin = pm?.min || 10;
+        const isViews = String(item.engagement_type).toLowerCase() === "views";
+        // Enforce floor: views >= 100, everything else >= 10 (or provider min if higher)
+        const providerMin = Math.max(isViews ? 100 : 10, pm?.min || (isViews ? 100 : 10));
         const providerMax = pm?.max || Number.MAX_SAFE_INTEGER;
 
-        // Target avg batch slightly above providerMin so each run has room for unique random variation
-        const avgBatch = Math.max(providerMin + 5, Math.ceil(providerMin * 1.5));
-        // Max ~500 runs safety cap
-        let numRuns = Math.min(500, Math.max(1, Math.floor(remaining / avgBatch)));
-        // Recompute effective avg batch
+        // Tight window near provider minimum
+        // Views: min..min+50% (e.g. 100..150). Others: min..min+30 (e.g. 10..40, mostly 10-20)
+        const qLo = providerMin;
+        let qHiRaw = isViews
+          ? Math.ceil(providerMin * 1.5)
+          : providerMin + 30;
+        let qHi = Math.min(providerMax, Math.max(qLo + 5, qHiRaw));
+
+        // Target avg batch toward the lower end of the window so most runs are small
+        let avgBatch = Math.max(providerMin, Math.floor(qLo + (qHi - qLo) * 0.35));
+        const MAX_RUNS = 500;
+        let numRuns = Math.min(MAX_RUNS, Math.max(1, Math.floor(remaining / avgBatch)));
         let effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
-        numRuns = Math.max(1, Math.ceil(remaining / effectiveBatch));
+
+        // For very large remaining (would exceed MAX_RUNS cap), grow qHi so batches stay balanced
+        if (effectiveBatch > qHi) {
+          qHi = Math.min(providerMax, Math.ceil(effectiveBatch * 1.3));
+          avgBatch = Math.max(providerMin, Math.floor((qLo + qHi) / 2));
+          numRuns = Math.min(MAX_RUNS, Math.max(1, Math.ceil(remaining / avgBatch)));
+          effectiveBatch = Math.max(providerMin, Math.ceil(remaining / numRuns));
+        }
+        numRuns = Math.max(1, Math.min(MAX_RUNS, Math.ceil(remaining / Math.max(providerMin, effectiveBatch))));
 
         // Ensure end window is at least numRuns * 3 minutes from start
         const minSpanMs = numRuns * 3 * 60 * 1000;
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
-
-        // Window for random qty per run — wide enough to give numRuns unique integers + slack
-        const qLo = providerMin;
-        const qHi = Math.min(providerMax, Math.max(qLo + numRuns + 20, effectiveBatch * 2));
 
 
         // Generate unique random quantities summing to `remaining`
@@ -141,22 +154,23 @@ Deno.serve(async (req) => {
         }
 
 
-        // If last collides with prior, try shifting by ±1
-        if (qtys.length >= 2) {
-          const last = qtys[qtys.length - 1];
-          const prevSet = new Set(qtys.slice(0, -1));
-          if (prevSet.has(last)) {
-            for (let t = 0; t < 12; t++) {
-              const shift = Math.random() < 0.5 ? -1 : 1;
-              const np = qtys[qtys.length - 2] + shift;
-              const nl = last - shift;
-              if (np >= providerMin && np <= providerMax && nl >= providerMin && nl <= providerMax && np !== nl && !prevSet.has(nl)) {
-                qtys[qtys.length - 2] = np;
-                qtys[qtys.length - 1] = nl;
-                break;
-              }
+        // If last run is below provider minimum, merge into a previous run
+        while (qtys.length >= 2 && qtys[qtys.length - 1] < providerMin) {
+          const last = qtys.pop()!;
+          // Try to add to a run that still has room under qHi
+          let absorbed = false;
+          for (let j = qtys.length - 1; j >= 0; j--) {
+            if (qtys[j] + last <= Math.min(providerMax, qHi + Math.ceil(qHi * 0.5))) {
+              qtys[j] += last;
+              absorbed = true;
+              break;
             }
           }
+          if (!absorbed) qtys[qtys.length - 1] += last;
+        }
+        // Ensure no quantity below providerMin
+        for (let i = 0; i < qtys.length; i++) {
+          if (qtys[i] < providerMin) qtys[i] = providerMin;
         }
 
         // Generate randomized timestamps within [startMs, endMs]
