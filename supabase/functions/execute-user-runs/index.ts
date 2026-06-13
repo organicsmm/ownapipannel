@@ -210,6 +210,31 @@ Deno.serve(async (req) => {
     if (requestBody?.chained === true) {
       return new Response(JSON.stringify({ success: true, ignored: "legacy self-trigger disabled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (requestBody?.background !== true) {
+      const backgroundBody = {
+        ...requestBody,
+        background: true,
+        depth: Number(requestBody?.depth || 0),
+      };
+      const trigger = async () => {
+        try {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify(backgroundBody),
+          });
+        } catch (e) { console.error("background executor trigger failed:", e); }
+      };
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+        (globalThis as any).EdgeRuntime.waitUntil(trigger());
+      } else {
+        trigger();
+      }
+      return new Response(JSON.stringify({ accepted: true, background: true }), { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
     //    may have timed out after reaching the provider. Do NOT retry them, because
@@ -276,7 +301,7 @@ Deno.serve(async (req) => {
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(2500)));
+      .limit(700)));
 
     const fetchError = dueBatches.find((batch) => batch.error)?.error;
     if (fetchError) {
@@ -297,6 +322,7 @@ Deno.serve(async (req) => {
     const regularRuns = priorityOrderIds.size > 0
       ? allDueRuns.filter((dueRun: any) => !priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
       : allDueRuns;
+    const runCap = Math.min(80, Math.max(10, Number(requestBody?.max_runs || 45)));
     const runsPerLinkType = new Map<string, number>();
     const dueRuns: any[] = [];
     for (const dueRun of [...priorityRuns, ...regularRuns]) {
@@ -309,7 +335,7 @@ Deno.serve(async (req) => {
       if (pickedForKey >= 5) continue;
       runsPerLinkType.set(fairKey, pickedForKey + 1);
       dueRuns.push(dueRun);
-      if (dueRuns.length >= 180) break;
+      if (dueRuns.length >= runCap) break;
     }
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
