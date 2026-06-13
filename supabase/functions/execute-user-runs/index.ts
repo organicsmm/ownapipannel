@@ -303,12 +303,42 @@ Deno.serve(async (req) => {
       .order("scheduled_at", { ascending: true })
       .limit(700)));
 
+    let priorityDirectRuns: any[] = [];
+    if (priorityOrderIds.size > 0) {
+      const { data: priorityItems } = await supabase
+        .from("engagement_order_items")
+        .select("id")
+        .in("engagement_order_id", Array.from(priorityOrderIds));
+      const priorityItemIds = (priorityItems || []).map((it: any) => it.id).filter(Boolean);
+      if (priorityItemIds.length > 0) {
+        const { data: directRuns, error: directErr } = await supabase
+          .from("organic_run_schedule")
+          .select(runSelect)
+          .eq("status", "pending")
+          .not("engagement_order_item_id", "is", null)
+          .lte("scheduled_at", nowIso)
+          .in("engagement_order_item_id", priorityItemIds)
+          .eq("engagement_order_item.engagement_order.use_user_api", true)
+          .order("scheduled_at", { ascending: true })
+          .limit(1000);
+        if (directErr) {
+          console.error("Fetch priority due runs error:", directErr);
+        } else {
+          priorityDirectRuns = directRuns || [];
+        }
+      }
+    }
+
     const fetchError = dueBatches.find((batch) => batch.error)?.error;
     if (fetchError) {
       console.error("Fetch due runs error:", fetchError);
       return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const allDueRuns = dueBatches.flatMap((batch) => batch.data || [])
+    const uniqueDueRunMap = new Map<string, any>();
+    for (const dueRun of [...priorityDirectRuns, ...dueBatches.flatMap((batch) => batch.data || [])]) {
+      uniqueDueRunMap.set(String(dueRun.id), dueRun);
+    }
+    const allDueRuns = Array.from(uniqueDueRunMap.values())
       .sort((a: any, b: any) => {
         const ao = a.engagement_order_item?.engagement_order;
         const bo = b.engagement_order_item?.engagement_order;
