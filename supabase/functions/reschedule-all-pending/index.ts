@@ -9,6 +9,34 @@ const corsHeaders = {
 };
 
 const ri = (lo: number, hi: number) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
+const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
+  if (total <= 0) return [];
+  if (total >= min && total <= max) return [total];
+  const hardMax = Math.max(min, max);
+  let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 500));
+  const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;
+  const maxSum = (runs: number, hi: number) => runs * hi - (runs * (runs - 1)) / 2;
+  while (n > 1 && minSum(n) > total) n--;
+  let hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25), min + n + 5));
+  while (n > 1 && maxSum(n, hi) < total) {
+    if (hi < hardMax) hi = Math.min(hardMax, hi + Math.max(5, Math.ceil((total - maxSum(n, hi)) / n) + 2));
+    else { n--; hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25))); }
+  }
+  const qtys = Array.from({ length: n }, (_, i) => min + i);
+  let left = total - qtys.reduce((s, q) => s + q, 0);
+  while (left > 0) {
+    const candidates = qtys.map((q, i) => ({ i, cap: (i === qtys.length - 1 ? hi : qtys[i + 1] - 1) - q })).filter(x => x.cap > 0);
+    if (candidates.length === 0) {
+      if (hi < hardMax) { hi = Math.min(hardMax, hi + Math.max(1, Math.min(25, left))); continue; }
+      return buildUniqueQuantities(total, min, hardMax, Math.max(1, n - 1));
+    }
+    const pick = candidates[ri(0, candidates.length - 1)];
+    const add = Math.min(left, pick.cap, ri(1, Math.max(1, Math.min(pick.cap, 25))));
+    qtys[pick.i] += add;
+    left -= add;
+  }
+  return qtys.sort(() => Math.random() - 0.5);
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
