@@ -257,22 +257,8 @@ Deno.serve(async (req) => {
     //    If provider clearly rejected the order as busy/failed, requeue it so priority
     //    rotation can try the next provider. If response was lost, keep the old safe
     //    behavior after 10 min to avoid duplicate delivery.
-    const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString();
-    const { data: rejectedNullRuns } = await supabase
-      .from("organic_run_schedule")
-      .select("id")
-      .eq("status", "started")
-      .is("provider_order_id", null)
-      .lt("started_at", oneMinAgo)
-      .not("provider_response", "is", null)
-      .filter("provider_response", "cs", '{}')
-      .limit(200);
-    let requeuedRejected = 0;
-    for (const rr of (rejectedNullRuns || [])) {
-      await supabase.rpc("requeue_user_api_runs_without_provider_order", { _max_age_minutes: 1 });
-      requeuedRejected = (rejectedNullRuns || []).length;
-      break;
-    }
+    const { data: requeueStats } = await supabase.rpc("requeue_user_api_runs_without_provider_order", { _max_age_minutes: 1 });
+    const requeuedRejected = Number((requeueStats as any)?.requeued || 0);
 
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: stuckRuns } = await supabase
@@ -656,6 +642,7 @@ Deno.serve(async (req) => {
       due: (dueRuns || []).length,
       runCap,
       depth,
+      requeuedRejected,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
