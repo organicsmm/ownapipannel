@@ -9,6 +9,34 @@ const corsHeaders = {
 };
 
 const ri = (lo: number, hi: number) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
+const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
+  if (total <= 0) return [];
+  if (total < min || desiredRuns <= 1) return [total];
+  const hardMax = Math.max(min, max);
+  let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 500));
+  const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;
+  const maxSum = (runs: number, hi: number) => runs * hi - (runs * (runs - 1)) / 2;
+  while (n > 1 && minSum(n) > total) n--;
+  let hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25), min + n + 5));
+  while (n > 1 && maxSum(n, hi) < total) {
+    if (hi < hardMax) hi = Math.min(hardMax, hi + Math.max(5, Math.ceil((total - maxSum(n, hi)) / n) + 2));
+    else { n--; hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25))); }
+  }
+  const qtys = Array.from({ length: n }, (_, i) => min + i);
+  let left = total - qtys.reduce((s, q) => s + q, 0);
+  while (left > 0) {
+    const candidates = qtys.map((q, i) => ({ i, cap: (i === qtys.length - 1 ? hi : qtys[i + 1] - 1) - q })).filter(x => x.cap > 0);
+    if (candidates.length === 0) {
+      if (hi < hardMax) { hi = Math.min(hardMax, hi + Math.max(1, Math.min(25, left))); continue; }
+      return buildUniqueQuantities(total, min, hardMax, Math.max(1, n - 1));
+    }
+    const pick = candidates[ri(0, candidates.length - 1)];
+    const add = Math.min(left, pick.cap, ri(1, Math.max(1, Math.min(pick.cap, 25))));
+    qtys[pick.i] += add;
+    left -= add;
+  }
+  return qtys.sort(() => Math.random() - 0.5);
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -50,7 +78,7 @@ Deno.serve(async (req) => {
       const { data: bundleItems } = ord.user_bundle_id
         ? await supabase
             .from("user_bundle_items")
-            .select("engagement_type, min_qty, max_qty")
+            .select("id, engagement_type, min_qty, max_qty")
             .eq("user_bundle_id", ord.user_bundle_id)
         : { data: [] as any[] };
       const minByType: Record<string, { min: number; max: number }> = {};
@@ -59,6 +87,35 @@ Deno.serve(async (req) => {
         const m = Math.max(1, Number(bi.min_qty || 0) || 10);
         const mx = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
         if (!minByType[t] || m < minByType[t].min) minByType[t] = { min: m, max: mx };
+      }
+      const bundleItemIds = (bundleItems || []).map((bi: any) => bi.id).filter(Boolean);
+      if (bundleItemIds.length > 0) {
+        const { data: rotationRows } = await supabase
+          .from("user_bundle_item_providers")
+          .select("user_bundle_item_id, user_provider_account_id, provider_service_id, is_active")
+          .in("user_bundle_item_id", bundleItemIds)
+          .eq("is_active", true);
+        const providerIds = [...new Set((rotationRows || []).map((r: any) => r.user_provider_account_id).filter(Boolean))];
+        const serviceIds = [...new Set((rotationRows || []).map((r: any) => String(r.provider_service_id)).filter(Boolean))];
+        if (providerIds.length > 0 && serviceIds.length > 0) {
+          const { data: svcRows } = await supabase
+            .from("user_services")
+            .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+            .in("user_provider_account_id", providerIds)
+            .in("provider_service_id", serviceIds);
+          const svcMap = new Map<string, any>();
+          for (const svc of svcRows || []) svcMap.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+          const typeByItem = new Map((bundleItems || []).map((bi: any) => [bi.id, String(bi.engagement_type)]));
+          for (const row of rotationRows || []) {
+            const type = typeByItem.get(row.user_bundle_item_id);
+            if (!type) continue;
+            const svc = svcMap.get(`${row.user_provider_account_id}|${row.provider_service_id}`);
+            if (!svc) continue;
+            const m = Math.max(1, Number(svc.min_quantity || 0) || 10);
+            const mx = Number(svc.max_quantity || 0) > 0 ? Number(svc.max_quantity) : Number.MAX_SAFE_INTEGER;
+            if (!minByType[type] || m < minByType[type].min) minByType[type] = { min: m, max: mx };
+          }
+        }
       }
 
       for (const item of items || []) {
@@ -120,58 +177,8 @@ Deno.serve(async (req) => {
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
 
 
-        // Generate unique random quantities summing to `remaining`
-        const used = new Set<number>();
-        const qtys: number[] = [];
-        let left = remaining;
-        for (let i = 0; i < numRuns; i++) {
-          const isLast = i === numRuns - 1;
-          let q: number;
-          if (isLast) {
-            q = Math.max(1, Math.min(providerMax, left));
-          } else {
-            const runsLeft = numRuns - i;
-            // Window for this slot, also feasibility-constrained
-            const lo = Math.max(qLo, left - (runsLeft - 1) * qHi);
-            const hi = Math.min(qHi, Math.max(lo, left - (runsLeft - 1) * qLo));
-            let cand = ri(lo, Math.max(lo, hi));
-            // Make unique within window
-            for (let k = 0; k < 80 && used.has(cand); k++) {
-              const delta = ri(1, Math.max(2, Math.min(numRuns, hi - lo))) * (Math.random() < 0.5 ? -1 : 1);
-              cand = Math.min(hi, Math.max(lo, cand + delta));
-            }
-            if (used.has(cand)) {
-              for (let v = lo; v <= hi; v++) if (!used.has(v)) { cand = v; break; }
-            }
-            q = cand;
-          }
-          if (q < 1) q = 1;
-          if (q > left) q = left;
-          qtys.push(q);
-          used.add(q);
-          left -= q;
-          if (left <= 0) break;
-        }
-
-
-        // If last run is below provider minimum, merge into a previous run
-        while (qtys.length >= 2 && qtys[qtys.length - 1] < providerMin) {
-          const last = qtys.pop()!;
-          // Try to add to a run that still has room under qHi
-          let absorbed = false;
-          for (let j = qtys.length - 1; j >= 0; j--) {
-            if (qtys[j] + last <= Math.min(providerMax, qHi + Math.ceil(qHi * 0.5))) {
-              qtys[j] += last;
-              absorbed = true;
-              break;
-            }
-          }
-          if (!absorbed) qtys[qtys.length - 1] += last;
-        }
-        // Ensure no quantity below providerMin
-        for (let i = 0; i < qtys.length; i++) {
-          if (qtys[i] < providerMin) qtys[i] = providerMin;
-        }
+        // Generate strictly unique random quantities summing to `remaining`.
+        const qtys = buildUniqueQuantities(remaining, providerMin, providerMax, numRuns);
 
         // Generate randomized timestamps within [startMs, endMs]
         const spanMs = Math.max(1, endMs - startMs);
@@ -232,17 +239,29 @@ Deno.serve(async (req) => {
         }
       }
     }
-    console.log(JSON.stringify({
-      done: true,
+    const summary = {
       orders_scanned: orders?.length || 0,
       items_rescheduled: totalItems,
       runs_deleted: totalDeleted,
       runs_created: totalNewRuns,
-    }));
+      details: details.slice(0, 50),
+    };
+    console.log(JSON.stringify({ done: true, ...summary }));
+    return summary;
   };
 
+  if (onlyOrderId || onlyUserId || body?.wait === true) {
+    const summary = await work();
+    return new Response(
+      JSON.stringify({ ok: true, started: false, ...summary }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const background = work().catch((e) => console.error("reschedule fatal:", e));
   // @ts-ignore EdgeRuntime global
-  EdgeRuntime.waitUntil(work().catch((e) => console.error("reschedule fatal:", e)));
+  if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") EdgeRuntime.waitUntil(background);
+  else await background;
 
   return new Response(
     JSON.stringify({ ok: true, started: true, message: "Rescheduling in background" }),

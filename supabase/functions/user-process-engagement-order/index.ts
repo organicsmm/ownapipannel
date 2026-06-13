@@ -9,14 +9,14 @@ const corsHeaders = {
 // minBatch/maxBatch = random per-run quantity range (organic drip)
 const CONFIG: Record<string, { baseInterval: number; intervalVariance: number; runsPerThousand: number; minRuns: number; maxRuns: number; batchCap: number; minBatch: number; maxBatch: number }> = {
   views:       { baseInterval: 45,  intervalVariance: 25, runsPerThousand: 20,   minRuns: 12, maxRuns: 5000, batchCap: 400,  minBatch: 100, maxBatch: 400  },
-  likes:       { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 20,   minRuns: 8,  maxRuns: 2000, batchCap: 500,  minBatch: 50,  maxBatch: 500  },
-  comments:    { baseInterval: 140, intervalVariance: 70, runsPerThousand: 50,   minRuns: 6,  maxRuns: 500,  batchCap: 50,   minBatch: 5,   maxBatch: 50   },
-  shares:      { baseInterval: 100, intervalVariance: 50, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
-  saves:       { baseInterval: 110, intervalVariance: 55, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
-  followers:   { baseInterval: 280, intervalVariance: 140, runsPerThousand: 30,  minRuns: 6,  maxRuns: 500,  batchCap: 200,  minBatch: 20,  maxBatch: 200  },
-  subscribers: { baseInterval: 340, intervalVariance: 170, runsPerThousand: 40,  minRuns: 6,  maxRuns: 500,  batchCap: 150,  minBatch: 15,  maxBatch: 150  },
-  reposts:     { baseInterval: 90,  intervalVariance: 45, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 30,  maxBatch: 300  },
-  retweets:    { baseInterval: 70,  intervalVariance: 35, runsPerThousand: 20,   minRuns: 6,  maxRuns: 1000, batchCap: 350,  minBatch: 35,  maxBatch: 350  },
+  likes:       { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 20,   minRuns: 8,  maxRuns: 2000, batchCap: 500,  minBatch: 10,  maxBatch: 500  },
+  comments:    { baseInterval: 140, intervalVariance: 70, runsPerThousand: 50,   minRuns: 6,  maxRuns: 500,  batchCap: 50,   minBatch: 10,  maxBatch: 50   },
+  shares:      { baseInterval: 100, intervalVariance: 50, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 10,  maxBatch: 300  },
+  saves:       { baseInterval: 110, intervalVariance: 55, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 10,  maxBatch: 300  },
+  followers:   { baseInterval: 280, intervalVariance: 140, runsPerThousand: 30,  minRuns: 6,  maxRuns: 500,  batchCap: 200,  minBatch: 10,  maxBatch: 200  },
+  subscribers: { baseInterval: 340, intervalVariance: 170, runsPerThousand: 40,  minRuns: 6,  maxRuns: 500,  batchCap: 150,  minBatch: 10,  maxBatch: 150  },
+  reposts:     { baseInterval: 90,  intervalVariance: 45, runsPerThousand: 25,   minRuns: 5,  maxRuns: 1000, batchCap: 300,  minBatch: 10,  maxBatch: 300  },
+  retweets:    { baseInterval: 70,  intervalVariance: 35, runsPerThousand: 20,   minRuns: 6,  maxRuns: 1000, batchCap: 350,  minBatch: 10,  maxBatch: 350  },
   watch_hours: { baseInterval: 480, intervalVariance: 240, runsPerThousand: 200, minRuns: 4,  maxRuns: 200,  batchCap: 10,   minBatch: 1,   maxBatch: 10   },
   generic:     { baseInterval: 80,  intervalVariance: 40, runsPerThousand: 20,   minRuns: 4,  maxRuns: 1000, batchCap: 500,  minBatch: 50,  maxBatch: 500  },
 };
@@ -71,8 +71,45 @@ Deno.serve(async (req) => {
     const itemMap = new Map<string, any>();
     for (const bi of (bundle.user_bundle_items || [])) itemMap.set(bi.id, bi);
 
+    const requestedBundleItemIds = items.map((it) => it.user_bundle_item_id).filter(Boolean);
+    const providerLimitsByItem = new Map<string, { min: number; max: number }>();
+    for (const id of requestedBundleItemIds) {
+      const bi = itemMap.get(id);
+      if (bi) providerLimitsByItem.set(id, {
+        min: Math.max(1, Number(bi.min_qty || 0) || 10),
+        max: Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER,
+      });
+    }
+    const { data: rotationRows } = requestedBundleItemIds.length > 0 ? await supabase
+      .from("user_bundle_item_providers")
+      .select("user_bundle_item_id, user_provider_account_id, provider_service_id")
+      .in("user_bundle_item_id", requestedBundleItemIds)
+      .eq("is_active", true) : { data: [] as any };
+    const rotationProviderIds = [...new Set((rotationRows || []).map((r: any) => r.user_provider_account_id).filter(Boolean))];
+    const rotationServiceIds = [...new Set((rotationRows || []).map((r: any) => String(r.provider_service_id)).filter(Boolean))];
+    if (rotationProviderIds.length > 0 && rotationServiceIds.length > 0) {
+      const { data: serviceLimits } = await supabase
+        .from("user_services")
+        .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+        .in("user_provider_account_id", rotationProviderIds)
+        .in("provider_service_id", rotationServiceIds);
+      const serviceLimitMap = new Map<string, any>();
+      for (const svc of (serviceLimits || [])) serviceLimitMap.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+      for (const row of (rotationRows || [])) {
+        const svc = serviceLimitMap.get(`${row.user_provider_account_id}|${row.provider_service_id}`);
+        if (!svc) continue;
+        const current = providerLimitsByItem.get(row.user_bundle_item_id);
+        const svcMin = Math.max(1, Number(svc.min_quantity || 0) || 10);
+        const svcMax = Number(svc.max_quantity || 0) > 0 ? Number(svc.max_quantity) : Number.MAX_SAFE_INTEGER;
+        providerLimitsByItem.set(row.user_bundle_item_id, {
+          min: current ? Math.min(current.min, svcMin) : svcMin,
+          max: current ? Math.max(current.max, svcMax) : svcMax,
+        });
+      }
+    }
+
     // Validate every requested item
-    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
+    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const it of items) {
       const bi = itemMap.get(it.user_bundle_item_id);
       if (!bi) return new Response(JSON.stringify({ error: `Bundle item ${it.user_bundle_item_id} not found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -82,8 +119,9 @@ Deno.serve(async (req) => {
       if (!bi.provider_service_id) {
         return new Response(JSON.stringify({ error: `Item "${bi.engagement_type}" has no provider service ID` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const minQ = Number(bi.min_qty || 0);
-      const maxQ = Number(bi.max_qty || 0);
+      const itemLimits = providerLimitsByItem.get(bi.id);
+      const minQ = Number(itemLimits?.min || bi.min_qty || 0);
+      const maxQ = Number(itemLimits?.max && itemLimits.max < Number.MAX_SAFE_INTEGER ? itemLimits.max : bi.max_qty || 0);
       if (minQ > 0 && it.quantity < minQ) {
         return new Response(JSON.stringify({ error: `${bi.engagement_type} below provider min ${minQ}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -98,6 +136,8 @@ Deno.serve(async (req) => {
         time_limit_hours: Math.max(0, Number(it.time_limit_hours || 0)),
         variance_percent: Math.min(50, Math.max(0, Number(it.variance_percent ?? 25))),
         peak_hours_enabled: !!it.peak_hours_enabled,
+        provider_min_qty: Math.max(1, minQ || 10),
+        provider_max_qty: maxQ > 0 ? maxQ : Number.MAX_SAFE_INTEGER,
       });
     }
 
@@ -151,7 +191,7 @@ Deno.serve(async (req) => {
 
     // Create items + schedule runs
     const startTime = new Date();
-    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
+    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const r of resolved) {
       const { data: item, error: itemErr } = await supabase
         .from("engagement_order_items")
@@ -177,6 +217,8 @@ Deno.serve(async (req) => {
         time_limit_hours: r.time_limit_hours,
         variance_percent: r.variance_percent,
         peak_hours_enabled: r.peak_hours_enabled,
+          provider_min_qty: r.provider_min_qty,
+          provider_max_qty: r.provider_max_qty,
       });
     }
 
@@ -197,6 +239,34 @@ Deno.serve(async (req) => {
 
     // helper: random int in [lo, hi]
     const ri = (lo: number, hi: number) => Math.floor(lo + Math.random() * (hi - lo + 1));
+    const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
+      if (total <= 0) return [];
+      if (total < min || desiredRuns <= 1) return [total];
+      const hardMax = Math.max(min, max);
+      let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 5000));
+      const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;
+      const maxSum = (runs: number, hi: number) => runs * hi - (runs * (runs - 1)) / 2;
+      while (n > 1 && minSum(n) > total) n--;
+      let hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25), min + n + 5));
+      while (n > 1 && maxSum(n, hi) < total) {
+        if (hi < hardMax) hi = Math.min(hardMax, hi + Math.max(5, Math.ceil((total - maxSum(n, hi)) / n) + 2));
+        else { n--; hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25))); }
+      }
+      const qtys = Array.from({ length: n }, (_, i) => min + i);
+      let left = total - qtys.reduce((s, q) => s + q, 0);
+      while (left > 0) {
+        const candidates = qtys.map((q, i) => ({ i, cap: (i === qtys.length - 1 ? hi : qtys[i + 1] - 1) - q })).filter(x => x.cap > 0);
+        if (candidates.length === 0) {
+          if (hi < hardMax) { hi = Math.min(hardMax, hi + Math.max(1, Math.min(25, left))); continue; }
+          return buildUniqueQuantities(total, min, hardMax, Math.max(1, n - 1));
+        }
+        const pick = candidates[ri(0, candidates.length - 1)];
+        const add = Math.min(left, pick.cap, ri(1, Math.max(1, Math.min(pick.cap, 25))));
+        qtys[pick.i] += add;
+        left -= add;
+      }
+      return qtys.sort(() => Math.random() - 0.5);
+    };
     // helper: turn round numbers into organic ones (e.g. 150 -> 147 / 152 / 161, never trailing zero)
     const organicize = (n: number, min: number, max: number) => {
       if (n <= min) return Math.max(min, n);
@@ -210,10 +280,11 @@ Deno.serve(async (req) => {
       return Math.max(1, v);
     };
 
-    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
+    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled, provider_min_qty, provider_max_qty } of createdItems) {
       const c = cfg(bi.engagement_type);
-      const providerMin = Math.max(1, Number(bi.min_qty || 1));
-      const providerMax = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
+      const isViews = String(bi.engagement_type).toLowerCase() === "views";
+      const providerMin = Math.max(isViews ? 100 : 10, Number(provider_min_qty || bi.min_qty || 1));
+      const providerMax = Number(provider_max_qty || bi.max_qty || 0) > 0 ? Number(provider_max_qty || bi.max_qty) : Number.MAX_SAFE_INTEGER;
       const variance = Math.max(0, Math.min(50, variance_percent || 25)) / 100;
       const MIN_INTERVAL = 3; // minutes
 
@@ -270,70 +341,13 @@ Deno.serve(async (req) => {
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + typeStartOffsetMin * 60 * 1000);
+      const qtyPlan = buildUniqueQuantities(quantity, minBatch, maxBatch, targetRuns);
 
       // Track used quantities so no two runs share the same number per engagement type
       const usedQtys = new Set<number>();
-      const pickUnique = (base: number, lo: number, hi: number): number => {
-        if (hi < lo) return base;
-        if (!usedQtys.has(base) && base >= lo && base <= hi) return base;
-        for (let k = 0; k < 60; k++) {
-          const span = Math.max(2, Math.min(15, hi - lo));
-          const delta = ri(1, span) * (Math.random() < 0.5 ? -1 : 1);
-          const cand = Math.min(hi, Math.max(lo, base + delta));
-          if (!usedQtys.has(cand)) return cand;
-        }
-        for (let v = lo; v <= hi; v++) if (!usedQtys.has(v)) return v;
-        return base;
-      };
 
-      for (let i = 1; i <= targetRuns && remaining > 0; i++) {
-        const runsLeft = targetRuns - i + 1;
-        let qty: number;
-        if (runsLeft === 1) {
-          // Last run delivers EXACT remaining → guarantees total == entered quantity
-          qty = Math.min(remaining, providerMax);
-          // If collides with a prior run, shift previous entry by ±1 to free a unique number
-          if (usedQtys.has(qty) && entries.length > 0) {
-            for (let tries = 0; tries < 12; tries++) {
-              const prev = entries[entries.length - 1];
-              const shift = Math.random() < 0.5 ? -1 : 1;
-              const newPrev = prev.quantity_to_send + shift;
-              const newLast = qty - shift;
-              if (
-                newPrev >= providerMin && newPrev <= maxBatch &&
-                newLast >= providerMin && newLast <= providerMax &&
-                newPrev !== newLast &&
-                !usedQtys.has(newLast) &&
-                (newPrev === prev.quantity_to_send || !usedQtys.has(newPrev))
-              ) {
-                usedQtys.delete(prev.quantity_to_send);
-                prev.quantity_to_send = newPrev;
-                prev.base_quantity = newPrev;
-                usedQtys.add(newPrev);
-                qty = newLast;
-                break;
-              }
-            }
-          }
-        } else {
-          const mustSendNow = Math.max(minBatch, remaining - (runsLeft - 1) * maxBatch);
-          const canSendNow = Math.min(maxBatch, Math.max(mustSendNow, remaining - (runsLeft - 1) * minBatch));
-          let rawQty: number;
-          if (canSendNow <= mustSendNow) {
-            rawQty = canSendNow;
-          } else {
-            rawQty = ri(mustSendNow, canSendNow);
-          }
-          qty = organicize(rawQty, Math.max(providerMin, mustSendNow), canSendNow);
-          const minNeededLater = remaining - qty;
-          const maxCapacityLater = (runsLeft - 1) * maxBatch;
-          if (minNeededLater > maxCapacityLater) qty = Math.min(canSendNow, remaining - maxCapacityLater);
-          if (qty < providerMin) qty = providerMin;
-          // Enforce uniqueness within the valid window
-          const loU = Math.max(providerMin, mustSendNow);
-          const hiU = Math.max(loU, canSendNow);
-          qty = pickUnique(qty, loU, hiU);
-        }
+      for (let i = 1; i <= qtyPlan.length && remaining > 0; i++) {
+        let qty = qtyPlan[i - 1];
         if (qty < 1) qty = 1;
         if (qty > remaining) qty = remaining;
 
