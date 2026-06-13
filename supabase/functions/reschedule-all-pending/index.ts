@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
     return summary;
   };
 
-  if (onlyOrderId || onlyUserId || body?.wait === true) {
+  if (onlyOrderId || body?.wait === true) {
     const summary = await work();
     return new Response(
       JSON.stringify({ ok: true, started: false, ...summary }),
