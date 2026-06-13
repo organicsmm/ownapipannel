@@ -557,7 +557,29 @@ Deno.serve(async (req) => {
       await recomputeStatuses(item.id, eo.id);
     }
 
-    // Cron invokes this every minute. Avoid self-trigger overlap, which can hammer providers.
+    const depth = Number(requestBody?.depth || 0);
+    if ((dueRuns || []).length >= runCap && depth < 5) {
+      const nextBody = { ...requestBody, background: true, depth: depth + 1, max_runs: runCap };
+      const triggerNext = async () => {
+        try {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify(nextBody),
+          });
+        } catch (e) { console.error("executor chain failed:", e); }
+      };
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+        (globalThis as any).EdgeRuntime.waitUntil(triggerNext());
+      } else {
+        triggerNext();
+      }
+    }
+
+    // Cron invokes this every minute. Avoid large synchronous batches, which can time out.
 
     return new Response(JSON.stringify({
       success: true,
@@ -566,6 +588,8 @@ Deno.serve(async (req) => {
       skipped,
       deferredBusy,
       due: (dueRuns || []).length,
+      runCap,
+      depth,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
