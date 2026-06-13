@@ -177,58 +177,8 @@ Deno.serve(async (req) => {
         if (endMs - startMs < minSpanMs) endMs = startMs + minSpanMs;
 
 
-        // Generate unique random quantities summing to `remaining`
-        const used = new Set<number>();
-        const qtys: number[] = [];
-        let left = remaining;
-        for (let i = 0; i < numRuns; i++) {
-          const isLast = i === numRuns - 1;
-          let q: number;
-          if (isLast) {
-            q = Math.max(1, Math.min(providerMax, left));
-          } else {
-            const runsLeft = numRuns - i;
-            // Window for this slot, also feasibility-constrained
-            const lo = Math.max(qLo, left - (runsLeft - 1) * qHi);
-            const hi = Math.min(qHi, Math.max(lo, left - (runsLeft - 1) * qLo));
-            let cand = ri(lo, Math.max(lo, hi));
-            // Make unique within window
-            for (let k = 0; k < 80 && used.has(cand); k++) {
-              const delta = ri(1, Math.max(2, Math.min(numRuns, hi - lo))) * (Math.random() < 0.5 ? -1 : 1);
-              cand = Math.min(hi, Math.max(lo, cand + delta));
-            }
-            if (used.has(cand)) {
-              for (let v = lo; v <= hi; v++) if (!used.has(v)) { cand = v; break; }
-            }
-            q = cand;
-          }
-          if (q < 1) q = 1;
-          if (q > left) q = left;
-          qtys.push(q);
-          used.add(q);
-          left -= q;
-          if (left <= 0) break;
-        }
-
-
-        // If last run is below provider minimum, merge into a previous run
-        while (qtys.length >= 2 && qtys[qtys.length - 1] < providerMin) {
-          const last = qtys.pop()!;
-          // Try to add to a run that still has room under qHi
-          let absorbed = false;
-          for (let j = qtys.length - 1; j >= 0; j--) {
-            if (qtys[j] + last <= Math.min(providerMax, qHi + Math.ceil(qHi * 0.5))) {
-              qtys[j] += last;
-              absorbed = true;
-              break;
-            }
-          }
-          if (!absorbed) qtys[qtys.length - 1] += last;
-        }
-        // Ensure no quantity below providerMin
-        for (let i = 0; i < qtys.length; i++) {
-          if (qtys[i] < providerMin) qtys[i] = providerMin;
-        }
+        // Generate strictly unique random quantities summing to `remaining`.
+        const qtys = buildUniqueQuantities(remaining, providerMin, providerMax, numRuns);
 
         // Generate randomized timestamps within [startMs, endMs]
         const spanMs = Math.max(1, endMs - startMs);
