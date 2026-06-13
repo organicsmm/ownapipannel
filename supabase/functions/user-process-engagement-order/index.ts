@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
     const ri = (lo: number, hi: number) => Math.floor(lo + Math.random() * (hi - lo + 1));
     const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
       if (total <= 0) return [];
-      if (total <= max && total >= min) return [total];
+      if (total < min || desiredRuns <= 1) return [total];
       const hardMax = Math.max(min, max);
       let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 5000));
       const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;

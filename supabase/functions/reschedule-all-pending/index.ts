@@ -11,7 +11,7 @@ const corsHeaders = {
 const ri = (lo: number, hi: number) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
 const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
   if (total <= 0) return [];
-  if (total >= min && total <= max) return [total];
+  if (total < min || desiredRuns <= 1) return [total];
   const hardMax = Math.max(min, max);
   let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 500));
   const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;
