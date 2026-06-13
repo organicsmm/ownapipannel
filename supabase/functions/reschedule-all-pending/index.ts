@@ -261,17 +261,29 @@ Deno.serve(async (req) => {
         }
       }
     }
-    console.log(JSON.stringify({
-      done: true,
+    const summary = {
       orders_scanned: orders?.length || 0,
       items_rescheduled: totalItems,
       runs_deleted: totalDeleted,
       runs_created: totalNewRuns,
-    }));
+      details: details.slice(0, 50),
+    };
+    console.log(JSON.stringify({ done: true, ...summary }));
+    return summary;
   };
 
+  if (onlyOrderId || onlyUserId || body?.wait === true) {
+    const summary = await work();
+    return new Response(
+      JSON.stringify({ ok: true, started: false, ...summary }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const background = work().catch((e) => console.error("reschedule fatal:", e));
   // @ts-ignore EdgeRuntime global
-  EdgeRuntime.waitUntil(work().catch((e) => console.error("reschedule fatal:", e)));
+  if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") EdgeRuntime.waitUntil(background);
+  else await background;
 
   return new Response(
     JSON.stringify({ ok: true, started: true, message: "Rescheduling in background" }),
