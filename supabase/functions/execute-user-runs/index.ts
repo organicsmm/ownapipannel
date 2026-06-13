@@ -210,6 +210,31 @@ Deno.serve(async (req) => {
     if (requestBody?.chained === true) {
       return new Response(JSON.stringify({ success: true, ignored: "legacy self-trigger disabled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (requestBody?.background !== true) {
+      const backgroundBody = {
+        ...requestBody,
+        background: true,
+        depth: Number(requestBody?.depth || 0),
+      };
+      const trigger = async () => {
+        try {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify(backgroundBody),
+          });
+        } catch (e) { console.error("background executor trigger failed:", e); }
+      };
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+        (globalThis as any).EdgeRuntime.waitUntil(trigger());
+      } else {
+        trigger();
+      }
+      return new Response(JSON.stringify({ accepted: true, background: true }), { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
     //    may have timed out after reaching the provider. Do NOT retry them, because
@@ -263,7 +288,7 @@ Deno.serve(async (req) => {
       id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
       engagement_order_item:engagement_order_items!inner(
         id, engagement_type, quantity, status,
-        engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
+        engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id, created_at)
       )
     `;
     const dueTypes = ["views", "likes", "comments", "shares", "reposts", "saves", "followers", "subscribers", "retweets", "watch_hours"];
@@ -276,21 +301,58 @@ Deno.serve(async (req) => {
       .eq("engagement_order_item.engagement_order.use_user_api", true)
       .eq("engagement_order_item.engagement_type", engagementType)
       .order("scheduled_at", { ascending: true })
-      .limit(2500)));
+      .limit(700)));
+
+    let priorityDirectRuns: any[] = [];
+    if (priorityOrderIds.size > 0) {
+      const { data: priorityItems } = await supabase
+        .from("engagement_order_items")
+        .select("id")
+        .in("engagement_order_id", Array.from(priorityOrderIds));
+      const priorityItemIds = (priorityItems || []).map((it: any) => it.id).filter(Boolean);
+      if (priorityItemIds.length > 0) {
+        const { data: directRuns, error: directErr } = await supabase
+          .from("organic_run_schedule")
+          .select(runSelect)
+          .eq("status", "pending")
+          .not("engagement_order_item_id", "is", null)
+          .lte("scheduled_at", nowIso)
+          .in("engagement_order_item_id", priorityItemIds)
+          .eq("engagement_order_item.engagement_order.use_user_api", true)
+          .order("scheduled_at", { ascending: true })
+          .limit(1000);
+        if (directErr) {
+          console.error("Fetch priority due runs error:", directErr);
+        } else {
+          priorityDirectRuns = directRuns || [];
+        }
+      }
+    }
 
     const fetchError = dueBatches.find((batch) => batch.error)?.error;
     if (fetchError) {
       console.error("Fetch due runs error:", fetchError);
       return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const allDueRuns = dueBatches.flatMap((batch) => batch.data || [])
-      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    const uniqueDueRunMap = new Map<string, any>();
+    for (const dueRun of [...priorityDirectRuns, ...dueBatches.flatMap((batch) => batch.data || [])]) {
+      uniqueDueRunMap.set(String(dueRun.id), dueRun);
+    }
+    const allDueRuns = Array.from(uniqueDueRunMap.values())
+      .sort((a: any, b: any) => {
+        const ao = a.engagement_order_item?.engagement_order;
+        const bo = b.engagement_order_item?.engagement_order;
+        const orderDiff = Number(bo?.order_number || 0) - Number(ao?.order_number || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+      });
     const priorityRuns = priorityOrderIds.size > 0
       ? allDueRuns.filter((dueRun: any) => priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
       : [];
     const regularRuns = priorityOrderIds.size > 0
       ? allDueRuns.filter((dueRun: any) => !priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
       : allDueRuns;
+    const runCap = Math.min(80, Math.max(10, Number(requestBody?.max_runs || 45)));
     const runsPerLinkType = new Map<string, number>();
     const dueRuns: any[] = [];
     for (const dueRun of [...priorityRuns, ...regularRuns]) {
@@ -303,7 +365,7 @@ Deno.serve(async (req) => {
       if (pickedForKey >= 5) continue;
       runsPerLinkType.set(fairKey, pickedForKey + 1);
       dueRuns.push(dueRun);
-      if (dueRuns.length >= 120) break;
+      if (dueRuns.length >= runCap) break;
     }
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
@@ -525,7 +587,29 @@ Deno.serve(async (req) => {
       await recomputeStatuses(item.id, eo.id);
     }
 
-    // Cron invokes this every minute. Avoid self-trigger overlap, which can hammer providers.
+    const depth = Number(requestBody?.depth || 0);
+    if ((dueRuns || []).length >= runCap && depth < 5) {
+      const nextBody = { ...requestBody, background: true, depth: depth + 1, max_runs: runCap };
+      const triggerNext = async () => {
+        try {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-user-runs`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify(nextBody),
+          });
+        } catch (e) { console.error("executor chain failed:", e); }
+      };
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+        (globalThis as any).EdgeRuntime.waitUntil(triggerNext());
+      } else {
+        triggerNext();
+      }
+    }
+
+    // Cron invokes this every minute. Avoid large synchronous batches, which can time out.
 
     return new Response(JSON.stringify({
       success: true,
@@ -534,6 +618,8 @@ Deno.serve(async (req) => {
       skipped,
       deferredBusy,
       due: (dueRuns || []).length,
+      runCap,
+      depth,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
