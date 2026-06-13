@@ -71,8 +71,45 @@ Deno.serve(async (req) => {
     const itemMap = new Map<string, any>();
     for (const bi of (bundle.user_bundle_items || [])) itemMap.set(bi.id, bi);
 
+    const requestedBundleItemIds = items.map((it) => it.user_bundle_item_id).filter(Boolean);
+    const providerLimitsByItem = new Map<string, { min: number; max: number }>();
+    for (const id of requestedBundleItemIds) {
+      const bi = itemMap.get(id);
+      if (bi) providerLimitsByItem.set(id, {
+        min: Math.max(1, Number(bi.min_qty || 0) || 10),
+        max: Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER,
+      });
+    }
+    const { data: rotationRows } = requestedBundleItemIds.length > 0 ? await supabase
+      .from("user_bundle_item_providers")
+      .select("user_bundle_item_id, user_provider_account_id, provider_service_id")
+      .in("user_bundle_item_id", requestedBundleItemIds)
+      .eq("is_active", true) : { data: [] as any };
+    const rotationProviderIds = [...new Set((rotationRows || []).map((r: any) => r.user_provider_account_id).filter(Boolean))];
+    const rotationServiceIds = [...new Set((rotationRows || []).map((r: any) => String(r.provider_service_id)).filter(Boolean))];
+    if (rotationProviderIds.length > 0 && rotationServiceIds.length > 0) {
+      const { data: serviceLimits } = await supabase
+        .from("user_services")
+        .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+        .in("user_provider_account_id", rotationProviderIds)
+        .in("provider_service_id", rotationServiceIds);
+      const serviceLimitMap = new Map<string, any>();
+      for (const svc of (serviceLimits || [])) serviceLimitMap.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+      for (const row of (rotationRows || [])) {
+        const svc = serviceLimitMap.get(`${row.user_provider_account_id}|${row.provider_service_id}`);
+        if (!svc) continue;
+        const current = providerLimitsByItem.get(row.user_bundle_item_id);
+        const svcMin = Math.max(1, Number(svc.min_quantity || 0) || 10);
+        const svcMax = Number(svc.max_quantity || 0) > 0 ? Number(svc.max_quantity) : Number.MAX_SAFE_INTEGER;
+        providerLimitsByItem.set(row.user_bundle_item_id, {
+          min: current ? Math.min(current.min, svcMin) : svcMin,
+          max: current ? Math.max(current.max, svcMax) : svcMax,
+        });
+      }
+    }
+
     // Validate every requested item
-    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
+    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const it of items) {
       const bi = itemMap.get(it.user_bundle_item_id);
       if (!bi) return new Response(JSON.stringify({ error: `Bundle item ${it.user_bundle_item_id} not found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -82,8 +119,9 @@ Deno.serve(async (req) => {
       if (!bi.provider_service_id) {
         return new Response(JSON.stringify({ error: `Item "${bi.engagement_type}" has no provider service ID` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const minQ = Number(bi.min_qty || 0);
-      const maxQ = Number(bi.max_qty || 0);
+      const itemLimits = providerLimitsByItem.get(bi.id);
+      const minQ = Number(itemLimits?.min || bi.min_qty || 0);
+      const maxQ = Number(itemLimits?.max && itemLimits.max < Number.MAX_SAFE_INTEGER ? itemLimits.max : bi.max_qty || 0);
       if (minQ > 0 && it.quantity < minQ) {
         return new Response(JSON.stringify({ error: `${bi.engagement_type} below provider min ${minQ}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -98,6 +136,8 @@ Deno.serve(async (req) => {
         time_limit_hours: Math.max(0, Number(it.time_limit_hours || 0)),
         variance_percent: Math.min(50, Math.max(0, Number(it.variance_percent ?? 25))),
         peak_hours_enabled: !!it.peak_hours_enabled,
+        provider_min_qty: Math.max(1, minQ || 10),
+        provider_max_qty: maxQ > 0 ? maxQ : Number.MAX_SAFE_INTEGER,
       });
     }
 
