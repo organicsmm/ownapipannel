@@ -1535,6 +1535,10 @@ export type Database = {
         Returns: boolean
       }
       is_maintenance_mode: { Args: never; Returns: boolean }
+      requeue_user_api_runs_without_provider_order: {
+        Args: { _max_age_minutes?: number }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

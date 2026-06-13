@@ -13,6 +13,23 @@ const supabase = createClient(
 const TERMINAL_OK = ["completed", "complete", "success", "partial"];
 const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
 
+function getProviderError(result: any): string | null {
+  if (!result) return "Empty provider response";
+  if (result.error) return typeof result.error === "string" ? result.error : JSON.stringify(result.error);
+  const status = String(result.status || "").toLowerCase();
+  const message = String(result.message || result.msg || "").trim();
+  if (["fail", "failed", "error", "false"].includes(status)) return message || `Provider status: ${result.status}`;
+  if (!result.order && !result.id) {
+    const raw = JSON.stringify(result);
+    if (/active order|busy|already|wait|try again|fail|error/i.test(raw)) return message || raw;
+  }
+  return null;
+}
+
+function isTemporaryProviderBlock(message: string): boolean {
+  return /less than min|minimal|min quantity|minimum|below|busy|already active|active order|wait until|wait|try again|temporar|duplicate|same link/i.test(message);
+}
+
 function deferBusyRunMinutes(runId: string, message: string, minMinutes = 4, spreadMinutes = 6) {
   const retryAt = new Date(Date.now() + (minMinutes + Math.random() * spreadMinutes) * 60 * 1000).toISOString();
   return supabase
@@ -236,9 +253,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ accepted: true, background: true }), { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
-    //    may have timed out after reaching the provider. Do NOT retry them, because
-    //    retrying can duplicate views. Count them as completed so delivery moves on safely.
+    // 0) RECOVERY: 'started' runs with NULL provider_order_id.
+    //    If provider clearly rejected the order as busy/failed, requeue it so priority
+    //    rotation can try the next provider. If response was lost, keep the old safe
+    //    behavior after 10 min to avoid duplicate delivery.
+    const { data: requeueStats } = await supabase.rpc("requeue_user_api_runs_without_provider_order", { _max_age_minutes: 1 });
+    const requeuedRejected = Number((requeueStats as any)?.requeued || 0);
+
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: stuckRuns } = await supabase
       .from("organic_run_schedule")
@@ -511,9 +532,10 @@ Deno.serve(async (req) => {
           try { result = JSON.parse(text); } catch { result = { error: text }; }
           lastResult = result;
 
-          if (result?.error) {
-            lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
-            if (/less than min|minimal|min quantity|minimum|below|busy|already active|try again|temporar/i.test(lastErr)) {
+          const providerError = getProviderError(result);
+          if (providerError) {
+            lastErr = `[${cand.provider.name}] ${providerError}`;
+            if (isTemporaryProviderBlock(lastErr)) {
               temporaryBlocked = true;
             } else {
               hardProviderError = true;
@@ -620,6 +642,7 @@ Deno.serve(async (req) => {
       due: (dueRuns || []).length,
       runCap,
       depth,
+      requeuedRejected,
       polled: pollStats,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
