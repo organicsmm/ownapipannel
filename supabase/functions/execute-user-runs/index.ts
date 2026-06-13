@@ -253,9 +253,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ accepted: true, background: true }), { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 0) RECOVERY: 'started' runs with NULL provider_order_id older than 10 min
-    //    may have timed out after reaching the provider. Do NOT retry them, because
-    //    retrying can duplicate views. Count them as completed so delivery moves on safely.
+    // 0) RECOVERY: 'started' runs with NULL provider_order_id.
+    //    If provider clearly rejected the order as busy/failed, requeue it so priority
+    //    rotation can try the next provider. If response was lost, keep the old safe
+    //    behavior after 10 min to avoid duplicate delivery.
+    const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: rejectedNullRuns } = await supabase
+      .from("organic_run_schedule")
+      .select("id")
+      .eq("status", "started")
+      .is("provider_order_id", null)
+      .lt("started_at", oneMinAgo)
+      .not("provider_response", "is", null)
+      .filter("provider_response", "cs", '{}')
+      .limit(200);
+    let requeuedRejected = 0;
+    for (const rr of (rejectedNullRuns || [])) {
+      await supabase.rpc("requeue_user_api_runs_without_provider_order", { _max_age_minutes: 1 });
+      requeuedRejected = (rejectedNullRuns || []).length;
+      break;
+    }
+
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: stuckRuns } = await supabase
       .from("organic_run_schedule")
