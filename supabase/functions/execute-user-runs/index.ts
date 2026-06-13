@@ -263,7 +263,7 @@ Deno.serve(async (req) => {
       id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
       engagement_order_item:engagement_order_items!inner(
         id, engagement_type, quantity, status,
-        engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id)
+        engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id, created_at)
       )
     `;
     const dueTypes = ["views", "likes", "comments", "shares", "reposts", "saves", "followers", "subscribers", "retweets", "watch_hours"];
@@ -284,7 +284,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: fetchError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const allDueRuns = dueBatches.flatMap((batch) => batch.data || [])
-      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+      .sort((a: any, b: any) => {
+        const ao = a.engagement_order_item?.engagement_order;
+        const bo = b.engagement_order_item?.engagement_order;
+        const orderDiff = Number(bo?.order_number || 0) - Number(ao?.order_number || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+      });
     const priorityRuns = priorityOrderIds.size > 0
       ? allDueRuns.filter((dueRun: any) => priorityOrderIds.has(String(dueRun.engagement_order_item?.engagement_order?.id)))
       : [];
@@ -303,7 +309,7 @@ Deno.serve(async (req) => {
       if (pickedForKey >= 5) continue;
       runsPerLinkType.set(fairKey, pickedForKey + 1);
       dueRuns.push(dueRun);
-      if (dueRuns.length >= 120) break;
+      if (dueRuns.length >= 180) break;
     }
 
     let processed = 0, failed = 0, skipped = 0, deferredBusy = 0;
