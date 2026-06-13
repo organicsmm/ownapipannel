@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       const { data: bundleItems } = ord.user_bundle_id
         ? await supabase
             .from("user_bundle_items")
-            .select("engagement_type, min_qty, max_qty")
+            .select("id, engagement_type, min_qty, max_qty")
             .eq("user_bundle_id", ord.user_bundle_id)
         : { data: [] as any[] };
       const minByType: Record<string, { min: number; max: number }> = {};
@@ -59,6 +59,35 @@ Deno.serve(async (req) => {
         const m = Math.max(1, Number(bi.min_qty || 0) || 10);
         const mx = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
         if (!minByType[t] || m < minByType[t].min) minByType[t] = { min: m, max: mx };
+      }
+      const bundleItemIds = (bundleItems || []).map((bi: any) => bi.id).filter(Boolean);
+      if (bundleItemIds.length > 0) {
+        const { data: rotationRows } = await supabase
+          .from("user_bundle_item_providers")
+          .select("user_bundle_item_id, user_provider_account_id, provider_service_id, is_active")
+          .in("user_bundle_item_id", bundleItemIds)
+          .eq("is_active", true);
+        const providerIds = [...new Set((rotationRows || []).map((r: any) => r.user_provider_account_id).filter(Boolean))];
+        const serviceIds = [...new Set((rotationRows || []).map((r: any) => String(r.provider_service_id)).filter(Boolean))];
+        if (providerIds.length > 0 && serviceIds.length > 0) {
+          const { data: svcRows } = await supabase
+            .from("user_services")
+            .select("user_provider_account_id, provider_service_id, min_quantity, max_quantity")
+            .in("user_provider_account_id", providerIds)
+            .in("provider_service_id", serviceIds);
+          const svcMap = new Map<string, any>();
+          for (const svc of svcRows || []) svcMap.set(`${svc.user_provider_account_id}|${svc.provider_service_id}`, svc);
+          const typeByItem = new Map((bundleItems || []).map((bi: any) => [bi.id, String(bi.engagement_type)]));
+          for (const row of rotationRows || []) {
+            const type = typeByItem.get(row.user_bundle_item_id);
+            if (!type) continue;
+            const svc = svcMap.get(`${row.user_provider_account_id}|${row.provider_service_id}`);
+            if (!svc) continue;
+            const m = Math.max(1, Number(svc.min_quantity || 0) || 10);
+            const mx = Number(svc.max_quantity || 0) > 0 ? Number(svc.max_quantity) : Number.MAX_SAFE_INTEGER;
+            if (!minByType[type] || m < minByType[type].min) minByType[type] = { min: m, max: mx };
+          }
+        }
       }
 
       for (const item of items || []) {
