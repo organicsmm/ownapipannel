@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
 
     // Create items + schedule runs
     const startTime = new Date();
-    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean }> = [];
+    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const r of resolved) {
       const { data: item, error: itemErr } = await supabase
         .from("engagement_order_items")
@@ -217,6 +217,8 @@ Deno.serve(async (req) => {
         time_limit_hours: r.time_limit_hours,
         variance_percent: r.variance_percent,
         peak_hours_enabled: r.peak_hours_enabled,
+          provider_min_qty: r.provider_min_qty,
+          provider_max_qty: r.provider_max_qty,
       });
     }
 
@@ -250,10 +252,11 @@ Deno.serve(async (req) => {
       return Math.max(1, v);
     };
 
-    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled } of createdItems) {
+    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled, provider_min_qty, provider_max_qty } of createdItems) {
       const c = cfg(bi.engagement_type);
-      const providerMin = Math.max(1, Number(bi.min_qty || 1));
-      const providerMax = Number(bi.max_qty || 0) > 0 ? Number(bi.max_qty) : Number.MAX_SAFE_INTEGER;
+      const isViews = String(bi.engagement_type).toLowerCase() === "views";
+      const providerMin = Math.max(isViews ? 100 : 10, Number(provider_min_qty || bi.min_qty || 1));
+      const providerMax = Number(provider_max_qty || bi.max_qty || 0) > 0 ? Number(provider_max_qty || bi.max_qty) : Number.MAX_SAFE_INTEGER;
       const variance = Math.max(0, Math.min(50, variance_percent || 25)) / 100;
       const MIN_INTERVAL = 3; // minutes
 
