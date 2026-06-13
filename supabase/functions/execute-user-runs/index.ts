@@ -13,6 +13,23 @@ const supabase = createClient(
 const TERMINAL_OK = ["completed", "complete", "success", "partial"];
 const TERMINAL_BAD = ["cancelled", "canceled", "canscelled", "refunded", "refund", "error", "failed"];
 
+function getProviderError(result: any): string | null {
+  if (!result) return "Empty provider response";
+  if (result.error) return typeof result.error === "string" ? result.error : JSON.stringify(result.error);
+  const status = String(result.status || "").toLowerCase();
+  const message = String(result.message || result.msg || "").trim();
+  if (["fail", "failed", "error", "false"].includes(status)) return message || `Provider status: ${result.status}`;
+  if (!result.order && !result.id) {
+    const raw = JSON.stringify(result);
+    if (/active order|busy|already|wait|try again|fail|error/i.test(raw)) return message || raw;
+  }
+  return null;
+}
+
+function isTemporaryProviderBlock(message: string): boolean {
+  return /less than min|minimal|min quantity|minimum|below|busy|already active|active order|wait until|wait|try again|temporar|duplicate|same link/i.test(message);
+}
+
 function deferBusyRunMinutes(runId: string, message: string, minMinutes = 4, spreadMinutes = 6) {
   const retryAt = new Date(Date.now() + (minMinutes + Math.random() * spreadMinutes) * 60 * 1000).toISOString();
   return supabase
@@ -511,9 +528,10 @@ Deno.serve(async (req) => {
           try { result = JSON.parse(text); } catch { result = { error: text }; }
           lastResult = result;
 
-          if (result?.error) {
-            lastErr = `[${cand.provider.name}] ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`;
-            if (/less than min|minimal|min quantity|minimum|below|busy|already active|try again|temporar/i.test(lastErr)) {
+          const providerError = getProviderError(result);
+          if (providerError) {
+            lastErr = `[${cand.provider.name}] ${providerError}`;
+            if (isTemporaryProviderBlock(lastErr)) {
               temporaryBlocked = true;
             } else {
               hardProviderError = true;
