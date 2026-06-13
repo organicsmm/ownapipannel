@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({} as any));
   const onlyOrderId: string | undefined = body?.order_id;
   const onlyUserId: string | undefined = body?.user_id;
+  const forceNow: boolean = body?.force_now === true;
 
   const work = async () => {
     // Fetch active orders
@@ -140,7 +141,7 @@ Deno.serve(async (req) => {
           .map((r: any) => new Date(r.scheduled_at).getTime())
           .sort((a: number, b: number) => a - b);
         const nowMs = Date.now();
-        const startMs = Math.max(nowMs + 60 * 1000, pendingTimes[0] || nowMs);
+        const startMs = forceNow ? nowMs + 60 * 1000 : Math.max(nowMs + 60 * 1000, pendingTimes[0] || nowMs);
         let endMs = Math.max(pendingTimes[pendingTimes.length - 1] || startMs, startMs);
 
         const pm = minByType[String(item.engagement_type)];
