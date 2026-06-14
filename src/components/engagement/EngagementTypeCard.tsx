@@ -581,8 +581,8 @@ export function EngagementTypeCard({
                           <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mt-0.5 sm:mt-1">interval</p>
                         </div>
                         <div className="bg-muted rounded-lg sm:rounded-xl p-2 sm:p-4 border border-border">
-                          <p className="text-sm sm:text-lg font-bold text-foreground">{format(scheduleData.finishTime, 'MMM d')}</p>
-                          <p className="text-xs sm:text-base font-bold text-foreground">{format(scheduleData.finishTime, 'h:mm a')}</p>
+                          <p className="text-sm sm:text-lg font-bold text-foreground">{formatDateShort(scheduleData.finishTime)}</p>
+                          <p className="text-xs sm:text-base font-bold text-foreground">{scheduleData.finishTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</p>
                           <p className="text-[10px] sm:text-xs text-muted-foreground font-medium hidden sm:block mt-1">finish</p>
                         </div>
                       </div>
@@ -618,7 +618,7 @@ export function EngagementTypeCard({
                                     <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0">
                                       {run.runNumber}
                                     </span>
-                                    <span className="font-bold text-foreground truncate">{format(run.scheduledAt, 'MMM d, h:mm')}</span>
+                                    <span className="font-bold text-foreground truncate">{formatDateShort(run.scheduledAt, true)}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                                     {editingRunIndex === idx ? (
