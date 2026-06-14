@@ -199,7 +199,10 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         const ratio = DEFAULT_RATIOS[type] ?? 100;
         const isBase = type === "views" || item.is_base;
         const minQty = Number(item.min_qty || 0) || 1;
-        const raw = isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100));
+        const override = r.qtyOverrides?.[type];
+        const raw = override != null
+          ? override
+          : (isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100)));
         const qty = Math.max(minQty, raw);
         const rate = Number(item.rate || 0);
         const price = (qty / 1000) * rate;
