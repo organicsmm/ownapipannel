@@ -276,11 +276,14 @@ Deno.serve(async (req) => {
       const eo = it?.engagement_order;
       if (!eo || eo.status === "cancelled") continue;
       await supabase.from("organic_run_schedule").update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        provider_status: "Unknown",
-        provider_remains: 0,
-        error_message: "Provider response lost; counted as delivered to avoid duplicate retry",
+        status: "pending",
+        scheduled_at: new Date(Date.now() + 2 * 60 * 1000 + Math.random() * 2 * 60 * 1000).toISOString(),
+        provider_account_id: null,
+        provider_account_name: null,
+        provider_order_id: null,
+        provider_status: null,
+        provider_remains: null,
+        error_message: "Provider response lost; requeued safely for backup rotation",
         last_status_check: new Date().toISOString(),
       }).eq("id", sr.id);
       await recomputeStatuses(it.id, eo.id);
@@ -538,7 +541,7 @@ Deno.serve(async (req) => {
           form.append("quantity", String(run.quantity_to_send));
 
           const ctrl = new AbortController();
-          const tid = setTimeout(() => ctrl.abort(), 20000);
+          const tid = setTimeout(() => ctrl.abort(), 12000);
           const resp = await fetch(cand.provider.api_url, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
