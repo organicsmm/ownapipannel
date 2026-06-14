@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,13 +19,14 @@ import {
 } from "@/lib/engagement-types";
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
-import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
-import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 
 
 import { useDebounce } from "@/hooks/useDebounce";
 
 type EngagementConfigs = Record<string, EngagementConfig>;
+
+const LiveGrowthChart = lazy(() => import("@/components/engagement/LiveGrowthChart").then(m => ({ default: m.LiveGrowthChart })));
+const DeliveryPreview = lazy(() => import("@/components/engagement/DeliveryPreview").then(m => ({ default: m.DeliveryPreview })));
 
 const PREFERRED_ORDER: Record<string, number> = {
   views: 1, likes: 2, comments: 3, shares: 4, reposts: 5, saves: 6, followers: 7, subscribers: 8, retweets: 9, watch_hours: 10,
@@ -51,6 +52,7 @@ function Inner() {
   const debouncedBase = useDebounce(baseQuantity, 200);
   const [engagements, setEngagements] = useState<EngagementConfigs>({});
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [showPreviews, setShowPreviews] = useState(false);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
