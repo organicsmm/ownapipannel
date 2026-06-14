@@ -118,6 +118,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; ok: number; fail: number; total: number } | null>(null);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
@@ -183,32 +184,38 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     });
   }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe]);
 
-  function computeRowTotals(r: OrderRow) {
-    const breakdown: { type: EngagementType; qty: number; price: number }[] = [];
-    let totalPrice = 0;
-    let totalQty = 0;
-    activeTypes.forEach((type) => {
-      if (!r.enabledTypes[type]) return;
-      const item = itemByType[type];
-      if (!item) return;
-      const ratio = DEFAULT_RATIOS[type] ?? 100;
-      const isBase = type === "views" || item.is_base;
-      const minQty = Number(item.min_qty || 0) || 1;
-      const raw = isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100));
-      const qty = Math.max(minQty, raw);
-      const rate = Number(item.rate || 0);
-      const price = (qty / 1000) * rate;
-      breakdown.push({ type, qty, price });
-      totalPrice += price;
-      totalQty += qty;
-    });
-    return { breakdown, totalPrice, totalQty };
-  }
+  // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
+  const rowTotalsById = useMemo(() => {
+    const map = new Map<string, { breakdown: { type: EngagementType; qty: number; price: number }[]; totalPrice: number; totalQty: number }>();
+    for (const r of rows) {
+      const breakdown: { type: EngagementType; qty: number; price: number }[] = [];
+      let totalPrice = 0; let totalQty = 0;
+      for (const type of activeTypes) {
+        if (!r.enabledTypes[type]) continue;
+        const item = itemByType[type];
+        if (!item) continue;
+        const ratio = DEFAULT_RATIOS[type] ?? 100;
+        const isBase = type === "views" || item.is_base;
+        const minQty = Number(item.min_qty || 0) || 1;
+        const raw = isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100));
+        const qty = Math.max(minQty, raw);
+        const rate = Number(item.rate || 0);
+        const price = (qty / 1000) * rate;
+        breakdown.push({ type, qty, price });
+        totalPrice += price; totalQty += qty;
+      }
+      map.set(r.id, { breakdown, totalPrice, totalQty });
+    }
+    return map;
+  }, [rows, activeTypes, itemByType]);
 
-  const grandTotal = useMemo(
-    () => rows.reduce((s, r) => s + computeRowTotals(r).totalPrice, 0),
-    [rows, activeTypes, itemByType]
-  );
+  const computeRowTotals = useCallback((r: OrderRow) => {
+    return rowTotalsById.get(r.id) ?? { breakdown: [], totalPrice: 0, totalQty: 0 };
+  }, [rowTotalsById]);
+
+  const grandTotal = useMemo(() => {
+    let s = 0; for (const v of rowTotalsById.values()) s += v.totalPrice; return s;
+  }, [rowTotalsById]);
 
   const invalidLines = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
@@ -223,6 +230,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   }, [linksText]);
 
   const validRows = useMemo(() => rows.filter(r => isValidUrl(r.link)), [rows]);
+
 
   const canSubmit = !submitting
     && !!bundle
@@ -272,6 +280,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   async function handleSubmitAll() {
     if (!canSubmit || !bundle || !user) return;
     setSubmitting(true);
+    setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
 
     // 1. Create batch record
     const { data: batch, error: batchErr } = await supabase
@@ -289,11 +298,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
     if (batchErr || !batch) {
       setSubmitting(false);
+      setProgress(null);
       toast({ title: "Batch create failed", description: batchErr?.message, variant: "destructive" });
       return;
     }
 
-    // 2. Insert all batch items as pending
+    // 2. Chunked insert of batch items (500/chunk → handles 10k+ items)
     const itemRecords = validRows.map(r => {
       const totals = computeRowTotals(r);
       return {
@@ -307,22 +317,46 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         status: "pending",
       };
     });
-    const { data: insertedItems, error: itemsErr } = await supabase
-      .from("mass_order_batch_items")
-      .insert(itemRecords)
-      .select();
-
-    if (itemsErr || !insertedItems) {
-      setSubmitting(false);
-      toast({ title: "Batch items insert failed", description: itemsErr?.message, variant: "destructive" });
-      return;
+    const INSERT_CHUNK = 500;
+    const itemIdByLink = new Map<string, string>();
+    for (let i = 0; i < itemRecords.length; i += INSERT_CHUNK) {
+      const chunk = itemRecords.slice(i, i + INSERT_CHUNK);
+      const { data: inserted, error: itemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .insert(chunk)
+        .select("id, link");
+      if (itemsErr || !inserted) {
+        setSubmitting(false);
+        setProgress(null);
+        toast({ title: "Batch items insert failed", description: itemsErr?.message, variant: "destructive" });
+        return;
+      }
+      inserted.forEach((it: any) => itemIdByLink.set(it.link, it.id));
     }
 
-    const itemIdByLink = new Map(insertedItems.map((it: any) => [it.link, it.id]));
+    // 3. Parallel submission with bounded concurrency
+    const CONCURRENCY = 6; // matches typical provider rate limits
+    let ok = 0, fail = 0, done = 0;
+    const queue = [...validRows];
+    // Throttled UI state buffer — flush every 250ms instead of per-row
+    const pending: Array<{ id: string; patch: Partial<OrderRow> }> = [];
+    const flush = () => {
+      if (pending.length === 0) return;
+      const batchPatches = [...pending];
+      pending.length = 0;
+      setRows(prev => {
+        const map = new Map(batchPatches.map(p => [p.id, p.patch]));
+        return prev.map(r => map.has(r.id) ? { ...r, ...map.get(r.id)! } : r);
+      });
+    };
+    const flusher = window.setInterval(flush, 250);
 
-    let ok = 0, fail = 0;
-    for (const r of validRows) {
-      updateRow(r.id, { status: "submitting", message: undefined });
+    const queueRow = (r: OrderRow, patch: Partial<OrderRow>) => {
+      pending.push({ id: r.id, patch });
+    };
+
+    async function processOne(r: OrderRow) {
+      queueRow(r, { status: "submitting", message: undefined });
       const batchItemId = itemIdByLink.get(r.link);
       try {
         const enabled = activeTypes.filter(t => r.enabledTypes[t]);
@@ -363,7 +397,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         ok++;
         const orderNumber = (data as any)?.order_number;
         const orderId = (data as any)?.order_id;
-        updateRow(r.id, {
+        queueRow(r, {
           status: "success",
           orderNumber,
           orderId,
@@ -371,27 +405,42 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           price: totals.totalPrice,
         });
         if (batchItemId) {
-          await supabase.from("mass_order_batch_items").update({
+          // fire-and-forget — don't block next row
+          supabase.from("mass_order_batch_items").update({
             status: "success",
             engagement_order_id: orderId ?? null,
             engagement_order_number: orderNumber ?? null,
-          }).eq("id", batchItemId);
+          }).eq("id", batchItemId).then(() => {});
         }
       } catch (e: any) {
         fail++;
         const msg = e?.message || "Failed";
-        updateRow(r.id, { status: "failed", message: msg });
+        queueRow(r, { status: "failed", message: msg });
         if (batchItemId) {
-          await supabase.from("mass_order_batch_items").update({
+          supabase.from("mass_order_batch_items").update({
             status: "failed",
             error_message: msg,
-          }).eq("id", batchItemId);
+          }).eq("id", batchItemId).then(() => {});
         }
+      } finally {
+        done++;
+        setProgress({ done, ok, fail, total: validRows.length });
       }
-      await new Promise(res => setTimeout(res, 250));
     }
 
-    // 3. Finalize batch
+    async function worker() {
+      while (queue.length > 0) {
+        const r = queue.shift();
+        if (!r) return;
+        await processOne(r);
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+    window.clearInterval(flusher);
+    flush(); // final flush
+
+    // 4. Finalize batch
     const finalStatus = fail === 0 ? "completed" : (ok === 0 ? "failed" : "partial");
     await supabase.from("mass_order_batches").update({
       success_count: ok,
@@ -400,6 +449,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }).eq("id", batch.id);
 
     setSubmitting(false);
+    setProgress(null);
     qc.invalidateQueries({ queryKey: ["mass-batches"] });
     toast({
       title: fail === 0 ? "🚀 All orders submitted" : "Submitted with some failures",
@@ -410,6 +460,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       setTimeout(() => onSubmitted(), 1500);
     }
   }
+
 
   const editingRow = rows.find(r => r.id === editingId) || null;
 
@@ -537,75 +588,97 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         </CardContent>
       </Card>
 
-      {/* Preview cards */}
-      {rows.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg sm:text-xl font-bold">Preview ({rows.length})</h2>
-            <span className="text-sm font-bold bg-foreground text-background px-3 py-1.5 rounded-lg">
-              Total: ₹{grandTotal.toFixed(2)}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {rows.map((r) => {
-              const t = computeRowTotals(r);
-              const valid = isValidUrl(r.link);
-              return (
-                <Card key={r.id} className={`border-2 transition-colors ${valid ? "border-border hover:border-primary/40" : "border-destructive/50"}`}>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link {!valid && <span className="text-destructive">· INVALID</span>}</div>
-                        <div className="text-sm font-mono truncate" title={r.link}>{r.link}</div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {r.status === "submitting" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                        {r.status === "success" && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                        {r.status === "failed" && <XCircle className="w-4 h-4 text-destructive" />}
-                        <Button size="icon" variant="ghost" className="h-8 w-8" disabled={submitting} onClick={() => setEditingId(r.id)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" disabled={submitting} onClick={() => removeRow(r.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                      {t.breakdown.length === 0 && (
-                        <div className="col-span-2 text-muted-foreground">No engagement type enabled</div>
-                      )}
-                      {t.breakdown.map(b => (
-                        <div key={b.type} className="flex items-center gap-1.5">
-                          <span>{ENGAGEMENT_CONFIG[b.type]?.emoji}</span>
-                          <span className="capitalize text-muted-foreground">{b.type}:</span>
-                          <span className="font-semibold">{b.qty.toLocaleString()}</span>
+      {/* Preview cards — capped at 200 to keep DOM light for 1000+ link batches */}
+      {rows.length > 0 && (() => {
+        const PREVIEW_CAP = 200;
+        const visibleRows = rows.slice(0, PREVIEW_CAP);
+        const hiddenCount = rows.length - visibleRows.length;
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-lg sm:text-xl font-bold">Preview ({rows.length})</h2>
+              <span className="text-sm font-bold bg-foreground text-background px-3 py-1.5 rounded-lg">
+                Total: ₹{grandTotal.toFixed(2)}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              {visibleRows.map((r) => {
+                const t = computeRowTotals(r);
+                const valid = isValidUrl(r.link);
+                return (
+                  <Card key={r.id} className={`border-2 transition-colors ${valid ? "border-border hover:border-primary/40" : "border-destructive/50"}`}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link {!valid && <span className="text-destructive">· INVALID</span>}</div>
+                          <div className="text-sm font-mono truncate" title={r.link}>{r.link}</div>
                         </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
-                      <span className="text-muted-foreground">
-                        ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label || `${r.timeLimitHours}h`}
-                      </span>
-                      <span className="font-bold">₹{t.totalPrice.toFixed(2)}</span>
-                    </div>
-                    {r.message && (
-                      <div className={`text-[11px] ${r.status === "failed" ? "text-destructive" : "text-green-600"}`}>
-                        {r.message}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {r.status === "submitting" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                          {r.status === "success" && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                          {r.status === "failed" && <XCircle className="w-4 h-4 text-destructive" />}
+                          <Button size="icon" variant="ghost" className="h-8 w-8" disabled={submitting} onClick={() => setEditingId(r.id)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" disabled={submitting} onClick={() => removeRow(r.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                        {t.breakdown.length === 0 && (
+                          <div className="col-span-2 text-muted-foreground">No engagement type enabled</div>
+                        )}
+                        {t.breakdown.map(b => (
+                          <div key={b.type} className="flex items-center gap-1.5">
+                            <span>{ENGAGEMENT_CONFIG[b.type]?.emoji}</span>
+                            <span className="capitalize text-muted-foreground">{b.type}:</span>
+                            <span className="font-semibold">{b.qty.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                        <span className="text-muted-foreground">
+                          ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label || `${r.timeLimitHours}h`}
+                        </span>
+                        <span className="font-bold">₹{t.totalPrice.toFixed(2)}</span>
+                      </div>
+                      {r.message && (
+                        <div className={`text-[11px] ${r.status === "failed" ? "text-destructive" : "text-green-600"}`}>
+                          {r.message}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            {hiddenCount > 0 && (
+              <div className="text-center text-xs text-muted-foreground py-2 border border-dashed border-border rounded-md">
+                +{hiddenCount.toLocaleString()} more link(s) hidden for performance · sab orders submit honge, Batches tab me full list dekho
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Submit */}
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-muted-foreground">
-            {validRows.length} order(s) ready • Total <span className="font-bold text-foreground">₹{grandTotal.toFixed(2)}</span>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>
+              {validRows.length} order(s) ready • Total <span className="font-bold text-foreground">₹{grandTotal.toFixed(2)}</span>
+            </div>
+            {progress && (
+              <div className="flex items-center gap-3 text-xs">
+                <span className="font-semibold text-foreground">{progress.done}/{progress.total}</span>
+                <span className="text-green-600">✓ {progress.ok}</span>
+                {progress.fail > 0 && <span className="text-destructive">✗ {progress.fail}</span>}
+                <div className="flex-1 min-w-[120px] h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+                </div>
+              </div>
+            )}
           </div>
           <Button
             size="lg"
@@ -617,6 +690,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           </Button>
         </CardContent>
       </Card>
+
 
       {/* Edit dialog */}
       <Dialog open={!!editingRow} onOpenChange={(o) => !o && setEditingId(null)}>
