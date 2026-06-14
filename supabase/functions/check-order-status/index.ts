@@ -11,6 +11,38 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
+async function fetchProviderStatuses(apiUrl: string, apiKey: string, orderIds: string[]) {
+  if (orderIds.length === 0) return new Map<string, any>()
+  const formData = new URLSearchParams()
+  formData.append('key', apiKey)
+  formData.append('action', orderIds.length > 1 ? 'status' : 'status')
+  if (orderIds.length > 1) formData.append('orders', orderIds.join(','))
+  else formData.append('order', orderIds[0])
+
+  const ctrl = new AbortController()
+  const timeout = setTimeout(() => ctrl.abort(), 8000)
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData.toString(),
+    signal: ctrl.signal
+  })
+  clearTimeout(timeout)
+
+  const responseText = await response.text()
+  let parsed: any
+  try { parsed = JSON.parse(responseText) } catch { parsed = { error: responseText } }
+  const map = new Map<string, any>()
+  if (orderIds.length === 1) {
+    map.set(orderIds[0], parsed)
+  } else if (parsed && !parsed.error && typeof parsed === 'object') {
+    for (const oid of orderIds) map.set(oid, parsed[oid] ?? parsed[String(oid)] ?? { error: 'Bulk status missing this order' })
+  } else {
+    for (const oid of orderIds) map.set(oid, parsed)
+  }
+  return map
+}
+
 // This function checks provider order status and marks runs as complete
 // Supports BOTH legacy orders AND new engagement orders
 // Stores real-time provider data (start_count, remains, status) for live tracking
@@ -52,15 +84,47 @@ Deno.serve(async (req) => {
     let targetRunId: string | null = null
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
-    let maxRuns = 35
+    let targetUserId: string | null = null
+    let maxRuns = 400
+    let requestBody: any = {}
     try {
-      const body = await req.json()
-      targetRunId = body?.runId || null
-      const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
+      requestBody = await req.json()
+      targetRunId = requestBody?.runId || null
+      const rawOrders = Array.isArray(requestBody?.orders) ? requestBody.orders : [requestBody?.orderNumber, requestBody?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(80, Number(body?.maxRuns || body?.max_runs || 35)))
+      maxRuns = Math.max(1, Math.min(500, Number(requestBody?.maxRuns || requestBody?.max_runs || 400)))
+      if (requestBody?.email) {
+        const { data: authUser } = await supabase.auth.admin.listUsers()
+        const matched = authUser?.users?.find((u: any) => String(u.email || '').toLowerCase() === String(requestBody.email).toLowerCase())
+        targetUserId = matched?.id || null
+      }
     } catch {
       // No body or invalid JSON - check all
+    }
+
+    if (requestBody?.background !== true) {
+      const backgroundBody = { ...requestBody, background: true }
+      const trigger = async () => {
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-order-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify(backgroundBody),
+          })
+        } catch (e) { console.error('background status checker trigger failed:', e) }
+      }
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === 'function') {
+        (globalThis as any).EdgeRuntime.waitUntil(trigger())
+      } else {
+        trigger()
+      }
+      return new Response(JSON.stringify({ accepted: true, background: true }), {
+        status: 202,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     if (targetOrderNumbers.length > 0) {
@@ -80,6 +144,7 @@ Deno.serve(async (req) => {
     let stillProcessing = 0
     let failed = 0
     const results: any[] = []
+    const touchedItems = new Map<string, string>()
 
     // ============================================
     // STEP 1: Check ENGAGEMENT ORDER runs (via engagement_order_item)
@@ -91,13 +156,13 @@ Deno.serve(async (req) => {
       .select(`
         *,
         retry_count,
-        engagement_order_item:engagement_order_items(
+        engagement_order_item:engagement_order_items!inner(
           id,
           status,
           engagement_type,
           engagement_order_id,
           service:services(provider_id),
-          engagement_order:engagement_orders(id, status)
+          engagement_order:engagement_orders!inner(id, status, user_id)
         )
       `)
       // Check ALL of these:
@@ -120,6 +185,11 @@ Deno.serve(async (req) => {
         .in('engagement_order_item_id', targetItemIds)
         .order('last_status_check', { ascending: true, nullsFirst: true })
         .limit(maxRuns)
+    } else if (targetUserId) {
+      engagementQuery = engagementQuery
+        .eq('engagement_order_item.engagement_order.user_id', targetUserId)
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(maxRuns)
     } else {
       engagementQuery = engagementQuery
         .order('last_status_check', { ascending: true, nullsFirst: true })
@@ -133,6 +203,37 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Found ${engagementRuns?.length || 0} engagement runs waiting for completion`)
+
+    const providerIds = [...new Set((engagementRuns || []).map((run: any) => run.provider_account_id).filter(Boolean).map(String))]
+    const accountById = new Map<string, any>()
+    if (providerIds.length > 0) {
+      const [{ data: userAccounts }, { data: adminAccounts }] = await Promise.all([
+        supabase.from('user_provider_accounts').select('id, name, api_key, api_url').in('id', providerIds),
+        supabase.from('provider_accounts').select('id, name, api_key, api_url').in('id', providerIds),
+      ])
+      for (const account of [...(userAccounts || []), ...(adminAccounts || [])]) accountById.set(String(account.id), account)
+    }
+
+    const bulkStatusByRunId = new Map<string, any>()
+    const groups = new Map<string, { account: any; runs: any[] }>()
+    for (const run of (engagementRuns || [])) {
+      const account = run.provider_account_id ? accountById.get(String(run.provider_account_id)) : null
+      if (!account || !run.provider_order_id) continue
+      const key = `${account.api_url}|${account.api_key}|${account.id}`
+      if (!groups.has(key)) groups.set(key, { account, runs: [] })
+      groups.get(key)!.runs.push(run)
+    }
+    for (const group of groups.values()) {
+      for (let i = 0; i < group.runs.length; i += 100) {
+        const chunk = group.runs.slice(i, i + 100)
+        try {
+          const statusMap = await fetchProviderStatuses(group.account.api_url, group.account.api_key, chunk.map((run: any) => String(run.provider_order_id)))
+          for (const run of chunk) bulkStatusByRunId.set(String(run.id), statusMap.get(String(run.provider_order_id)))
+        } catch (e: any) {
+          console.error(`Bulk status failed for ${group.account.name}:`, e?.message || e)
+        }
+      }
+    }
 
     // Process each run individually using its ACTUAL provider account
     // (Not grouped by service provider_id - that was the bug!)
@@ -158,30 +259,23 @@ Deno.serve(async (req) => {
         let providerName: string
 
         if (run.provider_account_id) {
-          // User-API order: provider_account_id points to user_provider_accounts
-          const { data: userProv } = await supabase
-            .from('user_provider_accounts')
-            .select('id, name, api_key, api_url')
-            .eq('id', run.provider_account_id)
-            .maybeSingle()
+          const userProv = accountById.get(String(run.provider_account_id))
           if (userProv) {
             apiKey = userProv.api_key
             apiUrl = userProv.api_url
             providerName = userProv.name
           } else {
-            // Admin/legacy engagement runs may store an admin provider account id here.
-            const { data: adminProv } = await supabase
-              .from('provider_accounts')
-              .select('id, name, api_key, api_url')
-              .eq('id', run.provider_account_id)
-              .maybeSingle()
-            if (!adminProv) {
-              console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
-              continue
-            }
-            apiKey = adminProv.api_key
-            apiUrl = adminProv.api_url
-            providerName = adminProv.name
+            console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
+            await supabase.from('organic_run_schedule').update({
+              status: 'failed',
+              provider_status: 'error',
+              completed_at: new Date().toISOString(),
+              last_status_check: new Date().toISOString(),
+              error_message: 'Provider account missing/deleted; cannot sync provider order',
+            }).eq('id', run.id)
+            failed++
+            if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
+            continue
           }
         } else {
           // Fallback to default provider (legacy runs without provider_account_id)
@@ -207,30 +301,12 @@ Deno.serve(async (req) => {
 
         console.log(`Checking ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id} on ${providerName}`)
 
-        const formData = new URLSearchParams()
-        formData.append('key', apiKey)
-        formData.append('action', 'status')
-        formData.append('order', run.provider_order_id)
-
-        const ctrl = new AbortController()
-        const timeout = setTimeout(() => ctrl.abort(), 5000)
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString(),
-          signal: ctrl.signal
-        })
-        clearTimeout(timeout)
-
-        const responseText = await response.text()
-        console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${responseText}`)
-
-        let result
-        try {
-          result = JSON.parse(responseText)
-        } catch {
-          result = { error: responseText }
+        let result = bulkStatusByRunId.get(String(run.id))
+        if (!result) {
+          const singleMap = await fetchProviderStatuses(apiUrl, apiKey, [String(run.provider_order_id)])
+          result = singleMap.get(String(run.provider_order_id))
         }
+        console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${JSON.stringify(result)}`)
 
         if (result.error) {
           console.error(`Status check failed for ${run.provider_order_id}:`, result.error)
@@ -284,7 +360,7 @@ Deno.serve(async (req) => {
                   retry_count: 99 // Set high to prevent further retries
                 }).eq('id', run.id)
                 failed++
-                await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+                if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
               }
             }
           } else {
@@ -362,7 +438,7 @@ Deno.serve(async (req) => {
             remains: 0
           })
 
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
 
         } else if (providerStatus === 'partial') {
           // SCAM GUARD: if provider says "Partial" but delivered 0 (remains == full qty),
@@ -422,7 +498,7 @@ Deno.serve(async (req) => {
             delivered: run.quantity_to_send - remains,
             remains: remains
           })
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
 
         } else if (providerStatus === 'cancelled' || providerStatus === 'canceled' || providerStatus === 'refunded' || providerStatus === 'refund' || providerStatus === 'canscelled') {
           const orderStatus = run.engagement_order_item?.engagement_order?.status
@@ -468,7 +544,7 @@ Deno.serve(async (req) => {
                 retry_count: 99
               }).eq('id', run.id)
               failed++
-              await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+              if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
             }
           }
         } else if (deliveredAll) {
@@ -489,7 +565,7 @@ Deno.serve(async (req) => {
             delivered: run.quantity_to_send,
             remains: 0
           })
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
         } else {
           await supabase.from('organic_run_schedule').update(trackingUpdate).eq('id', run.id)
 
@@ -512,8 +588,10 @@ Deno.serve(async (req) => {
         stillProcessing++
       }
 
-      // Faster processing - reduced delay between checks
-      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+
+    for (const [itemId, orderId] of touchedItems.entries()) {
+      await updateEngagementOrderStatus(supabase, orderId, itemId)
     }
 
     // ============================================
@@ -537,6 +615,10 @@ Deno.serve(async (req) => {
 
     if (targetRunId) {
       legacyQuery = legacyQuery.eq('id', targetRunId)
+    } else {
+      legacyQuery = legacyQuery
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(Math.min(50, maxRuns))
     }
 
     const { data: legacyRuns, error: legacyError } = await legacyQuery
