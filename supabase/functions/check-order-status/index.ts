@@ -11,6 +11,38 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
+async function fetchProviderStatuses(apiUrl: string, apiKey: string, orderIds: string[]) {
+  if (orderIds.length === 0) return new Map<string, any>()
+  const formData = new URLSearchParams()
+  formData.append('key', apiKey)
+  formData.append('action', orderIds.length > 1 ? 'status' : 'status')
+  if (orderIds.length > 1) formData.append('orders', orderIds.join(','))
+  else formData.append('order', orderIds[0])
+
+  const ctrl = new AbortController()
+  const timeout = setTimeout(() => ctrl.abort(), 8000)
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData.toString(),
+    signal: ctrl.signal
+  })
+  clearTimeout(timeout)
+
+  const responseText = await response.text()
+  let parsed: any
+  try { parsed = JSON.parse(responseText) } catch { parsed = { error: responseText } }
+  const map = new Map<string, any>()
+  if (orderIds.length === 1) {
+    map.set(orderIds[0], parsed)
+  } else if (parsed && !parsed.error && typeof parsed === 'object') {
+    for (const oid of orderIds) map.set(oid, parsed[oid] ?? parsed[String(oid)] ?? { error: 'Bulk status missing this order' })
+  } else {
+    for (const oid of orderIds) map.set(oid, parsed)
+  }
+  return map
+}
+
 // This function checks provider order status and marks runs as complete
 // Supports BOTH legacy orders AND new engagement orders
 // Stores real-time provider data (start_count, remains, status) for live tracking
