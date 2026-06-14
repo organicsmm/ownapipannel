@@ -52,11 +52,13 @@ Deno.serve(async (req) => {
     let targetRunId: string | null = null
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
+    let maxRuns = 35
     try {
       const body = await req.json()
       targetRunId = body?.runId || null
       const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
+      maxRuns = Math.max(1, Math.min(80, Number(body?.maxRuns || body?.max_runs || 35)))
     } catch {
       // No body or invalid JSON - check all
     }
@@ -117,11 +119,11 @@ Deno.serve(async (req) => {
       engagementQuery = engagementQuery
         .in('engagement_order_item_id', targetItemIds)
         .order('last_status_check', { ascending: true, nullsFirst: true })
-        .limit(80)
+        .limit(maxRuns)
     } else {
       engagementQuery = engagementQuery
         .order('last_status_check', { ascending: true, nullsFirst: true })
-        .limit(80)
+        .limit(maxRuns)
     }
 
     const { data: engagementRuns, error: engagementError } = await engagementQuery
@@ -211,7 +213,7 @@ Deno.serve(async (req) => {
         formData.append('order', run.provider_order_id)
 
         const ctrl = new AbortController()
-        const timeout = setTimeout(() => ctrl.abort(), 7000)
+        const timeout = setTimeout(() => ctrl.abort(), 5000)
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
