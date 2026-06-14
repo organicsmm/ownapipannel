@@ -239,14 +239,19 @@ Deno.serve(async (req) => {
                 if (run.provider_account_id) triedSet.add(run.provider_account_id)
                 const mergedResp = { ...(run.provider_response || {}), tried_providers: Array.from(triedSet) }
                 await supabase.from('organic_run_schedule').update({
-                  status: 'failed',
+                  status: 'pending',
+                  scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                  provider_account_id: null,
+                  provider_account_name: null,
+                  provider_order_id: null,
                   error_message: `Auto-retry: ${result.error}`,
-                  completed_at: new Date().toISOString(),
-                  provider_status: 'error',
+                  completed_at: null,
+                  provider_status: null,
                   last_status_check: new Date().toISOString(),
                   provider_response: mergedResp,
+                  retry_count: currentRetryCount + 1,
                 }).eq('id', run.id)
-                failed++
+                stillProcessing++
               } else {
                 // Max retries reached - mark as permanently failed
                 console.log(`❌ Max retries reached for run, marking as permanently failed`)
@@ -366,11 +371,17 @@ Deno.serve(async (req) => {
               await supabase.from('organic_run_schedule').update({
                 ...trackingUpdate,
                 provider_response: mergedResp,
-                status: 'failed',
-                completed_at: new Date().toISOString(),
+                status: 'pending',
+                scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                provider_account_id: null,
+                provider_account_name: null,
+                provider_order_id: null,
+                provider_status: null,
+                completed_at: null,
+                retry_count: currentRetryCount + 1,
                 error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains ?? 'unknown'}/${run.quantity_to_send})`
               }).eq('id', run.id)
-              failed++
+              stillProcessing++
               continue
             }
             // fall through to mark partial-completed if max retries exceeded
@@ -416,11 +427,17 @@ Deno.serve(async (req) => {
               await supabase.from('organic_run_schedule').update({
                 ...trackingUpdate,
                 provider_response: mergedResp,
-                status: 'failed',
-                completed_at: new Date().toISOString(),
+                status: 'pending',
+                scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                provider_account_id: null,
+                provider_account_name: null,
+                provider_order_id: null,
+                provider_status: null,
+                completed_at: null,
+                retry_count: currentRetryCount + 1,
                 error_message: `Auto-retry: ${providerStatus} by provider`
               }).eq('id', run.id)
-              failed++
+              stillProcessing++
             } else {
               console.log(`❌ Max retries reached for cancelled run`)
               await supabase.from('organic_run_schedule').update({
