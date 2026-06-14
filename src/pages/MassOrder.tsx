@@ -872,7 +872,7 @@ function BatchHistory() {
       <Card className="border-2 border-border">
         <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row gap-2">
           <Input
-            placeholder="Search by batch name..."
+            placeholder="Search by campaign name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10"
