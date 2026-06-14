@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timed out')), 10000)
+          setTimeout(() => reject(new Error('Session fetch timed out')), 30000)
         );
 
         const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             await Promise.race([
               fetchUserData(session.user.id),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Data fetch timed out')), 10000))
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Data fetch timed out')), 30000))
             ]);
           } catch (e) {
             console.warn('User data fetch timed out, will retry on next action');
