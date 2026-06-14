@@ -89,7 +89,7 @@ async function recomputeStatuses(itemId: string, engOrderId: string) {
 }
 
 // ===== POLL STARTED RUNS (check real provider status) =====
-async function pollStartedRuns() {
+async function pollStartedRuns(limit = 20) {
   let polled = 0, finished = 0, stillRunning = 0, reFailed = 0;
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
@@ -108,7 +108,7 @@ async function pollStartedRuns() {
     .eq("engagement_order_item.engagement_order.use_user_api", true)
     .or(`last_status_check.is.null,last_status_check.lt.${fiveMinAgo}`)
     .order("last_status_check", { ascending: true, nullsFirst: true })
-    .limit(120);
+    .limit(Math.max(1, Math.min(50, limit)));
 
   for (const run of (startedRuns || [])) {
     const item = (run as any).engagement_order_item;
@@ -139,7 +139,7 @@ async function pollStartedRuns() {
       form.append("order", String(run.provider_order_id));
 
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 6000);
+      const tid = setTimeout(() => ctrl.abort(), 4000);
       const resp = await fetch(acc.api_url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
     }
 
     // 1) POLL existing started runs first — check real provider status
-    const pollStats = await pollStartedRuns();
+    const pollStats = await pollStartedRuns(Number(requestBody?.max_poll || 20));
 
     const nowIso = new Date().toISOString();
     // 2) Pull due pending runs fairly per engagement type.
