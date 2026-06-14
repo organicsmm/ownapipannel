@@ -92,11 +92,14 @@ Deno.serve(async (req) => {
       targetRunId = requestBody?.runId || null
       const rawOrders = Array.isArray(requestBody?.orders) ? requestBody.orders : [requestBody?.orderNumber, requestBody?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(500, Number(requestBody?.maxRuns || requestBody?.max_runs || 400)))
+      maxRuns = Math.max(1, Math.min(1000, Number(requestBody?.maxRuns || requestBody?.max_runs || 500)))
       if (requestBody?.email) {
-        const { data: authUser } = await supabase.auth.admin.listUsers()
-        const matched = authUser?.users?.find((u: any) => String(u.email || '').toLowerCase() === String(requestBody.email).toLowerCase())
-        targetUserId = matched?.id || null
+        const { data: matchedProfile } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .ilike('email', String(requestBody.email).trim())
+          .maybeSingle()
+        targetUserId = matchedProfile?.user_id || null
       }
     } catch {
       // No body or invalid JSON - check all
@@ -592,6 +595,28 @@ Deno.serve(async (req) => {
 
     for (const [itemId, orderId] of touchedItems.entries()) {
       await updateEngagementOrderStatus(supabase, orderId, itemId)
+    }
+
+    const depth = Number(requestBody?.depth || 0)
+    if (!targetRunId && engagementRuns && engagementRuns.length >= maxRuns && depth < 6) {
+      const nextBody = { ...requestBody, background: true, depth: depth + 1, maxRuns }
+      const triggerNext = async () => {
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-order-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify(nextBody),
+          })
+        } catch (e) { console.error('status checker chain failed:', e) }
+      }
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === 'function') {
+        (globalThis as any).EdgeRuntime.waitUntil(triggerNext())
+      } else {
+        triggerNext()
+      }
     }
 
     // ============================================
