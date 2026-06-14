@@ -551,8 +551,10 @@ Deno.serve(async (req) => {
         stillProcessing++
       }
 
-      // Faster processing - reduced delay between checks
-      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+
+    for (const [itemId, orderId] of touchedItems.entries()) {
+      await updateEngagementOrderStatus(supabase, orderId, itemId)
     }
 
     // ============================================
