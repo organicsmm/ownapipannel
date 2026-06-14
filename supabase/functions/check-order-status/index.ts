@@ -221,39 +221,23 @@ Deno.serve(async (req) => {
         let providerName: string
 
         if (run.provider_account_id) {
-          // User-API order: provider_account_id points to user_provider_accounts
-          const { data: userProv } = await supabase
-            .from('user_provider_accounts')
-            .select('id, name, api_key, api_url')
-            .eq('id', run.provider_account_id)
-            .maybeSingle()
+          const userProv = accountById.get(String(run.provider_account_id))
           if (userProv) {
             apiKey = userProv.api_key
             apiUrl = userProv.api_url
             providerName = userProv.name
           } else {
-            // Admin/legacy engagement runs may store an admin provider account id here.
-            const { data: adminProv } = await supabase
-              .from('provider_accounts')
-              .select('id, name, api_key, api_url')
-              .eq('id', run.provider_account_id)
-              .maybeSingle()
-            if (!adminProv) {
-              console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
-              await supabase.from('organic_run_schedule').update({
-                status: 'failed',
-                provider_status: 'error',
-                completed_at: new Date().toISOString(),
-                last_status_check: new Date().toISOString(),
-                error_message: 'Provider account missing/deleted; cannot sync provider order',
-              }).eq('id', run.id)
-              failed++
-              await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
-              continue
-            }
-            apiKey = adminProv.api_key
-            apiUrl = adminProv.api_url
-            providerName = adminProv.name
+            console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
+            await supabase.from('organic_run_schedule').update({
+              status: 'failed',
+              provider_status: 'error',
+              completed_at: new Date().toISOString(),
+              last_status_check: new Date().toISOString(),
+              error_message: 'Provider account missing/deleted; cannot sync provider order',
+            }).eq('id', run.id)
+            failed++
+            await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+            continue
           }
         } else {
           // Fallback to default provider (legacy runs without provider_account_id)
@@ -279,30 +263,12 @@ Deno.serve(async (req) => {
 
         console.log(`Checking ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id} on ${providerName}`)
 
-        const formData = new URLSearchParams()
-        formData.append('key', apiKey)
-        formData.append('action', 'status')
-        formData.append('order', run.provider_order_id)
-
-        const ctrl = new AbortController()
-        const timeout = setTimeout(() => ctrl.abort(), 5000)
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString(),
-          signal: ctrl.signal
-        })
-        clearTimeout(timeout)
-
-        const responseText = await response.text()
-        console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${responseText}`)
-
-        let result
-        try {
-          result = JSON.parse(responseText)
-        } catch {
-          result = { error: responseText }
+        let result = bulkStatusByRunId.get(String(run.id))
+        if (!result) {
+          const singleMap = await fetchProviderStatuses(apiUrl, apiKey, [String(run.provider_order_id)])
+          result = singleMap.get(String(run.provider_order_id))
         }
+        console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${JSON.stringify(result)}`)
 
         if (result.error) {
           console.error(`Status check failed for ${run.provider_order_id}:`, result.error)
