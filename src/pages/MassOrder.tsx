@@ -727,21 +727,56 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                 </div>
               </div>
               <div>
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Engagement Types</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {activeTypes.map((type) => (
-                    <label key={type} className="flex items-center gap-2 px-3 py-2 border border-border rounded-md cursor-pointer hover:bg-muted/40">
-                      <input
-                        type="checkbox"
-                        checked={editingRow.enabledTypes[type] ?? false}
-                        onChange={(e) => updateRow(editingRow.id, {
-                          enabledTypes: { ...editingRow.enabledTypes, [type]: e.target.checked },
-                        })}
-                      />
-                      <span className="text-sm capitalize">{ENGAGEMENT_CONFIG[type]?.emoji} {type}</span>
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Engagement Types & Quantities</Label>
+                  {editingRow.qtyOverrides && Object.keys(editingRow.qtyOverrides).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => updateRow(editingRow.id, { qtyOverrides: {} })}
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      Reset to base ratio
+                    </button>
+                  )}
                 </div>
+                <div className="space-y-2">
+                  {activeTypes.map((type) => {
+                    const item = itemByType[type];
+                    const ratio = DEFAULT_RATIOS[type] ?? 100;
+                    const isBase = type === "views" || item?.is_base;
+                    const computed = isBase ? editingRow.baseQuantity : Math.round(editingRow.baseQuantity * (ratio / 100));
+                    const currentQty = editingRow.qtyOverrides?.[type] ?? computed;
+                    const enabled = editingRow.enabledTypes[type] ?? false;
+                    return (
+                      <div key={type} className="flex items-center gap-2 px-3 py-2 border border-border rounded-md">
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={(e) => updateRow(editingRow.id, {
+                            enabledTypes: { ...editingRow.enabledTypes, [type]: e.target.checked },
+                          })}
+                        />
+                        <span className="text-sm capitalize flex-1">{ENGAGEMENT_CONFIG[type]?.emoji} {type}</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          disabled={!enabled}
+                          value={currentQty}
+                          onChange={(e) => {
+                            const v = Math.max(1, Number(e.target.value) || 0);
+                            updateRow(editingRow.id, {
+                              qtyOverrides: { ...(editingRow.qtyOverrides || {}), [type]: v },
+                            });
+                          }}
+                          className="h-9 w-28 text-right font-semibold"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Tip: har service ki quantity yahan independently set kar sakte ho (views, likes, shares — sab alag).
+                </p>
               </div>
               <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
                 {computeRowTotals(editingRow).breakdown.map(b => (
