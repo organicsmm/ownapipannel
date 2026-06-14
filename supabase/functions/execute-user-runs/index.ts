@@ -108,7 +108,7 @@ async function pollStartedRuns() {
     .eq("engagement_order_item.engagement_order.use_user_api", true)
     .or(`last_status_check.is.null,last_status_check.lt.${fiveMinAgo}`)
     .order("last_status_check", { ascending: true, nullsFirst: true })
-    .limit(20);
+    .limit(120);
 
   for (const run of (startedRuns || [])) {
     const item = (run as any).engagement_order_item;
@@ -207,7 +207,7 @@ async function pollStartedRuns() {
       }).eq("id", run.id);
       stillRunning++;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 15));
   }
 
   return { polled, finished, stillRunning, reFailed };
