@@ -435,6 +435,122 @@ export type Database = {
           },
         ]
       }
+      mass_order_batch_items: {
+        Row: {
+          base_quantity: number
+          batch_id: string
+          created_at: string
+          enabled_types: Json
+          engagement_order_id: string | null
+          engagement_order_number: number | null
+          error_message: string | null
+          id: string
+          link: string
+          price: number
+          status: string
+          time_limit_hours: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_quantity?: number
+          batch_id: string
+          created_at?: string
+          enabled_types?: Json
+          engagement_order_id?: string | null
+          engagement_order_number?: number | null
+          error_message?: string | null
+          id?: string
+          link: string
+          price?: number
+          status?: string
+          time_limit_hours?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_quantity?: number
+          batch_id?: string
+          created_at?: string
+          enabled_types?: Json
+          engagement_order_id?: string | null
+          engagement_order_number?: number | null
+          error_message?: string | null
+          id?: string
+          link?: string
+          price?: number
+          status?: string
+          time_limit_hours?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mass_order_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "mass_order_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mass_order_batch_items_engagement_order_id_fkey"
+            columns: ["engagement_order_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mass_order_batches: {
+        Row: {
+          created_at: string
+          failed_count: number
+          id: string
+          name: string | null
+          status: string
+          success_count: number
+          total_links: number
+          total_price: number
+          updated_at: string
+          user_bundle_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_count?: number
+          id?: string
+          name?: string | null
+          status?: string
+          success_count?: number
+          total_links?: number
+          total_price?: number
+          updated_at?: string
+          user_bundle_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_count?: number
+          id?: string
+          name?: string | null
+          status?: string
+          success_count?: number
+          total_links?: number
+          total_price?: number
+          updated_at?: string
+          user_bundle_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mass_order_batches_user_bundle_id_fkey"
+            columns: ["user_bundle_id"]
+            isOneToOne: false
+            referencedRelation: "user_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string | null
