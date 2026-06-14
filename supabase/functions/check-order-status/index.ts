@@ -578,6 +578,10 @@ Deno.serve(async (req) => {
 
     if (targetRunId) {
       legacyQuery = legacyQuery.eq('id', targetRunId)
+    } else {
+      legacyQuery = legacyQuery
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(Math.min(50, maxRuns))
     }
 
     const { data: legacyRuns, error: legacyError } = await legacyQuery
