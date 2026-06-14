@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -43,6 +43,7 @@ function Inner() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   const [bundleId, setBundleId] = useState<string>("");
   const [link, setLink] = useState("");
