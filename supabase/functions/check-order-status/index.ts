@@ -52,13 +52,13 @@ Deno.serve(async (req) => {
     let targetRunId: string | null = null
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
-    let maxRuns = 35
+    let maxRuns = 60
     try {
       const body = await req.json()
       targetRunId = body?.runId || null
       const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(80, Number(body?.maxRuns || body?.max_runs || 35)))
+      maxRuns = Math.max(1, Math.min(150, Number(body?.maxRuns || body?.max_runs || 60)))
     } catch {
       // No body or invalid JSON - check all
     }
@@ -177,6 +177,15 @@ Deno.serve(async (req) => {
               .maybeSingle()
             if (!adminProv) {
               console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
+              await supabase.from('organic_run_schedule').update({
+                status: 'failed',
+                provider_status: 'error',
+                completed_at: new Date().toISOString(),
+                last_status_check: new Date().toISOString(),
+                error_message: 'Provider account missing/deleted; cannot sync provider order',
+              }).eq('id', run.id)
+              failed++
+              await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
               continue
             }
             apiKey = adminProv.api_key
