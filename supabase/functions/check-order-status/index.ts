@@ -92,11 +92,14 @@ Deno.serve(async (req) => {
       targetRunId = requestBody?.runId || null
       const rawOrders = Array.isArray(requestBody?.orders) ? requestBody.orders : [requestBody?.orderNumber, requestBody?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(500, Number(requestBody?.maxRuns || requestBody?.max_runs || 400)))
+      maxRuns = Math.max(1, Math.min(1000, Number(requestBody?.maxRuns || requestBody?.max_runs || 500)))
       if (requestBody?.email) {
-        const { data: authUser } = await supabase.auth.admin.listUsers()
-        const matched = authUser?.users?.find((u: any) => String(u.email || '').toLowerCase() === String(requestBody.email).toLowerCase())
-        targetUserId = matched?.id || null
+        const { data: matchedProfile } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .ilike('email', String(requestBody.email).trim())
+          .maybeSingle()
+        targetUserId = matchedProfile?.user_id || null
       }
     } catch {
       // No body or invalid JSON - check all
