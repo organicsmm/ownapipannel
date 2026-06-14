@@ -316,23 +316,27 @@ function Inner() {
         )}
       </div>
 
-      {/* Live Organic Growth Preview - updates with quantity/time changes */}
+      {/* Heavy previews load only when user opens them, keeping order form fast */}
       {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
-        <LiveGrowthChart
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          onRefresh={() => setPreviewRefreshKey(k => k + 1)}
-          platform={platform}
-        />
-      )}
-
-      {/* Per-Type Organic Delivery Preview */}
-      {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
-        <DeliveryPreview
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          platform={platform}
-        />
+        showPreviews ? (
+          <Suspense fallback={<div className="py-4 text-sm text-muted-foreground">Loading preview...</div>}>
+            <LiveGrowthChart
+              engagements={engagements as Record<EngagementType, EngagementConfig>}
+              refreshKey={previewRefreshKey}
+              onRefresh={() => setPreviewRefreshKey(k => k + 1)}
+              platform={platform}
+            />
+            <DeliveryPreview
+              engagements={engagements as Record<EngagementType, EngagementConfig>}
+              refreshKey={previewRefreshKey}
+              platform={platform}
+            />
+          </Suspense>
+        ) : (
+          <Button variant="outline" onClick={() => setShowPreviews(true)} className="w-full h-11">
+            Show Delivery Preview
+          </Button>
+        )
       )}
 
 
