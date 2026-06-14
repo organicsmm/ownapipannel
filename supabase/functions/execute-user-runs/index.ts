@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
     }
 
     const runSelect = `
-      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
+      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count, provider_response,
       engagement_order_item:engagement_order_items!inner(
         id, engagement_type, quantity, status,
         engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id, created_at)
@@ -462,6 +462,25 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         await supabase.from("organic_run_schedule").update({ status: "failed", error_message: "No active provider available" }).eq("id", run.id);
         failed++; continue;
+      }
+
+      const triedProviders = new Set<string>(
+        Array.isArray((run as any).provider_response?.tried_providers)
+          ? (run as any).provider_response.tried_providers.map(String)
+          : []
+      );
+      if (triedProviders.size > 0) {
+        const remaining = candidates.filter((c) => !triedProviders.has(String(c.provider.id)));
+        if (remaining.length === 0) {
+          await supabase.from("organic_run_schedule").update({
+            status: "failed",
+            completed_at: new Date().toISOString(),
+            error_message: "All backup providers already tried for this run",
+          }).eq("id", run.id);
+          await recomputeStatuses(item.id, eo.id);
+          failed++; continue;
+        }
+        candidates = remaining;
       }
 
       let success = false;
