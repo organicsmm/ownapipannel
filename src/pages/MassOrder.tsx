@@ -4,7 +4,6 @@ import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-quer
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +73,9 @@ function extractUrlsFromText(text: string): string[] {
 
 export default function MassOrder() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <Inner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <Inner />
+    </DashboardLayout>
   );
 }
 
