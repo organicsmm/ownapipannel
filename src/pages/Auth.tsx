@@ -55,7 +55,7 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setSuccessMessage(''); setIsSubmitting(true);
-    const timeoutId = setTimeout(() => { setIsSubmitting(c => { if (c) { setError('Connection timeout.'); return false; } return false; }); }, 20000);
+    const timeoutId = setTimeout(() => { setIsSubmitting(c => { if (c) { setError('Server slow hai, thodi der me dobara try karein.'); return false; } return false; }); }, 60000);
     try {
       if (isLogin) {
         const v = loginSchema.safeParse({ email, password });
