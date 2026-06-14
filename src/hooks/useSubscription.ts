@@ -46,6 +46,11 @@ export function useSubscription() {
       return data as Subscription | null;
     },
     enabled: !!user,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   const { data: pendingRequest, isLoading: isLoadingRequest } = useQuery({
@@ -70,6 +75,11 @@ export function useSubscription() {
       return data as SubscriptionRequest | null;
     },
     enabled: !!user,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   // Check expiry: monthly subs expire, lifetime has expires_at = null
