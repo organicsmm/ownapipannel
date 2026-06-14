@@ -718,12 +718,41 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                 </div>
                 <div>
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Timeframe</Label>
-                  <Select value={String(editingRow.timeLimitHours)} onValueChange={(v) => updateRow(editingRow.id, { timeLimitHours: Number(v) })}>
-                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TIMEFRAMES.map(tf => <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    const isPreset = TIMEFRAMES.some(tf => tf.value === editingRow.timeLimitHours);
+                    const selectVal = isPreset ? String(editingRow.timeLimitHours) : "custom";
+                    return (
+                      <div className="space-y-2">
+                        <Select
+                          value={selectVal}
+                          onValueChange={(v) => {
+                            if (v === "custom") {
+                              updateRow(editingRow.id, { timeLimitHours: editingRow.timeLimitHours || 1 });
+                            } else {
+                              updateRow(editingRow.id, { timeLimitHours: Number(v) });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {TIMEFRAMES.map(tf => <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>)}
+                            <SelectItem value="custom">Custom (hours)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {selectVal === "custom" && (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={720}
+                            placeholder="Hours (e.g. 48)"
+                            value={editingRow.timeLimitHours || ""}
+                            onChange={(e) => updateRow(editingRow.id, { timeLimitHours: Math.max(1, Number(e.target.value) || 1) })}
+                            className="h-10 font-semibold"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div>
