@@ -85,14 +85,40 @@ Deno.serve(async (req) => {
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
     let maxRuns = 400
+    let requestBody: any = {}
     try {
-      const body = await req.json()
-      targetRunId = body?.runId || null
-      const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
+      requestBody = await req.json()
+      targetRunId = requestBody?.runId || null
+      const rawOrders = Array.isArray(requestBody?.orders) ? requestBody.orders : [requestBody?.orderNumber, requestBody?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(500, Number(body?.maxRuns || body?.max_runs || 400)))
+      maxRuns = Math.max(1, Math.min(500, Number(requestBody?.maxRuns || requestBody?.max_runs || 400)))
     } catch {
       // No body or invalid JSON - check all
+    }
+
+    if (requestBody?.background !== true) {
+      const backgroundBody = { ...requestBody, background: true }
+      const trigger = async () => {
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-order-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify(backgroundBody),
+          })
+        } catch (e) { console.error('background status checker trigger failed:', e) }
+      }
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === 'function') {
+        (globalThis as any).EdgeRuntime.waitUntil(trigger())
+      } else {
+        trigger()
+      }
+      return new Response(JSON.stringify({ accepted: true, background: true }), {
+        status: 202,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     if (targetOrderNumbers.length > 0) {
