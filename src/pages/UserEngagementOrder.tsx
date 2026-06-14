@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +33,9 @@ const PREFERRED_ORDER: Record<string, number> = {
 
 export default function UserEngagementOrder() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <Inner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <Inner />
+    </DashboardLayout>
   );
 }
 
@@ -46,7 +43,6 @@ function Inner() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const qc = useQueryClient();
 
   const [bundleId, setBundleId] = useState<string>("");
   const [link, setLink] = useState("");
