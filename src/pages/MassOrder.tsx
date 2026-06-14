@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -12,9 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Rocket, Link as LinkIcon, Package, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle,
+  Upload, Download, History, FileText,
 } from "lucide-react";
 import {
   EngagementType, DEFAULT_RATIOS, ENGAGEMENT_CONFIG,
@@ -38,10 +40,11 @@ interface OrderRow {
   baseQuantity: number;
   timeLimitHours: number;
   enabledTypes: Record<EngagementType, boolean>;
-  // submit state
   status: "idle" | "submitting" | "success" | "failed";
   message?: string;
   orderNumber?: number;
+  orderId?: string;
+  price?: number;
 }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -51,6 +54,20 @@ function isValidUrl(s: string) {
     const u = new URL(s.trim());
     return u.protocol === "http:" || u.protocol === "https:";
   } catch { return false; }
+}
+
+// Extract URLs from CSV / TXT content. CSV: first column or any column with http(s).
+function extractUrlsFromText(text: string): string[] {
+  const out: string[] = [];
+  text.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    // Split on common CSV delimiters; pick first http(s) token, else whole line
+    const tokens = trimmed.split(/[,;\t]/).map(t => t.trim().replace(/^"|"$/g, ""));
+    const url = tokens.find(t => /^https?:\/\//i.test(t)) ?? tokens[0];
+    if (url) out.push(url);
+  });
+  return out;
 }
 
 export default function MassOrder() {
@@ -64,11 +81,37 @@ export default function MassOrder() {
 }
 
 function Inner() {
+  const [tab, setTab] = useState<"create" | "history">("create");
+  return (
+    <div className="max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pb-10">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="create" className="gap-2"><Rocket className="w-4 h-4" /> Create</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2"><History className="w-4 h-4" /> Batches</TabsTrigger>
+        </TabsList>
+        <TabsContent value="create" className="space-y-4 sm:space-y-6 mt-0">
+          <CreateMassOrder onSubmitted={() => setTab("history")} />
+        </TabsContent>
+        <TabsContent value="history" className="mt-0">
+          <BatchHistory />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/* ============================================================
+   CREATE
+   ============================================================ */
+
+function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [bundleId, setBundleId] = useState<string>("");
+  const [batchName, setBatchName] = useState<string>("");
   const [linksText, setLinksText] = useState("");
   const [defaultBaseQty, setDefaultBaseQty] = useState(10000);
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
@@ -114,7 +157,7 @@ function Inner() {
     return m;
   }, [items]);
 
-  // Parse links from textarea → build/sync rows
+  // Build rows from textarea
   useEffect(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     const unique: string[] = [];
@@ -140,7 +183,6 @@ function Inner() {
     });
   }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe]);
 
-  // Compute per-row totals
   function computeRowTotals(r: OrderRow) {
     const breakdown: { type: EngagementType; qty: number; price: number }[] = [];
     let totalPrice = 0;
@@ -168,7 +210,6 @@ function Inner() {
     [rows, activeTypes, itemByType]
   );
 
-  // Validation
   const invalidLines = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     return lines.filter(l => !isValidUrl(l));
@@ -181,11 +222,12 @@ function Inner() {
     return Object.entries(counts).filter(([, c]) => c > 1).map(([l]) => l);
   }, [linksText]);
 
+  const validRows = useMemo(() => rows.filter(r => isValidUrl(r.link)), [rows]);
+
   const canSubmit = !submitting
     && !!bundle
     && activeTypes.length > 0
-    && rows.length > 0
-    && invalidLines.length === 0
+    && validRows.length > 0
     && defaultBaseQty > 0;
 
   const removeRow = useCallback((id: string) => {
@@ -199,13 +241,89 @@ function Inner() {
     setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
   }, []);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max 5MB", variant: "destructive" });
+      return;
+    }
+    try {
+      const text = await file.text();
+      const urls = extractUrlsFromText(text);
+      if (urls.length === 0) {
+        toast({ title: "No URLs found", description: "File me koi link nahi mila", variant: "destructive" });
+        return;
+      }
+      // Merge with existing
+      const existing = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const merged = [...existing, ...urls];
+      const seen = new Set<string>(); const unique: string[] = [];
+      for (const u of merged) { if (!seen.has(u)) { seen.add(u); unique.push(u); } }
+      setLinksText(unique.join("\n"));
+      toast({ title: `${urls.length} links loaded`, description: `Total unique: ${unique.length}` });
+    } catch (err: any) {
+      toast({ title: "File read failed", description: err.message, variant: "destructive" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   async function handleSubmitAll() {
-    if (!canSubmit || !bundle) return;
+    if (!canSubmit || !bundle || !user) return;
     setSubmitting(true);
+
+    // 1. Create batch record
+    const { data: batch, error: batchErr } = await supabase
+      .from("mass_order_batches")
+      .insert({
+        user_id: user.id,
+        user_bundle_id: bundle.id,
+        name: batchName.trim() || `Batch ${new Date().toLocaleString()}`,
+        total_links: validRows.length,
+        total_price: grandTotal,
+        status: "processing",
+      })
+      .select()
+      .single();
+
+    if (batchErr || !batch) {
+      setSubmitting(false);
+      toast({ title: "Batch create failed", description: batchErr?.message, variant: "destructive" });
+      return;
+    }
+
+    // 2. Insert all batch items as pending
+    const itemRecords = validRows.map(r => {
+      const totals = computeRowTotals(r);
+      return {
+        batch_id: batch.id,
+        user_id: user.id,
+        link: r.link,
+        base_quantity: r.baseQuantity,
+        time_limit_hours: r.timeLimitHours,
+        enabled_types: activeTypes.filter(t => r.enabledTypes[t]) as any,
+        price: totals.totalPrice,
+        status: "pending",
+      };
+    });
+    const { data: insertedItems, error: itemsErr } = await supabase
+      .from("mass_order_batch_items")
+      .insert(itemRecords)
+      .select();
+
+    if (itemsErr || !insertedItems) {
+      setSubmitting(false);
+      toast({ title: "Batch items insert failed", description: itemsErr?.message, variant: "destructive" });
+      return;
+    }
+
+    const itemIdByLink = new Map(insertedItems.map((it: any) => [it.link, it.id]));
+
     let ok = 0, fail = 0;
-    // Sequential to avoid overwhelming providers
-    for (const r of rows) {
+    for (const r of validRows) {
       updateRow(r.id, { status: "submitting", message: undefined });
+      const batchItemId = itemIdByLink.get(r.link);
       try {
         const enabled = activeTypes.filter(t => r.enabledTypes[t]);
         if (enabled.length === 0) throw new Error("No engagement type enabled");
@@ -243,33 +361,60 @@ function Inner() {
         }
         if ((data as any)?.error) throw new Error((data as any).error);
         ok++;
+        const orderNumber = (data as any)?.order_number;
+        const orderId = (data as any)?.order_id;
         updateRow(r.id, {
           status: "success",
-          orderNumber: (data as any)?.order_number,
-          message: `Order #${(data as any)?.order_number}`,
+          orderNumber,
+          orderId,
+          message: `Order #${orderNumber}`,
+          price: totals.totalPrice,
         });
+        if (batchItemId) {
+          await supabase.from("mass_order_batch_items").update({
+            status: "success",
+            engagement_order_id: orderId ?? null,
+            engagement_order_number: orderNumber ?? null,
+          }).eq("id", batchItemId);
+        }
       } catch (e: any) {
         fail++;
-        updateRow(r.id, { status: "failed", message: e?.message || "Failed" });
+        const msg = e?.message || "Failed";
+        updateRow(r.id, { status: "failed", message: msg });
+        if (batchItemId) {
+          await supabase.from("mass_order_batch_items").update({
+            status: "failed",
+            error_message: msg,
+          }).eq("id", batchItemId);
+        }
       }
-      // tiny stagger
       await new Promise(res => setTimeout(res, 250));
     }
+
+    // 3. Finalize batch
+    const finalStatus = fail === 0 ? "completed" : (ok === 0 ? "failed" : "partial");
+    await supabase.from("mass_order_batches").update({
+      success_count: ok,
+      failed_count: fail,
+      status: finalStatus,
+    }).eq("id", batch.id);
+
     setSubmitting(false);
+    qc.invalidateQueries({ queryKey: ["mass-batches"] });
     toast({
       title: fail === 0 ? "🚀 All orders submitted" : "Submitted with some failures",
       description: `${ok} success, ${fail} failed`,
       variant: fail === 0 ? "default" : "destructive",
     });
     if (fail === 0) {
-      setTimeout(() => navigate("/engagement-orders"), 1200);
+      setTimeout(() => onSubmitted(), 1500);
     }
   }
 
   const editingRow = rows.find(r => r.id === editingId) || null;
 
   return (
-    <div className="max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 space-y-4 sm:space-y-6 pb-10">
+    <>
       {/* Hero */}
       <Card className="glass-card border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-transparent to-primary/5">
         <CardContent className="p-4 sm:p-6">
@@ -282,8 +427,7 @@ function Inner() {
                 Mass Order — Bulk Engagement
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                Ek hi page se multiple links par engagement order place karo. Bundle select karo, default settings set karo,
-                phir har link ko alag se customize karke ek click me submit karo.
+                Multiple links ek saath order karo. Paste karo ya CSV/TXT file upload karo, har link customize karo, batch me submit karo aur history me track karo.
               </p>
             </div>
           </div>
@@ -322,26 +466,45 @@ function Inner() {
               <AlertCircle className="w-4 h-4" /> Is bundle me koi linked service nahi hai.
             </div>
           )}
+
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Batch Name (optional)</Label>
+            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="e.g. Diwali Reels Push" className="h-11" />
+          </div>
         </CardContent>
       </Card>
 
       {/* Links + defaults */}
       <Card className="glass-card border-2 border-border">
         <CardContent className="p-4 sm:p-6 space-y-5">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
-              <LinkIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+                <LinkIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <Label className="text-base sm:text-lg font-bold">Links</Label>
             </div>
-            <Label className="text-base sm:text-lg font-bold">Links (har line par ek)</Label>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt,text/csv,text/plain"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-1.5" /> Upload CSV / TXT
+              </Button>
+            </div>
           </div>
           <Textarea
-            placeholder={`https://instagram.com/p/abc\nhttps://instagram.com/p/xyz\nhttps://youtube.com/watch?v=...`}
+            placeholder={`Ek line par ek link.\nhttps://instagram.com/p/abc\nhttps://instagram.com/p/xyz\n\nYa CSV upload karo (first column = link).`}
             value={linksText}
             onChange={(e) => setLinksText(e.target.value)}
-            className="min-h-[140px] font-mono text-sm"
+            className="min-h-[160px] font-mono text-sm"
           />
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            <span className="text-muted-foreground">{rows.length} valid link(s)</span>
+            <span className="text-muted-foreground">{validRows.length} valid link(s)</span>
             {invalidLines.length > 0 && <span className="text-destructive">{invalidLines.length} invalid URL</span>}
             {duplicates.length > 0 && <span className="text-yellow-600">{duplicates.length} duplicate(s) auto-removed</span>}
           </div>
@@ -386,12 +549,13 @@ function Inner() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {rows.map((r) => {
               const t = computeRowTotals(r);
+              const valid = isValidUrl(r.link);
               return (
-                <Card key={r.id} className="border-2 border-border hover:border-primary/40 transition-colors">
+                <Card key={r.id} className={`border-2 transition-colors ${valid ? "border-border hover:border-primary/40" : "border-destructive/50"}`}>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link</div>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link {!valid && <span className="text-destructive">· INVALID</span>}</div>
                         <div className="text-sm font-mono truncate" title={r.link}>{r.link}</div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -441,7 +605,7 @@ function Inner() {
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
-            {rows.length} order(s) ready • Total <span className="font-bold text-foreground">₹{grandTotal.toFixed(2)}</span>
+            {validRows.length} order(s) ready • Total <span className="font-bold text-foreground">₹{grandTotal.toFixed(2)}</span>
           </div>
           <Button
             size="lg"
@@ -520,6 +684,252 @@ function Inner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+/* ============================================================
+   BATCH HISTORY
+   ============================================================ */
+
+function BatchHistory() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [openBatchId, setOpenBatchId] = useState<string | null>(null);
+
+  const { data: batches, isLoading, refetch } = useQuery({
+    queryKey: ["mass-batches", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("mass_order_batches")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const filtered = useMemo(() => {
+    let list = batches || [];
+    if (statusFilter !== "all") list = list.filter(b => b.status === statusFilter);
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      list = list.filter((b: any) => (b.name || "").toLowerCase().includes(s));
+    }
+    return list;
+  }, [batches, search, statusFilter]);
+
+  const stats = useMemo(() => {
+    const all = batches || [];
+    const total = all.length;
+    const completed = all.filter((b: any) => b.status === "completed").length;
+    const processing = all.filter((b: any) => b.status === "processing").length;
+    const failed = all.filter((b: any) => b.status === "failed").length;
+    const partial = all.filter((b: any) => b.status === "partial").length;
+    const totalSuccess = all.reduce((s: number, b: any) => s + (b.success_count || 0), 0);
+    const totalLinks = all.reduce((s: number, b: any) => s + (b.total_links || 0), 0);
+    const successRate = totalLinks > 0 ? Math.round((totalSuccess / totalLinks) * 100) : 0;
+    return { total, completed, processing, failed, partial, successRate };
+  }, [batches]);
+
+  async function downloadCSV(batchId: string, batchName: string) {
+    const { data, error } = await supabase
+      .from("mass_order_batch_items")
+      .select("*")
+      .eq("batch_id", batchId)
+      .order("created_at", { ascending: true });
+    if (error || !data) {
+      toast({ title: "Download failed", description: error?.message, variant: "destructive" });
+      return;
+    }
+    const headers = ["link", "base_quantity", "time_limit_hours", "enabled_types", "status", "engagement_order_number", "price", "error_message"];
+    const rows = data.map((r: any) => [
+      r.link,
+      r.base_quantity,
+      r.time_limit_hours,
+      JSON.stringify(r.enabled_types || []),
+      r.status,
+      r.engagement_order_number || "",
+      r.price,
+      (r.error_message || "").replace(/"/g, '""'),
+    ]);
+    const csv = [headers, ...rows].map(row =>
+      row.map(c => {
+        const s = String(c ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(",")
+    ).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${batchName.replace(/[^a-z0-9-_]+/gi, "_")}_${batchId.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[
+          { label: "Total Batches", value: stats.total, color: "text-foreground" },
+          { label: "Completed", value: stats.completed, color: "text-green-600" },
+          { label: "Processing", value: stats.processing, color: "text-primary" },
+          { label: "Failed / Partial", value: stats.failed + stats.partial, color: "text-destructive" },
+          { label: "Success Rate", value: `${stats.successRate}%`, color: "text-foreground" },
+        ].map((s) => (
+          <Card key={s.label} className="border-2 border-border">
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
+              <div className={`text-xl sm:text-2xl font-bold mt-1 ${s.color}`}>{s.value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <Card className="border-2 border-border">
+        <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row gap-2">
+          <Input
+            placeholder="Search by batch name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-10 sm:w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={() => refetch()}>Refresh</Button>
+        </CardContent>
+      </Card>
+
+      {/* List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading batches...
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <FileText className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            Koi batch nahi mila. Naya batch banane ke liye Create tab par jao.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((b: any) => {
+            const pct = b.total_links > 0 ? Math.round((b.success_count / b.total_links) * 100) : 0;
+            const statusColor =
+              b.status === "completed" ? "bg-green-600/15 text-green-600 border-green-600/30"
+              : b.status === "processing" ? "bg-primary/15 text-primary border-primary/30"
+              : b.status === "partial" ? "bg-yellow-600/15 text-yellow-600 border-yellow-600/30"
+              : "bg-destructive/15 text-destructive border-destructive/30";
+            return (
+              <Card key={b.id} className="border-2 border-border hover:border-primary/30 transition-colors">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold truncate">{b.name || `Batch ${b.id.slice(0, 8)}`}</span>
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${statusColor}`}>{b.status}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {new Date(b.created_at).toLocaleString()} • {b.total_links} links • ₹{Number(b.total_price).toFixed(2)}
+                    </div>
+                    <div className="text-xs mt-1">
+                      <span className="text-green-600 font-semibold">{b.success_count} success</span>
+                      {b.failed_count > 0 && <span className="text-destructive font-semibold ml-2">{b.failed_count} failed</span>}
+                      <span className="text-muted-foreground ml-2">({pct}% rate)</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => setOpenBatchId(b.id)}>View</Button>
+                    <Button variant="outline" size="sm" onClick={() => downloadCSV(b.id, b.name || b.id)}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> CSV
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <BatchDetailDialog batchId={openBatchId} onClose={() => setOpenBatchId(null)} />
     </div>
+  );
+}
+
+function BatchDetailDialog({ batchId, onClose }: { batchId: string | null; onClose: () => void }) {
+  const { data: items, isLoading } = useQuery({
+    queryKey: ["mass-batch-items", batchId],
+    enabled: !!batchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("mass_order_batch_items")
+        .select("*")
+        .eq("batch_id", batchId!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  return (
+    <Dialog open={!!batchId} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Batch Details</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-6 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+        ) : (
+          <div className="space-y-2">
+            {(items || []).map((it: any) => (
+              <div key={it.id} className="border border-border rounded-md p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs truncate" title={it.link}>{it.link}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Base {it.base_quantity?.toLocaleString()} • {it.time_limit_hours}h • ₹{Number(it.price).toFixed(2)}
+                    </div>
+                    {it.error_message && (
+                      <div className="text-[11px] text-destructive mt-1">{it.error_message}</div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      it.status === "success" ? "bg-green-600/15 text-green-600 border-green-600/30"
+                      : it.status === "failed" ? "bg-destructive/15 text-destructive border-destructive/30"
+                      : "bg-muted text-muted-foreground border-border"
+                    }`}>{it.status}</span>
+                    {it.engagement_order_number && (
+                      <div className="mt-1">
+                        <RouterLink to={`/engagement-orders/${it.engagement_order_number}`} className="text-xs underline text-primary">
+                          #{it.engagement_order_number}
+                        </RouterLink>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
