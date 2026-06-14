@@ -131,6 +131,7 @@ const App = () => {
 
                     {/* Engagement */}
                     <Route path="/engagement-order" element={<SubscriptionGuard><EngagementOrder /></SubscriptionGuard>} />
+                    <Route path="/mass-order" element={<SubscriptionGuard><MassOrder /></SubscriptionGuard>} />
                     <Route path="/engagement-orders" element={<EngagementOrders />} />
                     <Route path="/engagement-orders/:orderNumber" element={<EngagementOrderDetail />} />
 
