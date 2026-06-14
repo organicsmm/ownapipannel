@@ -280,6 +280,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   async function handleSubmitAll() {
     if (!canSubmit || !bundle || !user) return;
     setSubmitting(true);
+    setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
 
     // 1. Create batch record
     const { data: batch, error: batchErr } = await supabase
@@ -297,11 +298,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
     if (batchErr || !batch) {
       setSubmitting(false);
+      setProgress(null);
       toast({ title: "Batch create failed", description: batchErr?.message, variant: "destructive" });
       return;
     }
 
-    // 2. Insert all batch items as pending
+    // 2. Chunked insert of batch items (500/chunk → handles 10k+ items)
     const itemRecords = validRows.map(r => {
       const totals = computeRowTotals(r);
       return {
@@ -315,22 +317,46 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         status: "pending",
       };
     });
-    const { data: insertedItems, error: itemsErr } = await supabase
-      .from("mass_order_batch_items")
-      .insert(itemRecords)
-      .select();
-
-    if (itemsErr || !insertedItems) {
-      setSubmitting(false);
-      toast({ title: "Batch items insert failed", description: itemsErr?.message, variant: "destructive" });
-      return;
+    const INSERT_CHUNK = 500;
+    const itemIdByLink = new Map<string, string>();
+    for (let i = 0; i < itemRecords.length; i += INSERT_CHUNK) {
+      const chunk = itemRecords.slice(i, i + INSERT_CHUNK);
+      const { data: inserted, error: itemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .insert(chunk)
+        .select("id, link");
+      if (itemsErr || !inserted) {
+        setSubmitting(false);
+        setProgress(null);
+        toast({ title: "Batch items insert failed", description: itemsErr?.message, variant: "destructive" });
+        return;
+      }
+      inserted.forEach((it: any) => itemIdByLink.set(it.link, it.id));
     }
 
-    const itemIdByLink = new Map(insertedItems.map((it: any) => [it.link, it.id]));
+    // 3. Parallel submission with bounded concurrency
+    const CONCURRENCY = 6; // matches typical provider rate limits
+    let ok = 0, fail = 0, done = 0;
+    const queue = [...validRows];
+    // Throttled UI state buffer — flush every 250ms instead of per-row
+    const pending: Array<{ id: string; patch: Partial<OrderRow> }> = [];
+    const flush = () => {
+      if (pending.length === 0) return;
+      const batchPatches = [...pending];
+      pending.length = 0;
+      setRows(prev => {
+        const map = new Map(batchPatches.map(p => [p.id, p.patch]));
+        return prev.map(r => map.has(r.id) ? { ...r, ...map.get(r.id)! } : r);
+      });
+    };
+    const flusher = window.setInterval(flush, 250);
 
-    let ok = 0, fail = 0;
-    for (const r of validRows) {
-      updateRow(r.id, { status: "submitting", message: undefined });
+    const queueRow = (r: OrderRow, patch: Partial<OrderRow>) => {
+      pending.push({ id: r.id, patch });
+    };
+
+    async function processOne(r: OrderRow) {
+      queueRow(r, { status: "submitting", message: undefined });
       const batchItemId = itemIdByLink.get(r.link);
       try {
         const enabled = activeTypes.filter(t => r.enabledTypes[t]);
@@ -371,7 +397,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         ok++;
         const orderNumber = (data as any)?.order_number;
         const orderId = (data as any)?.order_id;
-        updateRow(r.id, {
+        queueRow(r, {
           status: "success",
           orderNumber,
           orderId,
@@ -379,27 +405,42 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           price: totals.totalPrice,
         });
         if (batchItemId) {
-          await supabase.from("mass_order_batch_items").update({
+          // fire-and-forget — don't block next row
+          supabase.from("mass_order_batch_items").update({
             status: "success",
             engagement_order_id: orderId ?? null,
             engagement_order_number: orderNumber ?? null,
-          }).eq("id", batchItemId);
+          }).eq("id", batchItemId).then(() => {});
         }
       } catch (e: any) {
         fail++;
         const msg = e?.message || "Failed";
-        updateRow(r.id, { status: "failed", message: msg });
+        queueRow(r, { status: "failed", message: msg });
         if (batchItemId) {
-          await supabase.from("mass_order_batch_items").update({
+          supabase.from("mass_order_batch_items").update({
             status: "failed",
             error_message: msg,
-          }).eq("id", batchItemId);
+          }).eq("id", batchItemId).then(() => {});
         }
+      } finally {
+        done++;
+        setProgress({ done, ok, fail, total: validRows.length });
       }
-      await new Promise(res => setTimeout(res, 250));
     }
 
-    // 3. Finalize batch
+    async function worker() {
+      while (queue.length > 0) {
+        const r = queue.shift();
+        if (!r) return;
+        await processOne(r);
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+    window.clearInterval(flusher);
+    flush(); // final flush
+
+    // 4. Finalize batch
     const finalStatus = fail === 0 ? "completed" : (ok === 0 ? "failed" : "partial");
     await supabase.from("mass_order_batches").update({
       success_count: ok,
@@ -408,6 +449,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }).eq("id", batch.id);
 
     setSubmitting(false);
+    setProgress(null);
     qc.invalidateQueries({ queryKey: ["mass-batches"] });
     toast({
       title: fail === 0 ? "🚀 All orders submitted" : "Submitted with some failures",
@@ -418,6 +460,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       setTimeout(() => onSubmitted(), 1500);
     }
   }
+
 
   const editingRow = rows.find(r => r.id === editingId) || null;
 
