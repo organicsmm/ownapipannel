@@ -166,6 +166,37 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${engagementRuns?.length || 0} engagement runs waiting for completion`)
 
+    const providerIds = [...new Set((engagementRuns || []).map((run: any) => run.provider_account_id).filter(Boolean).map(String))]
+    const accountById = new Map<string, any>()
+    if (providerIds.length > 0) {
+      const [{ data: userAccounts }, { data: adminAccounts }] = await Promise.all([
+        supabase.from('user_provider_accounts').select('id, name, api_key, api_url').in('id', providerIds),
+        supabase.from('provider_accounts').select('id, name, api_key, api_url').in('id', providerIds),
+      ])
+      for (const account of [...(userAccounts || []), ...(adminAccounts || [])]) accountById.set(String(account.id), account)
+    }
+
+    const bulkStatusByRunId = new Map<string, any>()
+    const groups = new Map<string, { account: any; runs: any[] }>()
+    for (const run of (engagementRuns || [])) {
+      const account = run.provider_account_id ? accountById.get(String(run.provider_account_id)) : null
+      if (!account || !run.provider_order_id) continue
+      const key = `${account.api_url}|${account.api_key}|${account.id}`
+      if (!groups.has(key)) groups.set(key, { account, runs: [] })
+      groups.get(key)!.runs.push(run)
+    }
+    for (const group of groups.values()) {
+      for (let i = 0; i < group.runs.length; i += 100) {
+        const chunk = group.runs.slice(i, i + 100)
+        try {
+          const statusMap = await fetchProviderStatuses(group.account.api_url, group.account.api_key, chunk.map((run: any) => String(run.provider_order_id)))
+          for (const run of chunk) bulkStatusByRunId.set(String(run.id), statusMap.get(String(run.provider_order_id)))
+        } catch (e: any) {
+          console.error(`Bulk status failed for ${group.account.name}:`, e?.message || e)
+        }
+      }
+    }
+
     // Process each run individually using its ACTUAL provider account
     // (Not grouped by service provider_id - that was the bug!)
     for (const run of engagementRuns || []) {
