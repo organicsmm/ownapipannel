@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
     let targetRunId: string | null = null
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
+    let targetUserId: string | null = null
     let maxRuns = 400
     let requestBody: any = {}
     try {
@@ -92,6 +93,11 @@ Deno.serve(async (req) => {
       const rawOrders = Array.isArray(requestBody?.orders) ? requestBody.orders : [requestBody?.orderNumber, requestBody?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
       maxRuns = Math.max(1, Math.min(500, Number(requestBody?.maxRuns || requestBody?.max_runs || 400)))
+      if (requestBody?.email) {
+        const { data: authUser } = await supabase.auth.admin.listUsers()
+        const matched = authUser?.users?.find((u: any) => String(u.email || '').toLowerCase() === String(requestBody.email).toLowerCase())
+        targetUserId = matched?.id || null
+      }
     } catch {
       // No body or invalid JSON - check all
     }
@@ -156,7 +162,7 @@ Deno.serve(async (req) => {
           engagement_type,
           engagement_order_id,
           service:services(provider_id),
-          engagement_order:engagement_orders(id, status)
+          engagement_order:engagement_orders(id, status, user_id)
         )
       `)
       // Check ALL of these:
@@ -177,6 +183,11 @@ Deno.serve(async (req) => {
     } else if (targetItemIds.length > 0) {
       engagementQuery = engagementQuery
         .in('engagement_order_item_id', targetItemIds)
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(maxRuns)
+    } else if (targetUserId) {
+      engagementQuery = engagementQuery
+        .eq('engagement_order_item.engagement_order.user_id', targetUserId)
         .order('last_status_check', { ascending: true, nullsFirst: true })
         .limit(maxRuns)
     } else {
