@@ -122,97 +122,38 @@ export function EngagementTypeCard({
   // Calculate full schedule with runs
   const scheduleData = useMemo(() => {
     if (!config.enabled || config.quantity < providerMin) return null;
-
-    // For custom mode, use the actual timeLimitHours value (already stored in config)
-    // For preset modes, use timeLimitHours directly
-    const effectiveTimeLimit = timeLimitHours;
-    const durationHoursForCurve = effectiveTimeLimit > 0 ? effectiveTimeLimit : 24;
-    const timeLimitArg = effectiveTimeLimit > 0 ? effectiveTimeLimit : undefined;
+    const durationHours = timeLimitHours > 0 ? timeLimitHours : 24;
+    const duration = durationHours * 60 * 60 * 1000;
     const startTime = new Date();
-
-    // If draw-mode provides a curve, let AI generate runs following that shape
-    if (customCurvePoints && customCurvePoints.length >= 2) {
-      const curveRuns = curveToSchedule(
-        customCurvePoints,
-        type,
-        config.quantity,
-        durationHoursForCurve,
-        30
-      );
-
-      const runs: OrganicRunConfig[] = curveRuns.map((run) => {
-        const scheduledAt = new Date(
-          startTime.getTime() +
-          (run.timePercent / 100) * durationHoursForCurve * 60 * 60 * 1000
-        );
-        return {
-          runNumber: run.runNumber,
-          scheduledAt,
-          quantity: run.quantity,
-          baseQuantity: run.quantity,
-          varianceApplied: 0,
-          peakMultiplier: 1,
-          dayOfWeek: scheduledAt.getDay(),
-          hourOfDay: scheduledAt.getHours(),
-          sessionType: 'normal',
-          humanBehaviorScore: 85,
-          patternBreaker: false,
-        };
-      });
-
-      const totalDuration =
-        runs.length > 1
-          ? runs[runs.length - 1].scheduledAt.getTime() - runs[0].scheduledAt.getTime()
-          : 0;
-
-      const avgInterval = runs.length > 1 ? Math.round(totalDuration / (runs.length - 1) / 60000) : 0;
-      const finishTime = runs.length > 0 ? runs[runs.length - 1].scheduledAt : new Date();
-
+    const runCount = Math.min(30, Math.max(3, Math.ceil(config.quantity / Math.max(providerMin * 25, 1))));
+    const avgInterval = runCount > 1 ? Math.round(duration / (runCount - 1) / 60000) : 0;
+    const baseRunQty = Math.floor(config.quantity / runCount);
+    const remainder = config.quantity - baseRunQty * runCount;
+    const runs = Array.from({ length: runCount }, (_, idx) => {
+      const scheduledAt = new Date(startTime.getTime() + (runCount === 1 ? 0 : (duration * idx) / (runCount - 1)));
       return {
-        runs,
-        runCount: runs.length,
-        avgInterval,
-        finishTime,
-        duration: totalDuration,
+        runNumber: idx + 1,
+        scheduledAt,
+        quantity: Math.max(providerMin, baseRunQty + (idx === runCount - 1 ? remainder : 0)),
+        peakMultiplier: peakHoursEnabled && scheduledAt.getHours() >= 18 && scheduledAt.getHours() <= 23 ? 1.2 : 1,
       };
-    }
-
-    // Default: use organic schedule generator
-    const schedule = generateOrganicSchedule(
-      type,
-      config.quantity,
-      variancePercent,
-      peakHoursEnabled,
-      startTime,
-      providerMin,
-      timeLimitArg
-    );
-
-    const avgInterval =
-      schedule.runs.length > 1
-        ? Math.round(schedule.totalDuration / (schedule.runs.length - 1) / 60000)
-        : 0;
-
-    const finishTime =
-      schedule.runs.length > 0 ? schedule.runs[schedule.runs.length - 1].scheduledAt : new Date();
+    });
+    const finishTime = runs[runs.length - 1]?.scheduledAt ?? new Date();
 
     return {
-      runs: schedule.runs,
-      runCount: schedule.runs.length,
+      runs,
+      runCount,
       avgInterval,
       finishTime,
-      duration: schedule.totalDuration,
+      duration,
     };
   }, [
     config.enabled,
     config.quantity,
     timeLimitHours,
-    isCustomMode,
     variancePercent,
     peakHoursEnabled,
-    type,
     providerMin,
-    customCurvePoints,
   ]);
 
   const handleToggle = (enabled: boolean) => {
