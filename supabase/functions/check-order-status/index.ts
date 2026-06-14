@@ -274,12 +274,13 @@ Deno.serve(async (req) => {
 
         const providerStatus = (result.status || '').toLowerCase()
         const startCount = parseInt(result.start_count) || null
-        const remains = parseInt(result.remains) || 0
+        const parsedRemains = parseInt(result.remains)
+        const remains = Number.isNaN(parsedRemains) ? null : parsedRemains
         const charge = parseFloat(result.charge) || null
         
         // Calculate delivery progress
-        const delivered = startCount !== null ? (run.quantity_to_send - remains) : null
-        const progressPercent = run.quantity_to_send > 0 ? ((run.quantity_to_send - remains) / run.quantity_to_send * 100).toFixed(1) : 0
+        const delivered = remains !== null ? Math.max(0, run.quantity_to_send - remains) : null
+        const progressPercent = run.quantity_to_send > 0 && remains !== null ? ((run.quantity_to_send - remains) / run.quantity_to_send * 100).toFixed(1) : 0
 
         console.log(`Provider status: ${providerStatus}, Start: ${startCount}, Remains: ${remains}, Delivered: ${delivered} (${progressPercent}%)`)
         
@@ -300,7 +301,7 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString()
         }
 
-        const deliveredAll = remains === 0 && !['cancelled', 'canceled', 'refunded', 'refund', 'failed', 'error', 'canscelled'].includes(providerStatus)
+        const deliveredAll = remains !== null && remains === 0 && !['cancelled', 'canceled', 'refunded', 'refund', 'failed', 'error', 'canscelled'].includes(providerStatus)
 
         if (providerStatus === 'completed' || providerStatus === 'complete' || providerStatus === 'success' || deliveredAll) {
           const orderStatus = run.engagement_order_item?.engagement_order?.status
@@ -342,7 +343,7 @@ Deno.serve(async (req) => {
           // SCAM GUARD: if provider says "Partial" but delivered 0 (remains == full qty),
           // treat as a failed delivery and retry on a backup provider instead of
           // silently marking it complete.
-          const deliveredQty = run.quantity_to_send - remains
+          const deliveredQty = remains !== null ? run.quantity_to_send - remains : 0
           if (deliveredQty <= 0) {
             const orderStatus = run.engagement_order_item?.engagement_order?.status
             const itemStatus = run.engagement_order_item?.status
@@ -367,7 +368,7 @@ Deno.serve(async (req) => {
                 provider_response: mergedResp,
                 status: 'failed',
                 completed_at: new Date().toISOString(),
-                error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains}/${run.quantity_to_send})`
+                error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains ?? 'unknown'}/${run.quantity_to_send})`
               }).eq('id', run.id)
               failed++
               continue
