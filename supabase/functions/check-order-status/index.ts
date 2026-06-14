@@ -76,7 +76,6 @@ Deno.serve(async (req) => {
       .select(`
         *,
         retry_count,
-        provider_account:provider_accounts(id, name, api_key, api_url),
         engagement_order_item:engagement_order_items(
           id,
           status,
@@ -101,6 +100,10 @@ Deno.serve(async (req) => {
 
     if (targetRunId) {
       engagementQuery = engagementQuery.eq('id', targetRunId)
+    } else {
+      engagementQuery = engagementQuery
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(80)
     }
 
     const { data: engagementRuns, error: engagementError } = await engagementQuery
@@ -134,12 +137,7 @@ Deno.serve(async (req) => {
         let apiUrl: string
         let providerName: string
 
-        if (run.provider_account) {
-          // Use the actual admin provider account that placed this order
-          apiKey = run.provider_account.api_key
-          apiUrl = run.provider_account.api_url
-          providerName = run.provider_account.name
-        } else if (run.provider_account_id) {
+        if (run.provider_account_id) {
           // User-API order: provider_account_id points to user_provider_accounts
           const { data: userProv } = await supabase
             .from('user_provider_accounts')
@@ -151,8 +149,19 @@ Deno.serve(async (req) => {
             apiUrl = userProv.api_url
             providerName = userProv.name
           } else {
-            console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found in provider_accounts or user_provider_accounts`)
-            continue
+            // Admin/legacy engagement runs may store an admin provider account id here.
+            const { data: adminProv } = await supabase
+              .from('provider_accounts')
+              .select('id, name, api_key, api_url')
+              .eq('id', run.provider_account_id)
+              .maybeSingle()
+            if (!adminProv) {
+              console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
+              continue
+            }
+            apiKey = adminProv.api_key
+            apiUrl = adminProv.api_url
+            providerName = adminProv.name
           }
         } else {
           // Fallback to default provider (legacy runs without provider_account_id)
@@ -183,11 +192,15 @@ Deno.serve(async (req) => {
         formData.append('action', 'status')
         formData.append('order', run.provider_order_id)
 
+        const ctrl = new AbortController()
+        const timeout = setTimeout(() => ctrl.abort(), 7000)
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString()
+          body: formData.toString(),
+          signal: ctrl.signal
         })
+        clearTimeout(timeout)
 
         const responseText = await response.text()
         console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${responseText}`)
@@ -462,7 +475,7 @@ Deno.serve(async (req) => {
       }
 
       // Faster processing - reduced delay between checks
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 25))
     }
 
     // ============================================
