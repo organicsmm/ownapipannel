@@ -18,14 +18,13 @@
   <meta name="geo.placename" content="India" />
 
   <!-- Performance: Early connections -->
-  <link rel="preconnect" href="https://ziqdvrxvkwryprwpqped.supabase.co" crossorigin />
-  <link rel="dns-prefetch" href="https://ziqdvrxvkwryprwpqped.supabase.co" />
+  <link rel="preconnect" href="https://aqxniduulgvxetykysog.supabase.co" crossorigin />
+  <link rel="dns-prefetch" href="https://aqxniduulgvxetykysog.supabase.co" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
 
   <!-- Favicon -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
   <link rel="apple-touch-icon" href="/icon-192x192.png" />
 
   <!-- Open Graph -->
@@ -50,7 +49,6 @@
   <meta name="twitter:image:alt" content="Boostly Pro Platform" />
 
   <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -224,16 +222,6 @@
     #root { min-height: 100vh; display: flex; flex-direction: column; }
   </style>
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('Boostly Pro: Service Worker Registered'))
-          .catch(err => console.log('SW Registration failed:', err));
-      });
-    }
-  </script>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   
   
   

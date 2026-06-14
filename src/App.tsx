@@ -11,14 +11,14 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { toast } from "sonner";
 import { AppErrorBoundary } from "@/components/app/AppErrorBoundary";
 
-// Eager — landing/auth/dashboard so first paint is instant
-import Index from "./pages/Index";
+// Eager — dashboard so logged-in app first paint stays instant
 import NotFound from "./pages/NotFound";
-import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 
 // Lazy — everything else is code-split so a single user's heavy workload
 // (millions of runs, bundles, admin tools) never blocks anyone else's UI.
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
 const Services = lazy(() => import("./pages/Services"));
 const Order = lazy(() => import("./pages/Order"));
 const Orders = lazy(() => import("./pages/Orders"));

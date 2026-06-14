@@ -46,7 +46,15 @@ export function useSubscription() {
       return data as Subscription | null;
     },
     enabled: !!user,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
+
+  const notExpired = !subscription?.expires_at || new Date(subscription.expires_at) > new Date();
+  const hasActiveSubscription = subscription?.status === 'active' && subscription?.plan_type !== 'trial' && notExpired;
 
   const { data: pendingRequest, isLoading: isLoadingRequest } = useQuery({
     queryKey: ['subscription-requests', user?.id],
@@ -69,12 +77,15 @@ export function useSubscription() {
 
       return data as SubscriptionRequest | null;
     },
-    enabled: !!user,
+    enabled: !!user && !isLoadingSubscription && !hasActiveSubscription,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   // Check expiry: monthly subs expire, lifetime has expires_at = null
-  const notExpired = !subscription?.expires_at || new Date(subscription.expires_at) > new Date();
-  const hasActiveSubscription = subscription?.status === 'active' && subscription?.plan_type !== 'trial' && notExpired;
   const isSubscriptionExpired = subscription?.status === 'expired' || (subscription?.status === 'active' && !notExpired);
   const hasPendingRequest = !!pendingRequest;
   const isTrial = subscription?.plan_type === 'trial' && subscription?.status === 'active';
@@ -88,6 +99,6 @@ export function useSubscription() {
     hasPendingRequest,
     isTrial,
     trialDaysRemaining,
-    isLoading: isLoadingSubscription || isLoadingRequest,
+    isLoading: isLoadingSubscription || (!hasActiveSubscription && isLoadingRequest),
   };
 }

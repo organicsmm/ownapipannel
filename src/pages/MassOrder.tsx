@@ -4,7 +4,6 @@ import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-quer
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +73,9 @@ function extractUrlsFromText(text: string): string[] {
 
 export default function MassOrder() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <Inner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <Inner />
+    </DashboardLayout>
   );
 }
 
@@ -136,6 +133,11 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       return data || [];
     },
     placeholderData: keepPreviousData,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   useEffect(() => {
@@ -856,6 +858,11 @@ function BatchHistory() {
       return data || [];
     },
     placeholderData: keepPreviousData,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   const filtered = useMemo(() => {
@@ -1041,7 +1048,7 @@ function BatchDetailDialog({ batchId, onClose }: { batchId: string | null; onClo
           <div className="flex items-center gap-2 py-6 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
         ) : (
           <div className="space-y-2">
-            {(items || []).map((it: any) => (
+            {(items || []).slice(0, 250).map((it: any) => (
               <div key={it.id} className="border border-border rounded-md p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -1070,6 +1077,11 @@ function BatchDetailDialog({ batchId, onClose }: { batchId: string | null; onClo
                 </div>
               </div>
             ))}
+            {(items || []).length > 250 && (
+              <div className="text-center text-xs text-muted-foreground py-2 border border-dashed border-border rounded-md">
+                +{((items || []).length - 250).toLocaleString()} more hidden for speed · full list CSV download me available hai
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

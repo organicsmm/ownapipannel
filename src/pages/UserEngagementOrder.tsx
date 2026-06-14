@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +19,14 @@ import {
 } from "@/lib/engagement-types";
 import { QuantitySelector } from "@/components/engagement/QuantitySelector";
 import { EngagementTypeCard } from "@/components/engagement/EngagementTypeCard";
-import { LiveGrowthChart } from "@/components/engagement/LiveGrowthChart";
-import { DeliveryPreview } from "@/components/engagement/DeliveryPreview";
 
 
 import { useDebounce } from "@/hooks/useDebounce";
 
 type EngagementConfigs = Record<string, EngagementConfig>;
+
+const LiveGrowthChart = lazy(() => import("@/components/engagement/LiveGrowthChart").then(m => ({ default: m.LiveGrowthChart })));
+const DeliveryPreview = lazy(() => import("@/components/engagement/DeliveryPreview").then(m => ({ default: m.DeliveryPreview })));
 
 const PREFERRED_ORDER: Record<string, number> = {
   views: 1, likes: 2, comments: 3, shares: 4, reposts: 5, saves: 6, followers: 7, subscribers: 8, retweets: 9, watch_hours: 10,
@@ -34,11 +34,9 @@ const PREFERRED_ORDER: Record<string, number> = {
 
 export default function UserEngagementOrder() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <Inner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <Inner />
+    </DashboardLayout>
   );
 }
 
@@ -54,6 +52,7 @@ function Inner() {
   const debouncedBase = useDebounce(baseQuantity, 200);
   const [engagements, setEngagements] = useState<EngagementConfigs>({});
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [showPreviews, setShowPreviews] = useState(false);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
@@ -80,62 +79,6 @@ function Inner() {
   const bundle = useMemo(() => bundles?.find((b: any) => b.id === bundleId), [bundles, bundleId]);
   const platform = (bundle?.platform || "instagram") as 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook';
   const items = bundle?.user_bundle_items || [];
-
-  // Auto-refresh service metadata (min/max/rate) from provider when a bundle is selected
-  // so stale DB values don't block the user (e.g. provider lowered min from 100 to 10).
-  useEffect(() => {
-    if (!bundle || !user) return;
-    const linked = (bundle.user_bundle_items || []).filter(
-      (it: any) => it.provider_service_id && it.user_provider_account_id
-    );
-    if (linked.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const byProvider: Record<string, { ids: string[]; items: any[] }> = {};
-      linked.forEach((it: any) => {
-        const k = it.user_provider_account_id;
-        if (!byProvider[k]) byProvider[k] = { ids: [], items: [] };
-        byProvider[k].ids.push(String(it.provider_service_id));
-        byProvider[k].items.push(it);
-      });
-      let changed = false;
-      for (const [providerId, group] of Object.entries(byProvider)) {
-        if (cancelled) return;
-        try {
-          const { data, error } = await supabase.functions.invoke("user-import-services", {
-            body: { providerAccountId: providerId, service_ids: group.ids, fetch_only: true },
-          });
-          if (error || !(data as any)?.services) continue;
-          const svcMap: Record<string, any> = {};
-          (data as any).services.forEach((s: any) => { svcMap[String(s.id)] = s; });
-          for (const it of group.items) {
-            const fresh = svcMap[String(it.provider_service_id)];
-            if (!fresh) continue;
-            const newMin = Number(fresh.min) || 1;
-            const newMax = Number(fresh.max) || Number(it.max_qty);
-            const newRate = Number(fresh.rate) || Number(it.rate);
-            const newName = String(fresh.name || it.service_name);
-            if (
-              Number(it.min_qty) !== newMin ||
-              Number(it.max_qty) !== newMax ||
-              Number(it.rate) !== newRate ||
-              it.service_name !== newName
-            ) {
-              const { error: upErr } = await supabase
-                .from("user_bundle_items")
-                .update({ min_qty: newMin, max_qty: newMax, rate: newRate, service_name: newName })
-                .eq("id", it.id);
-              if (!upErr) changed = true;
-            }
-          }
-        } catch { /* ignore */ }
-      }
-      if (changed && !cancelled) {
-        qc.invalidateQueries({ queryKey: ["user-bundles-with-items", user.id] });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [bundle?.id, user?.id, qc]);
 
   const activeEngagementTypes = useMemo<EngagementType[]>(() => {
     const types = items
@@ -373,23 +316,27 @@ function Inner() {
         )}
       </div>
 
-      {/* Live Organic Growth Preview - updates with quantity/time changes */}
+      {/* Heavy previews load only when user opens them, keeping order form fast */}
       {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
-        <LiveGrowthChart
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          onRefresh={() => setPreviewRefreshKey(k => k + 1)}
-          platform={platform}
-        />
-      )}
-
-      {/* Per-Type Organic Delivery Preview */}
-      {activeEngagementTypes.length > 0 && Object.values(engagements).some(e => e.enabled) && (
-        <DeliveryPreview
-          engagements={engagements as Record<EngagementType, EngagementConfig>}
-          refreshKey={previewRefreshKey}
-          platform={platform}
-        />
+        showPreviews ? (
+          <Suspense fallback={<div className="py-4 text-sm text-muted-foreground">Loading preview...</div>}>
+            <LiveGrowthChart
+              engagements={engagements as Record<EngagementType, EngagementConfig>}
+              refreshKey={previewRefreshKey}
+              onRefresh={() => setPreviewRefreshKey(k => k + 1)}
+              platform={platform}
+            />
+            <DeliveryPreview
+              engagements={engagements as Record<EngagementType, EngagementConfig>}
+              refreshKey={previewRefreshKey}
+              platform={platform}
+            />
+          </Suspense>
+        ) : (
+          <Button variant="outline" onClick={() => setShowPreviews(true)} className="w-full h-11">
+            Show Delivery Preview
+          </Button>
+        )
       )}
 
 
