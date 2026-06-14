@@ -519,8 +519,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           )}
 
           <div>
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Batch Name (optional)</Label>
-            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="e.g. Diwali Reels Push" className="h-11" />
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Campaign Name (optional)</Label>
+            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="e.g. Diwali Reels Mega Campaign 2026" className="h-11" />
           </div>
         </CardContent>
       </Card>
