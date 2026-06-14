@@ -15,21 +15,13 @@ import {
   ENGAGEMENT_CONFIG,
   DEFAULT_ORGANIC_SETTINGS
 } from "@/lib/engagement-types";
-import {
-  generateOrganicSchedule,
-  formatDuration,
-  PROVIDER_MINIMUMS,
-  PROVIDER_MAXIMUMS,
-  OrganicRunConfig,
-} from "@/lib/organic-algorithm";
-import { ControlPoint, curveToSchedule } from "@/lib/curve-to-schedule";
+import type { ControlPoint } from "@/lib/curve-to-schedule";
 import {
   Eye, Heart, MessageCircle, Bookmark, Share2,
   Clock, Sparkles, AlertTriangle,
   Timer, Shuffle, Flame, Calendar, ChevronDown, ChevronUp, List, Pencil,
   UserPlus, Bell, Repeat, RefreshCw
 } from "lucide-react";
-import { format } from "date-fns";
 
 interface EngagementTypeCardProps {
   type: EngagementType;
@@ -63,6 +55,21 @@ const TIME_PRESETS = [
   { value: 48, label: '48h' },
   { value: -1, label: 'Custom' },
 ];
+
+const PROVIDER_MINIMUMS: Partial<Record<EngagementType, number>> = { views: 100, likes: 10, comments: 5, saves: 10, shares: 10 };
+const PROVIDER_MAXIMUMS: Partial<Record<EngagementType, number>> = { views: 10000000, likes: 1000000, comments: 100000, saves: 500000, shares: 500000 };
+
+const formatDuration = (ms: number) => {
+  const hours = Math.max(1, Math.round(ms / 36e5));
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+};
+
+const formatDateShort = (date: Date, withYear = false) => date.toLocaleString(undefined, {
+  month: "short",
+  day: "numeric",
+  ...(withYear ? { hour: "numeric", minute: "2-digit" } : {}),
+});
 
 export function EngagementTypeCard({
   type,
