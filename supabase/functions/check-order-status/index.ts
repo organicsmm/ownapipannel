@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
     let stillProcessing = 0
     let failed = 0
     const results: any[] = []
+    const touchedItems = new Map<string, string>()
 
     // ============================================
     // STEP 1: Check ENGAGEMENT ORDER runs (via engagement_order_item)
