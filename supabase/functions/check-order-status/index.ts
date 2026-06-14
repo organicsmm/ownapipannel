@@ -156,13 +156,13 @@ Deno.serve(async (req) => {
       .select(`
         *,
         retry_count,
-        engagement_order_item:engagement_order_items(
+        engagement_order_item:engagement_order_items!inner(
           id,
           status,
           engagement_type,
           engagement_order_id,
           service:services(provider_id),
-          engagement_order:engagement_orders(id, status, user_id)
+          engagement_order:engagement_orders!inner(id, status, user_id)
         )
       `)
       // Check ALL of these:
