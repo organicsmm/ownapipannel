@@ -50,16 +50,31 @@ Deno.serve(async (req) => {
 
     // Check if specific run ID was passed (for on-demand check)
     let targetRunId: string | null = null
+    let targetOrderNumbers: number[] = []
+    let targetItemIds: string[] = []
+    let maxRuns = 35
     try {
       const body = await req.json()
       targetRunId = body?.runId || null
+      const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
+      targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
+      maxRuns = Math.max(1, Math.min(80, Number(body?.maxRuns || body?.max_runs || 35)))
     } catch {
       // No body or invalid JSON - check all
+    }
+
+    if (targetOrderNumbers.length > 0) {
+      const { data: targetItems } = await supabase
+        .from('engagement_order_items')
+        .select('id, engagement_order:engagement_orders!inner(order_number)')
+        .in('engagement_order.order_number', targetOrderNumbers)
+      targetItemIds = (targetItems || []).map((item: any) => item.id).filter(Boolean)
     }
 
     console.log(`=== CHECK PROVIDER ORDER STATUS ===`)
     console.log(`Time: ${new Date().toISOString()}`)
     console.log(`Target Run: ${targetRunId || 'ALL STARTED RUNS'}`)
+    console.log(`Target Orders: ${targetOrderNumbers.length ? targetOrderNumbers.join(',') : 'none'}`)
 
     let completed = 0
     let stillProcessing = 0
@@ -76,7 +91,6 @@ Deno.serve(async (req) => {
       .select(`
         *,
         retry_count,
-        provider_account:provider_accounts(id, name, api_key, api_url),
         engagement_order_item:engagement_order_items(
           id,
           status,
@@ -101,6 +115,15 @@ Deno.serve(async (req) => {
 
     if (targetRunId) {
       engagementQuery = engagementQuery.eq('id', targetRunId)
+    } else if (targetItemIds.length > 0) {
+      engagementQuery = engagementQuery
+        .in('engagement_order_item_id', targetItemIds)
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(maxRuns)
+    } else {
+      engagementQuery = engagementQuery
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(maxRuns)
     }
 
     const { data: engagementRuns, error: engagementError } = await engagementQuery
@@ -134,12 +157,7 @@ Deno.serve(async (req) => {
         let apiUrl: string
         let providerName: string
 
-        if (run.provider_account) {
-          // Use the actual admin provider account that placed this order
-          apiKey = run.provider_account.api_key
-          apiUrl = run.provider_account.api_url
-          providerName = run.provider_account.name
-        } else if (run.provider_account_id) {
+        if (run.provider_account_id) {
           // User-API order: provider_account_id points to user_provider_accounts
           const { data: userProv } = await supabase
             .from('user_provider_accounts')
@@ -151,8 +169,19 @@ Deno.serve(async (req) => {
             apiUrl = userProv.api_url
             providerName = userProv.name
           } else {
-            console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found in provider_accounts or user_provider_accounts`)
-            continue
+            // Admin/legacy engagement runs may store an admin provider account id here.
+            const { data: adminProv } = await supabase
+              .from('provider_accounts')
+              .select('id, name, api_key, api_url')
+              .eq('id', run.provider_account_id)
+              .maybeSingle()
+            if (!adminProv) {
+              console.error(`Run ${run.id}: provider_account_id ${run.provider_account_id} not found`)
+              continue
+            }
+            apiKey = adminProv.api_key
+            apiUrl = adminProv.api_url
+            providerName = adminProv.name
           }
         } else {
           // Fallback to default provider (legacy runs without provider_account_id)
@@ -183,11 +212,15 @@ Deno.serve(async (req) => {
         formData.append('action', 'status')
         formData.append('order', run.provider_order_id)
 
+        const ctrl = new AbortController()
+        const timeout = setTimeout(() => ctrl.abort(), 5000)
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString()
+          body: formData.toString(),
+          signal: ctrl.signal
         })
+        clearTimeout(timeout)
 
         const responseText = await response.text()
         console.log(`Status for ${run.engagement_order_item?.engagement_type} order ${run.provider_order_id}: ${responseText}`)
@@ -226,14 +259,19 @@ Deno.serve(async (req) => {
                 if (run.provider_account_id) triedSet.add(run.provider_account_id)
                 const mergedResp = { ...(run.provider_response || {}), tried_providers: Array.from(triedSet) }
                 await supabase.from('organic_run_schedule').update({
-                  status: 'failed',
+                  status: 'pending',
+                  scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                  provider_account_id: null,
+                  provider_account_name: null,
+                  provider_order_id: null,
                   error_message: `Auto-retry: ${result.error}`,
-                  completed_at: new Date().toISOString(),
-                  provider_status: 'error',
+                  completed_at: null,
+                  provider_status: null,
                   last_status_check: new Date().toISOString(),
                   provider_response: mergedResp,
+                  retry_count: currentRetryCount + 1,
                 }).eq('id', run.id)
-                failed++
+                stillProcessing++
               } else {
                 // Max retries reached - mark as permanently failed
                 console.log(`❌ Max retries reached for run, marking as permanently failed`)
@@ -261,12 +299,13 @@ Deno.serve(async (req) => {
 
         const providerStatus = (result.status || '').toLowerCase()
         const startCount = parseInt(result.start_count) || null
-        const remains = parseInt(result.remains) || 0
+        const parsedRemains = parseInt(result.remains)
+        const remains = Number.isNaN(parsedRemains) ? null : parsedRemains
         const charge = parseFloat(result.charge) || null
         
         // Calculate delivery progress
-        const delivered = startCount !== null ? (run.quantity_to_send - remains) : null
-        const progressPercent = run.quantity_to_send > 0 ? ((run.quantity_to_send - remains) / run.quantity_to_send * 100).toFixed(1) : 0
+        const delivered = remains !== null ? Math.max(0, run.quantity_to_send - remains) : null
+        const progressPercent = run.quantity_to_send > 0 && remains !== null ? ((run.quantity_to_send - remains) / run.quantity_to_send * 100).toFixed(1) : 0
 
         console.log(`Provider status: ${providerStatus}, Start: ${startCount}, Remains: ${remains}, Delivered: ${delivered} (${progressPercent}%)`)
         
@@ -287,7 +326,7 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString()
         }
 
-        const deliveredAll = remains === 0 && !['cancelled', 'canceled', 'refunded', 'refund', 'failed', 'error', 'canscelled'].includes(providerStatus)
+        const deliveredAll = remains !== null && remains === 0 && !['cancelled', 'canceled', 'refunded', 'refund', 'failed', 'error', 'canscelled'].includes(providerStatus)
 
         if (providerStatus === 'completed' || providerStatus === 'complete' || providerStatus === 'success' || deliveredAll) {
           const orderStatus = run.engagement_order_item?.engagement_order?.status
@@ -329,7 +368,7 @@ Deno.serve(async (req) => {
           // SCAM GUARD: if provider says "Partial" but delivered 0 (remains == full qty),
           // treat as a failed delivery and retry on a backup provider instead of
           // silently marking it complete.
-          const deliveredQty = run.quantity_to_send - remains
+          const deliveredQty = remains !== null ? run.quantity_to_send - remains : 0
           if (deliveredQty <= 0) {
             const orderStatus = run.engagement_order_item?.engagement_order?.status
             const itemStatus = run.engagement_order_item?.status
@@ -352,11 +391,17 @@ Deno.serve(async (req) => {
               await supabase.from('organic_run_schedule').update({
                 ...trackingUpdate,
                 provider_response: mergedResp,
-                status: 'failed',
-                completed_at: new Date().toISOString(),
-                error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains}/${run.quantity_to_send})`
+                status: 'pending',
+                scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                provider_account_id: null,
+                provider_account_name: null,
+                provider_order_id: null,
+                provider_status: null,
+                completed_at: null,
+                retry_count: currentRetryCount + 1,
+                error_message: `Auto-retry: provider returned Partial with 0 delivered (remains=${remains ?? 'unknown'}/${run.quantity_to_send})`
               }).eq('id', run.id)
-              failed++
+              stillProcessing++
               continue
             }
             // fall through to mark partial-completed if max retries exceeded
@@ -402,11 +447,17 @@ Deno.serve(async (req) => {
               await supabase.from('organic_run_schedule').update({
                 ...trackingUpdate,
                 provider_response: mergedResp,
-                status: 'failed',
-                completed_at: new Date().toISOString(),
+                status: 'pending',
+                scheduled_at: new Date(Date.now() + 30_000 + Math.random() * 90_000).toISOString(),
+                provider_account_id: null,
+                provider_account_name: null,
+                provider_order_id: null,
+                provider_status: null,
+                completed_at: null,
+                retry_count: currentRetryCount + 1,
                 error_message: `Auto-retry: ${providerStatus} by provider`
               }).eq('id', run.id)
-              failed++
+              stillProcessing++
             } else {
               console.log(`❌ Max retries reached for cancelled run`)
               await supabase.from('organic_run_schedule').update({
@@ -462,7 +513,7 @@ Deno.serve(async (req) => {
       }
 
       // Faster processing - reduced delay between checks
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 25))
     }
 
     // ============================================

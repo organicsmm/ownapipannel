@@ -89,7 +89,7 @@ async function recomputeStatuses(itemId: string, engOrderId: string) {
 }
 
 // ===== POLL STARTED RUNS (check real provider status) =====
-async function pollStartedRuns() {
+async function pollStartedRuns(limit = 20) {
   let polled = 0, finished = 0, stillRunning = 0, reFailed = 0;
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
@@ -108,7 +108,7 @@ async function pollStartedRuns() {
     .eq("engagement_order_item.engagement_order.use_user_api", true)
     .or(`last_status_check.is.null,last_status_check.lt.${fiveMinAgo}`)
     .order("last_status_check", { ascending: true, nullsFirst: true })
-    .limit(20);
+    .limit(Math.max(1, Math.min(50, limit)));
 
   for (const run of (startedRuns || [])) {
     const item = (run as any).engagement_order_item;
@@ -139,7 +139,7 @@ async function pollStartedRuns() {
       form.append("order", String(run.provider_order_id));
 
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 6000);
+      const tid = setTimeout(() => ctrl.abort(), 4000);
       const resp = await fetch(acc.api_url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -207,7 +207,7 @@ async function pollStartedRuns() {
       }).eq("id", run.id);
       stillRunning++;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 15));
   }
 
   return { polled, finished, stillRunning, reFailed };
@@ -276,11 +276,14 @@ Deno.serve(async (req) => {
       const eo = it?.engagement_order;
       if (!eo || eo.status === "cancelled") continue;
       await supabase.from("organic_run_schedule").update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        provider_status: "Unknown",
-        provider_remains: 0,
-        error_message: "Provider response lost; counted as delivered to avoid duplicate retry",
+        status: "pending",
+        scheduled_at: new Date(Date.now() + 2 * 60 * 1000 + Math.random() * 2 * 60 * 1000).toISOString(),
+        provider_account_id: null,
+        provider_account_name: null,
+        provider_order_id: null,
+        provider_status: null,
+        provider_remains: null,
+        error_message: "Provider response lost; requeued safely for backup rotation",
         last_status_check: new Date().toISOString(),
       }).eq("id", sr.id);
       await recomputeStatuses(it.id, eo.id);
@@ -288,7 +291,7 @@ Deno.serve(async (req) => {
     }
 
     // 1) POLL existing started runs first — check real provider status
-    const pollStats = await pollStartedRuns();
+    const pollStats = await pollStartedRuns(Number(requestBody?.max_poll || 20));
 
     const nowIso = new Date().toISOString();
     // 2) Pull due pending runs fairly per engagement type.
@@ -306,7 +309,7 @@ Deno.serve(async (req) => {
     }
 
     const runSelect = `
-      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count,
+      id, run_number, scheduled_at, quantity_to_send, engagement_order_item_id, retry_count, provider_response,
       engagement_order_item:engagement_order_items!inner(
         id, engagement_type, quantity, status,
         engagement_order:engagement_orders!inner(id, order_number, link, status, use_user_api, user_id, user_bundle_id, user_provider_account_id, created_at)
@@ -464,6 +467,25 @@ Deno.serve(async (req) => {
         failed++; continue;
       }
 
+      const triedProviders = new Set<string>(
+        Array.isArray((run as any).provider_response?.tried_providers)
+          ? (run as any).provider_response.tried_providers.map(String)
+          : []
+      );
+      if (triedProviders.size > 0) {
+        const remaining = candidates.filter((c) => !triedProviders.has(String(c.provider.id)));
+        if (remaining.length === 0) {
+          await supabase.from("organic_run_schedule").update({
+            status: "failed",
+            completed_at: new Date().toISOString(),
+            error_message: "All backup providers already tried for this run",
+          }).eq("id", run.id);
+          await recomputeStatuses(item.id, eo.id);
+          failed++; continue;
+        }
+        candidates = remaining;
+      }
+
       let success = false;
       let lastErr = "";
       let lastResult: any = null;
@@ -519,7 +541,7 @@ Deno.serve(async (req) => {
           form.append("quantity", String(run.quantity_to_send));
 
           const ctrl = new AbortController();
-          const tid = setTimeout(() => ctrl.abort(), 20000);
+          const tid = setTimeout(() => ctrl.abort(), 12000);
           const resp = await fetch(cand.provider.api_url, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
