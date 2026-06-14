@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Package, Wallet, ListOrdered, Settings,
   LifeBuoy, Shield, LogOut, Rocket, Sparkles, X, ChevronDown, Code2, Brain,
-  KeyRound, Layers, Boxes
+  KeyRound, Layers, Boxes, PackagePlus
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -15,6 +15,7 @@ interface SidebarProps { onClose?: () => void; }
 const userNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW', requiresSub: true },
+  { icon: PackagePlus, label: 'Mass Order', path: '/mass-order', tag: 'NEW', requiresSub: true },
   { icon: Brain, label: 'AI Intelligence', path: '/intelligence' },
   { icon: Sparkles, label: 'Engagement Orders', path: '/engagement-orders' },
   
