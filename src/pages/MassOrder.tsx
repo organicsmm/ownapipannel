@@ -118,6 +118,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; ok: number; fail: number; total: number } | null>(null);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
