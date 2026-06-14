@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
               error_message: 'Provider account missing/deleted; cannot sync provider order',
             }).eq('id', run.id)
             failed++
-            await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+            if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
             continue
           }
         } else {
@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
                   retry_count: 99 // Set high to prevent further retries
                 }).eq('id', run.id)
                 failed++
-                await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+                if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
               }
             }
           } else {
@@ -401,7 +401,7 @@ Deno.serve(async (req) => {
             remains: 0
           })
 
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
 
         } else if (providerStatus === 'partial') {
           // SCAM GUARD: if provider says "Partial" but delivered 0 (remains == full qty),
@@ -461,7 +461,7 @@ Deno.serve(async (req) => {
             delivered: run.quantity_to_send - remains,
             remains: remains
           })
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
 
         } else if (providerStatus === 'cancelled' || providerStatus === 'canceled' || providerStatus === 'refunded' || providerStatus === 'refund' || providerStatus === 'canscelled') {
           const orderStatus = run.engagement_order_item?.engagement_order?.status
@@ -507,7 +507,7 @@ Deno.serve(async (req) => {
                 retry_count: 99
               }).eq('id', run.id)
               failed++
-              await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+              if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
             }
           }
         } else if (deliveredAll) {
@@ -528,7 +528,7 @@ Deno.serve(async (req) => {
             delivered: run.quantity_to_send,
             remains: 0
           })
-          await updateEngagementOrderStatus(supabase, run.engagement_order_item?.engagement_order_id, run.engagement_order_item?.id)
+          if (run.engagement_order_item?.engagement_order_id && run.engagement_order_item?.id) touchedItems.set(run.engagement_order_item.id, run.engagement_order_item.engagement_order_id)
         } else {
           await supabase.from('organic_run_schedule').update(trackingUpdate).eq('id', run.id)
 
