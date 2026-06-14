@@ -183,32 +183,38 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     });
   }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe]);
 
-  function computeRowTotals(r: OrderRow) {
-    const breakdown: { type: EngagementType; qty: number; price: number }[] = [];
-    let totalPrice = 0;
-    let totalQty = 0;
-    activeTypes.forEach((type) => {
-      if (!r.enabledTypes[type]) return;
-      const item = itemByType[type];
-      if (!item) return;
-      const ratio = DEFAULT_RATIOS[type] ?? 100;
-      const isBase = type === "views" || item.is_base;
-      const minQty = Number(item.min_qty || 0) || 1;
-      const raw = isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100));
-      const qty = Math.max(minQty, raw);
-      const rate = Number(item.rate || 0);
-      const price = (qty / 1000) * rate;
-      breakdown.push({ type, qty, price });
-      totalPrice += price;
-      totalQty += qty;
-    });
-    return { breakdown, totalPrice, totalQty };
-  }
+  // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
+  const rowTotalsById = useMemo(() => {
+    const map = new Map<string, { breakdown: { type: EngagementType; qty: number; price: number }[]; totalPrice: number; totalQty: number }>();
+    for (const r of rows) {
+      const breakdown: { type: EngagementType; qty: number; price: number }[] = [];
+      let totalPrice = 0; let totalQty = 0;
+      for (const type of activeTypes) {
+        if (!r.enabledTypes[type]) continue;
+        const item = itemByType[type];
+        if (!item) continue;
+        const ratio = DEFAULT_RATIOS[type] ?? 100;
+        const isBase = type === "views" || item.is_base;
+        const minQty = Number(item.min_qty || 0) || 1;
+        const raw = isBase ? r.baseQuantity : Math.round(r.baseQuantity * (ratio / 100));
+        const qty = Math.max(minQty, raw);
+        const rate = Number(item.rate || 0);
+        const price = (qty / 1000) * rate;
+        breakdown.push({ type, qty, price });
+        totalPrice += price; totalQty += qty;
+      }
+      map.set(r.id, { breakdown, totalPrice, totalQty });
+    }
+    return map;
+  }, [rows, activeTypes, itemByType]);
 
-  const grandTotal = useMemo(
-    () => rows.reduce((s, r) => s + computeRowTotals(r).totalPrice, 0),
-    [rows, activeTypes, itemByType]
-  );
+  const computeRowTotals = useCallback((r: OrderRow) => {
+    return rowTotalsById.get(r.id) ?? { breakdown: [], totalPrice: 0, totalQty: 0 };
+  }, [rowTotalsById]);
+
+  const grandTotal = useMemo(() => {
+    let s = 0; for (const v of rowTotalsById.values()) s += v.totalPrice; return s;
+  }, [rowTotalsById]);
 
   const invalidLines = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
@@ -223,6 +229,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   }, [linksText]);
 
   const validRows = useMemo(() => rows.filter(r => isValidUrl(r.link)), [rows]);
+
 
   const canSubmit = !submitting
     && !!bundle
