@@ -40,6 +40,8 @@ interface OrderRow {
   baseQuantity: number;
   timeLimitHours: number;
   enabledTypes: Record<EngagementType, boolean>;
+  /** Per-type quantity overrides. If set for a type, used instead of ratio-based calc. */
+  qtyOverrides?: Partial<Record<EngagementType, number>>;
   status: "idle" | "submitting" | "success" | "failed";
   message?: string;
   orderNumber?: number;
