@@ -50,16 +50,29 @@ Deno.serve(async (req) => {
 
     // Check if specific run ID was passed (for on-demand check)
     let targetRunId: string | null = null
+    let targetOrderNumbers: number[] = []
+    let targetItemIds: string[] = []
     try {
       const body = await req.json()
       targetRunId = body?.runId || null
+      const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
+      targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
     } catch {
       // No body or invalid JSON - check all
+    }
+
+    if (targetOrderNumbers.length > 0) {
+      const { data: targetItems } = await supabase
+        .from('engagement_order_items')
+        .select('id, engagement_order:engagement_orders!inner(order_number)')
+        .in('engagement_order.order_number', targetOrderNumbers)
+      targetItemIds = (targetItems || []).map((item: any) => item.id).filter(Boolean)
     }
 
     console.log(`=== CHECK PROVIDER ORDER STATUS ===`)
     console.log(`Time: ${new Date().toISOString()}`)
     console.log(`Target Run: ${targetRunId || 'ALL STARTED RUNS'}`)
+    console.log(`Target Orders: ${targetOrderNumbers.length ? targetOrderNumbers.join(',') : 'none'}`)
 
     let completed = 0
     let stillProcessing = 0
@@ -100,6 +113,11 @@ Deno.serve(async (req) => {
 
     if (targetRunId) {
       engagementQuery = engagementQuery.eq('id', targetRunId)
+    } else if (targetItemIds.length > 0) {
+      engagementQuery = engagementQuery
+        .in('engagement_order_item_id', targetItemIds)
+        .order('last_status_check', { ascending: true, nullsFirst: true })
+        .limit(250)
     } else {
       engagementQuery = engagementQuery
         .order('last_status_check', { ascending: true, nullsFirst: true })
