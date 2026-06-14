@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
       engagementQuery = engagementQuery
         .in('engagement_order_item_id', targetItemIds)
         .order('last_status_check', { ascending: true, nullsFirst: true })
-        .limit(250)
+        .limit(80)
     } else {
       engagementQuery = engagementQuery
         .order('last_status_check', { ascending: true, nullsFirst: true })
