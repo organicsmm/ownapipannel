@@ -594,6 +594,28 @@ Deno.serve(async (req) => {
       await updateEngagementOrderStatus(supabase, orderId, itemId)
     }
 
+    const depth = Number(requestBody?.depth || 0)
+    if (!targetRunId && engagementRuns && engagementRuns.length >= maxRuns && depth < 6) {
+      const nextBody = { ...requestBody, background: true, depth: depth + 1, maxRuns }
+      const triggerNext = async () => {
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-order-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify(nextBody),
+          })
+        } catch (e) { console.error('status checker chain failed:', e) }
+      }
+      if (typeof (globalThis as any).EdgeRuntime?.waitUntil === 'function') {
+        (globalThis as any).EdgeRuntime.waitUntil(triggerNext())
+      } else {
+        triggerNext()
+      }
+    }
+
     // ============================================
     // STEP 2: Check LEGACY ORDER runs (via order_id)
     // ============================================
