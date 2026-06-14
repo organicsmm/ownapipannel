@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SubscriptionRequestDialog } from './SubscriptionRequestDialog';
 import { 
   Lock, 
   Zap, 
@@ -19,6 +18,8 @@ import {
 interface SubscriptionGuardProps {
   children: React.ReactNode;
 }
+
+const SubscriptionRequestDialog = lazy(() => import('./SubscriptionRequestDialog').then(m => ({ default: m.SubscriptionRequestDialog })));
 
 export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
   const { hasActiveSubscription, hasPendingRequest, isLoading } = useSubscription();
@@ -169,11 +170,15 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
         </CardContent>
       </Card>
 
-      <SubscriptionRequestDialog 
-        open={showDialog}
-        onOpenChange={setShowDialog}
-        planType={selectedPlan}
-      />
+      {showDialog && (
+        <Suspense fallback={null}>
+          <SubscriptionRequestDialog 
+            open={showDialog}
+            onOpenChange={setShowDialog}
+            planType={selectedPlan}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
