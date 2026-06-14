@@ -84,13 +84,13 @@ Deno.serve(async (req) => {
     let targetRunId: string | null = null
     let targetOrderNumbers: number[] = []
     let targetItemIds: string[] = []
-    let maxRuns = 60
+    let maxRuns = 400
     try {
       const body = await req.json()
       targetRunId = body?.runId || null
       const rawOrders = Array.isArray(body?.orders) ? body.orders : [body?.orderNumber, body?.order_number].filter(Boolean)
       targetOrderNumbers = rawOrders.map((n: any) => Number(n)).filter(Number.isFinite)
-      maxRuns = Math.max(1, Math.min(150, Number(body?.maxRuns || body?.max_runs || 60)))
+      maxRuns = Math.max(1, Math.min(500, Number(body?.maxRuns || body?.max_runs || 400)))
     } catch {
       // No body or invalid JSON - check all
     }
