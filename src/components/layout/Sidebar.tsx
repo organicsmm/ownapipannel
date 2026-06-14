@@ -15,6 +15,7 @@ interface SidebarProps { onClose?: () => void; }
 const userNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: Rocket, label: 'Full Engagement', path: '/engagement-order', tag: 'NEW', requiresSub: true },
+  { icon: PackagePlus, label: 'Mass Order', path: '/mass-order', tag: 'NEW', requiresSub: true },
   { icon: Brain, label: 'AI Intelligence', path: '/intelligence' },
   { icon: Sparkles, label: 'Engagement Orders', path: '/engagement-orders' },
   
