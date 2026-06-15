@@ -649,12 +649,6 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           </p>
         </CardContent>
       </Card>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            Defaults sirf naye links par apply hote hain. Existing rows ko edit karke per-link override karo.
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Preview cards — capped at 200 to keep DOM light for 1000+ link batches */}
       {rows.length > 0 && (() => {
