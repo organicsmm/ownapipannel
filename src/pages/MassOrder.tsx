@@ -579,14 +579,43 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Default Timeframe</Label>
-              <Select value={String(defaultTimeframe)} onValueChange={(v) => setDefaultTimeframe(Number(v))}>
-                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIMEFRAMES.map(tf => (
-                    <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {(() => {
+                const isPreset = TIMEFRAMES.some(tf => tf.value === defaultTimeframe);
+                const selectVal = isPreset ? String(defaultTimeframe) : "custom";
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectVal}
+                      onValueChange={(v) => {
+                        if (v === "custom") {
+                          setDefaultTimeframe(defaultTimeframe && !TIMEFRAMES.some(tf => tf.value === defaultTimeframe) ? defaultTimeframe : 1);
+                        } else {
+                          setDefaultTimeframe(Number(v));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIMEFRAMES.map(tf => (
+                          <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom (hours)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {selectVal === "custom" && (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={720}
+                        placeholder="Hours (e.g. 48)"
+                        value={defaultTimeframe || ""}
+                        onChange={(e) => setDefaultTimeframe(Math.max(1, Number(e.target.value) || 1))}
+                        className="h-11 font-semibold"
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground">
