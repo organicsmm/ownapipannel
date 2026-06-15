@@ -148,6 +148,9 @@ export default function EngagementOrders() {
     return null;
   }
 
+  const visibleIds = (filteredOrders || []).map((o: any) => o.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -157,16 +160,51 @@ export default function EngagementOrders() {
             <h1 className="text-2xl font-bold flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" /> Engagement Orders</h1>
             <p className="text-muted-foreground">Track your full engagement deliveries in real-time</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
+            {!selectMode ? (
+              <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Select
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={clearSelection}>
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+            )}
             <Button onClick={() => navigate('/engagement-order')}>
               + New Order
             </Button>
           </div>
         </div>
+
+        {/* Selection toolbar */}
+        {selectMode && (
+          <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border bg-secondary/50">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={allVisibleSelected}
+                onCheckedChange={(c) => c ? selectAllVisible(visibleIds) : setSelectedIds(new Set())}
+              />
+              <span className="text-sm">
+                {selectedIds.size} selected
+              </span>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={selectedIds.size === 0 || deleting}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete ({selectedIds.size})
+            </Button>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative">
@@ -214,14 +252,50 @@ export default function EngagementOrders() {
         ) : (
           <div className="space-y-4">
             {filteredOrders?.map((order) => (
-              <OrderCard key={order.id} order={order} onClick={() => navigate(`/engagement-orders/${order.order_number}`)} />
+              <OrderCard
+                key={order.id}
+                order={order}
+                selectMode={selectMode}
+                selected={selectedIds.has(order.id)}
+                onToggleSelect={() => toggleSelect(order.id)}
+                onClick={() => {
+                  if (selectMode) {
+                    toggleSelect(order.id);
+                  } else {
+                    navigate(`/engagement-orders/${order.order_number}`);
+                  }
+                }}
+              />
             ))}
           </div>
         )}
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} order{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selected orders cancel ho jayenge — pending runs providers ke pass nahi jayenge aur orders aapki list se permanently delete ho jayenge. Ye action undo nahi ho sakta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Yes, delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
+
 
 function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
   const { formatPrice } = useCurrency();
