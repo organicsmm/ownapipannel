@@ -74,6 +74,8 @@ export default function EngagementOrders() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
+
 
   // Fast aggregated load — server-side summary RPC (no nested run fetches)
   const { data: orders, refetch } = useQuery({
