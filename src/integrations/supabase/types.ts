@@ -1655,6 +1655,10 @@ export type Database = {
         Args: { _max_age_minutes?: number }
         Returns: Json
       }
+      user_cancel_and_delete_engagement_orders: {
+        Args: { _order_ids: string[] }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
