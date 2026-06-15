@@ -930,9 +930,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 function BatchHistory() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [openBatchId, setOpenBatchId] = useState<string | null>(null);
+  const [deleteBatchId, setDeleteBatchId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { data: batches, isLoading, refetch } = useQuery({
     queryKey: ["mass-batches", user?.id],
