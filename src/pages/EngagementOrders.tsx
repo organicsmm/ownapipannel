@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,8 @@ export default function EngagementOrders() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
+
 
   // Fast aggregated load — server-side summary RPC (no nested run fetches)
   const { data: orders, refetch } = useQuery({
@@ -89,13 +92,21 @@ export default function EngagementOrders() {
     refetchInterval: 15000,
   });
 
-  // Realtime: auto-refresh on any change to this user's orders / items
+  // Realtime: only own orders. engagement_order_items has no user_id column,
+  // so filter client-side by matching engagement_order_id against cached user orders.
   useEffect(() => {
     if (!user) return;
     let timer: any;
     const debouncedRefetch = () => {
       clearTimeout(timer);
       timer = setTimeout(() => refetch(), 400);
+    };
+    const isOwnItem = (payload: any) => {
+      const row = payload?.new ?? payload?.old ?? {};
+      const orderId = row.engagement_order_id;
+      if (!orderId) return false;
+      const cached = queryClient.getQueryData<any[]>(['engagement-orders', user.id]);
+      return !!cached?.some(o => o.id === orderId);
     };
     const channel = supabase
       .channel(`engagement-orders-${user.id}`)
@@ -105,13 +116,15 @@ export default function EngagementOrders() {
       }, debouncedRefetch)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'engagement_order_items',
-      }, debouncedRefetch)
+      }, (payload) => { if (isOwnItem(payload)) debouncedRefetch(); })
       .subscribe();
     return () => {
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetch]);
+  }, [user?.id, refetch, queryClient]);
+
+
 
 
   const toggleSelect = (id: string) => {
