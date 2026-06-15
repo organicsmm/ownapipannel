@@ -347,14 +347,28 @@ Deno.serve(async (req) => {
       const minBatch = Math.max(providerMin, effectiveMinBatch);
       const maxBatch = effectiveMaxBatch;
 
-      // Per-type start offset: views first, others delayed
+      // Per-type start offset: views first, others delayed.
+      // When user picked a custom timeframe, use a real fraction of the window
+      // instead of 0-2 min so delivery actually spreads — not instant.
       const delayRange = TYPE_START_DELAY_MIN[bi.engagement_type] || TYPE_START_DELAY_MIN.generic;
-      const typeStartOffsetMin = ri(delayRange[0], delayRange[1]) + Math.random();
+      let typeStartOffsetMin = ri(delayRange[0], delayRange[1]) + Math.random();
+      if (time_limit_hours && time_limit_hours > 0) {
+        const totalMinutes = time_limit_hours * 60;
+        if (targetRuns <= 1) {
+          // Single run → schedule it at a random point inside the user's window
+          // (between 20% and 80% of the window) so it isn't an instant dump.
+          typeStartOffsetMin = totalMinutes * (0.2 + Math.random() * 0.6);
+        } else {
+          // Multiple runs → small random jitter (max 1 interval) so cadence stays organic
+          typeStartOffsetMin = Math.random() * intervalMinutes * 0.6;
+        }
+      }
 
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + typeStartOffsetMin * 60 * 1000);
       const qtyPlan = buildUniqueQuantities(quantity, minBatch, maxBatch, targetRuns);
+
 
       // Track used quantities so no two runs share the same number per engagement type
       const usedQtys = new Set<number>();
