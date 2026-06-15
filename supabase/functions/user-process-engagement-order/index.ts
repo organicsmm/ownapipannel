@@ -297,17 +297,30 @@ Deno.serve(async (req) => {
       if (time_limit_hours && time_limit_hours > 0) {
         const totalMinutes = time_limit_hours * 60;
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
+        // How many runs are actually possible without going below provider minimum
+        const maxSplitByMin = Math.max(1, Math.floor(quantity / Math.max(1, providerMin)));
         const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
         const idealRuns = Math.max(1, Math.floor(totalMinutes / Math.max(MIN_INTERVAL, c.baseInterval / 2)));
-        if (runsAtBaseBatch <= idealRuns) {
-          targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
+        // Always try to split into at least 2 runs if quantity allows it, so the
+        // chosen timeframe actually spreads delivery — never dump everything instantly.
+        const desired = Math.min(
+          maxSplitByMin,
+          maxRunsByTime,
+          Math.max(runsAtBaseBatch, Math.min(idealRuns, c.maxRuns))
+        );
+        if (runsAtBaseBatch <= idealRuns && maxSplitByMin >= 2) {
+          targetRuns = Math.max(2, Math.max(c.minRuns, Math.min(c.maxRuns, desired)));
+        } else if (runsAtBaseBatch <= idealRuns) {
+          // qty too small to split → single run, but we'll schedule it inside the window below
+          targetRuns = 1;
         } else {
-          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, maxRunsByTime));
+          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, Math.min(maxRunsByTime, maxSplitByMin)));
           const avgRequired = quantity / targetRuns;
           effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
           effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
         }
-        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / targetRuns);
+        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / Math.max(1, targetRuns));
+
       } else if (is_organic_mode) {
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
         if (runsAtBaseBatch <= c.maxRuns) {
@@ -334,14 +347,28 @@ Deno.serve(async (req) => {
       const minBatch = Math.max(providerMin, effectiveMinBatch);
       const maxBatch = effectiveMaxBatch;
 
-      // Per-type start offset: views first, others delayed
+      // Per-type start offset: views first, others delayed.
+      // When user picked a custom timeframe, use a real fraction of the window
+      // instead of 0-2 min so delivery actually spreads — not instant.
       const delayRange = TYPE_START_DELAY_MIN[bi.engagement_type] || TYPE_START_DELAY_MIN.generic;
-      const typeStartOffsetMin = ri(delayRange[0], delayRange[1]) + Math.random();
+      let typeStartOffsetMin = ri(delayRange[0], delayRange[1]) + Math.random();
+      if (time_limit_hours && time_limit_hours > 0) {
+        const totalMinutes = time_limit_hours * 60;
+        if (targetRuns <= 1) {
+          // Single run → schedule it at a random point inside the user's window
+          // (between 20% and 80% of the window) so it isn't an instant dump.
+          typeStartOffsetMin = totalMinutes * (0.2 + Math.random() * 0.6);
+        } else {
+          // Multiple runs → small random jitter (max 1 interval) so cadence stays organic
+          typeStartOffsetMin = Math.random() * intervalMinutes * 0.6;
+        }
+      }
 
       const entries: any[] = [];
       let remaining = quantity;
       let currentTime = new Date(startTime.getTime() + typeStartOffsetMin * 60 * 1000);
       const qtyPlan = buildUniqueQuantities(quantity, minBatch, maxBatch, targetRuns);
+
 
       // Track used quantities so no two runs share the same number per engagement type
       const usedQtys = new Set<number>();
