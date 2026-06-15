@@ -1155,6 +1155,14 @@ function BatchHistory() {
                     <Button variant="outline" size="sm" onClick={() => downloadCSV(b.id, b.name || b.id)}>
                       <Download className="w-3.5 h-3.5 mr-1" /> CSV
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => setDeleteBatchId(b.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1164,6 +1172,28 @@ function BatchHistory() {
       )}
 
       <BatchDetailDialog batchId={openBatchId} onClose={() => setOpenBatchId(null)} />
+
+      <AlertDialog open={!!deleteBatchId} onOpenChange={(o) => !o && !deleting && setDeleteBatchId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Batch ke saare engagement orders cancel honge, pending runs providers ke pass nahi jayenge,
+              aur batch + orders permanently DB se delete ho jayenge. Ye action undo nahi ho sakta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => { e.preventDefault(); if (deleteBatchId) deleteBatch(deleteBatchId); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Deleting...</> : "Yes, delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
