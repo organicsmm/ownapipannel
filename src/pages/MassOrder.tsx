@@ -238,12 +238,24 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   const validRows = useMemo(() => rows.filter(r => isValidUrl(r.link)), [rows]);
 
+  // Timeframe validation: 0 = Auto (smart), else must be integer 1-720 hours (30 days max)
+  const isValidTimeframe = (h: number) =>
+    Number.isInteger(h) && (h === 0 || (h >= 1 && h <= 720));
+  const TIMEFRAME_ERR = "Custom hours must be a whole number between 1 and 720 (30 days)";
+
+  const defaultTimeframeError = isValidTimeframe(defaultTimeframe) ? null : TIMEFRAME_ERR;
+  const invalidTimeframeRowCount = useMemo(
+    () => validRows.filter(r => !isValidTimeframe(r.timeLimitHours)).length,
+    [validRows]
+  );
 
   const canSubmit = !submitting
     && !!bundle
     && activeTypes.length > 0
     && validRows.length > 0
-    && defaultBaseQty > 0;
+    && defaultBaseQty > 0
+    && !defaultTimeframeError
+    && invalidTimeframeRowCount === 0;
 
   const removeRow = useCallback((id: string) => {
     const row = rows.find(r => r.id === id);
