@@ -615,20 +615,40 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                       </SelectContent>
                     </Select>
                     {selectVal === "custom" && (
-                      <Input
-                        type="number"
-                        min={1}
-                        max={720}
-                        placeholder="Hours (e.g. 48)"
-                        value={defaultTimeframe || ""}
-                        onChange={(e) => setDefaultTimeframe(Math.max(1, Number(e.target.value) || 1))}
-                        className="h-11 font-semibold"
-                      />
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={720}
+                          step={1}
+                          placeholder="Hours (1–720)"
+                          value={defaultTimeframe || ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === "") { setDefaultTimeframe(0); return; }
+                            const n = Number(raw);
+                            setDefaultTimeframe(Number.isFinite(n) ? Math.floor(n) : 0);
+                          }}
+                          aria-invalid={!!defaultTimeframeError}
+                          className={`h-11 font-semibold ${defaultTimeframeError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                        />
+                        {defaultTimeframeError ? (
+                          <p className="text-[11px] text-destructive">{defaultTimeframeError}</p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">Allowed: 1 hour – 720 hours (30 days)</p>
+                        )}
+                      </>
                     )}
                   </div>
                 );
               })()}
             </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Defaults sirf naye links par apply hote hain. Existing rows ko edit karke per-link override karo.
+          </p>
+        </CardContent>
+      </Card>
           </div>
           <p className="text-[11px] text-muted-foreground">
             Defaults sirf naye links par apply hote hain. Existing rows ko edit karke per-link override karo.
