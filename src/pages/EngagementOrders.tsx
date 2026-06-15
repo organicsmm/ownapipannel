@@ -92,13 +92,21 @@ export default function EngagementOrders() {
     refetchInterval: 15000,
   });
 
-  // Realtime: auto-refresh on any change to this user's orders / items
+  // Realtime: only own orders. engagement_order_items has no user_id column,
+  // so filter client-side by matching engagement_order_id against cached user orders.
   useEffect(() => {
     if (!user) return;
     let timer: any;
     const debouncedRefetch = () => {
       clearTimeout(timer);
       timer = setTimeout(() => refetch(), 400);
+    };
+    const isOwnItem = (payload: any) => {
+      const row = payload?.new ?? payload?.old ?? {};
+      const orderId = row.engagement_order_id;
+      if (!orderId) return false;
+      const cached = queryClient.getQueryData<any[]>(['engagement-orders', user.id]);
+      return !!cached?.some(o => o.id === orderId);
     };
     const channel = supabase
       .channel(`engagement-orders-${user.id}`)
@@ -108,13 +116,15 @@ export default function EngagementOrders() {
       }, debouncedRefetch)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'engagement_order_items',
-      }, debouncedRefetch)
+      }, (payload) => { if (isOwnItem(payload)) debouncedRefetch(); })
       .subscribe();
     return () => {
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetch]);
+  }, [user?.id, refetch, queryClient]);
+
+
 
 
   const toggleSelect = (id: string) => {
