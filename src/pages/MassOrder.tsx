@@ -297,7 +297,20 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   };
 
   async function handleSubmitAll() {
-    if (!canSubmit || !bundle || !user) return;
+    if (submitting || !bundle || !user) return;
+    if (defaultTimeframeError) {
+      toast({ title: "Invalid default timeframe", description: TIMEFRAME_ERR, variant: "destructive" });
+      return;
+    }
+    if (invalidTimeframeRowCount > 0) {
+      toast({
+        title: `${invalidTimeframeRowCount} link(s) ka timeframe galat hai`,
+        description: TIMEFRAME_ERR + ". Edit karke fix karo.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!canSubmit) return;
     setSubmitting(true);
     setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
 
