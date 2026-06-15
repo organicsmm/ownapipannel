@@ -68,6 +68,10 @@ export default function EngagementOrders() {
   const { user, isLoading: authLoading } = useAuth();
   const { formatPrice } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Fast aggregated load — server-side summary RPC (no nested run fetches)
   const { data: orders, refetch } = useQuery({
@@ -83,6 +87,44 @@ export default function EngagementOrders() {
     refetchOnWindowFocus: false,
     refetchInterval: 15000,
   });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+
+  const selectAllVisible = (ids: string[]) => {
+    setSelectedIds(new Set(ids));
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.rpc('user_cancel_and_delete_engagement_orders' as any, {
+        _order_ids: Array.from(selectedIds),
+      });
+      if (error) throw error;
+      const count = (data as any)?.deleted_orders ?? selectedIds.size;
+      toast.success(`${count} order${count !== 1 ? 's' : ''} cancelled & deleted`);
+      clearSelection();
+      setConfirmOpen(false);
+      await refetch();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to delete orders');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
 
   // Filter orders based on search query
   const filteredOrders = useMemo(() => {
