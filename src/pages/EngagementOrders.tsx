@@ -10,6 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { 
   Loader2, 
@@ -29,8 +41,10 @@ import {
   Timer,
   Search,
   X,
-  BarChart3
+  BarChart3,
+  Trash2
 } from "lucide-react";
+
 
 const ENGAGEMENT_ICONS = {
   views: Eye,
