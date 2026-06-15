@@ -1017,6 +1017,58 @@ function BatchHistory() {
     URL.revokeObjectURL(url);
   }
 
+  async function deleteBatch(batchId: string) {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      // 1. Get all engagement_order_ids linked to this batch
+      const { data: items, error: itemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .select("engagement_order_id")
+        .eq("batch_id", batchId)
+        .eq("user_id", user.id);
+      if (itemsErr) throw itemsErr;
+
+      const orderIds = (items || [])
+        .map((i: any) => i.engagement_order_id)
+        .filter((x: any) => !!x);
+
+      // 2. Cancel + hard-delete linked engagement orders (runs/items/orders) via RPC
+      if (orderIds.length > 0) {
+        const { error: rpcErr } = await supabase.rpc(
+          'user_cancel_and_delete_engagement_orders' as any,
+          { _order_ids: orderIds }
+        );
+        if (rpcErr) throw rpcErr;
+      }
+
+      // 3. Delete batch items
+      const { error: delItemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .delete()
+        .eq("batch_id", batchId)
+        .eq("user_id", user.id);
+      if (delItemsErr) throw delItemsErr;
+
+      // 4. Delete batch row
+      const { error: delBatchErr } = await supabase
+        .from("mass_order_batches")
+        .delete()
+        .eq("id", batchId)
+        .eq("user_id", user.id);
+      if (delBatchErr) throw delBatchErr;
+
+      toast({ title: "Batch deleted", description: `${orderIds.length} order(s) cancelled & removed from DB` });
+      qc.invalidateQueries({ queryKey: ["mass-batches"] });
+      qc.invalidateQueries({ queryKey: ["user-engagement-orders"] });
+      setDeleteBatchId(null);
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Stats */}
