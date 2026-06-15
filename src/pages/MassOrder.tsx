@@ -238,12 +238,24 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   const validRows = useMemo(() => rows.filter(r => isValidUrl(r.link)), [rows]);
 
+  // Timeframe validation: 0 = Auto (smart), else must be integer 1-720 hours (30 days max)
+  const isValidTimeframe = (h: number) =>
+    Number.isInteger(h) && (h === 0 || (h >= 1 && h <= 720));
+  const TIMEFRAME_ERR = "Custom hours must be a whole number between 1 and 720 (30 days)";
+
+  const defaultTimeframeError = isValidTimeframe(defaultTimeframe) ? null : TIMEFRAME_ERR;
+  const invalidTimeframeRowCount = useMemo(
+    () => validRows.filter(r => !isValidTimeframe(r.timeLimitHours)).length,
+    [validRows]
+  );
 
   const canSubmit = !submitting
     && !!bundle
     && activeTypes.length > 0
     && validRows.length > 0
-    && defaultBaseQty > 0;
+    && defaultBaseQty > 0
+    && !defaultTimeframeError
+    && invalidTimeframeRowCount === 0;
 
   const removeRow = useCallback((id: string) => {
     const row = rows.find(r => r.id === id);
@@ -285,7 +297,20 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   };
 
   async function handleSubmitAll() {
-    if (!canSubmit || !bundle || !user) return;
+    if (submitting || !bundle || !user) return;
+    if (defaultTimeframeError) {
+      toast({ title: "Invalid default timeframe", description: TIMEFRAME_ERR, variant: "destructive" });
+      return;
+    }
+    if (invalidTimeframeRowCount > 0) {
+      toast({
+        title: `${invalidTimeframeRowCount} link(s) ka timeframe galat hai`,
+        description: TIMEFRAME_ERR + ". Edit karke fix karo.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!canSubmit) return;
     setSubmitting(true);
     setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
 
@@ -603,15 +628,29 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                       </SelectContent>
                     </Select>
                     {selectVal === "custom" && (
-                      <Input
-                        type="number"
-                        min={1}
-                        max={720}
-                        placeholder="Hours (e.g. 48)"
-                        value={defaultTimeframe || ""}
-                        onChange={(e) => setDefaultTimeframe(Math.max(1, Number(e.target.value) || 1))}
-                        className="h-11 font-semibold"
-                      />
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={720}
+                          step={1}
+                          placeholder="Hours (1–720)"
+                          value={defaultTimeframe || ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === "") { setDefaultTimeframe(0); return; }
+                            const n = Number(raw);
+                            setDefaultTimeframe(Number.isFinite(n) ? Math.floor(n) : 0);
+                          }}
+                          aria-invalid={!!defaultTimeframeError}
+                          className={`h-11 font-semibold ${defaultTimeframeError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                        />
+                        {defaultTimeframeError ? (
+                          <p className="text-[11px] text-destructive">{defaultTimeframeError}</p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">Allowed: 1 hour – 720 hours (30 days)</p>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -674,8 +713,9 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                         ))}
                       </div>
                       <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
-                        <span className="text-muted-foreground">
-                          ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label || `${r.timeLimitHours}h`}
+                        <span className={isValidTimeframe(r.timeLimitHours) ? "text-muted-foreground" : "text-destructive font-semibold"}>
+                          ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label
+                              || (isValidTimeframe(r.timeLimitHours) ? `${r.timeLimitHours}h` : `${r.timeLimitHours}h · invalid`)}
                         </span>
                         <span className="font-bold">₹{t.totalPrice.toFixed(2)}</span>
                       </div>
@@ -770,17 +810,34 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                             <SelectItem value="custom">Custom (hours)</SelectItem>
                           </SelectContent>
                         </Select>
-                        {selectVal === "custom" && (
-                          <Input
-                            type="number"
-                            min={1}
-                            max={720}
-                            placeholder="Hours (e.g. 48)"
-                            value={editingRow.timeLimitHours || ""}
-                            onChange={(e) => updateRow(editingRow.id, { timeLimitHours: Math.max(1, Number(e.target.value) || 1) })}
-                            className="h-10 font-semibold"
-                          />
-                        )}
+                        {selectVal === "custom" && (() => {
+                          const rowErr = isValidTimeframe(editingRow.timeLimitHours) ? null : TIMEFRAME_ERR;
+                          return (
+                            <>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={720}
+                                step={1}
+                                placeholder="Hours (1–720)"
+                                value={editingRow.timeLimitHours || ""}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === "") { updateRow(editingRow.id, { timeLimitHours: 0 }); return; }
+                                  const n = Number(raw);
+                                  updateRow(editingRow.id, { timeLimitHours: Number.isFinite(n) ? Math.floor(n) : 0 });
+                                }}
+                                aria-invalid={!!rowErr}
+                                className={`h-10 font-semibold ${rowErr ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                              />
+                              {rowErr ? (
+                                <p className="text-[11px] text-destructive">{rowErr}</p>
+                              ) : (
+                                <p className="text-[11px] text-muted-foreground">Allowed: 1–720 hours (30 days max)</p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
