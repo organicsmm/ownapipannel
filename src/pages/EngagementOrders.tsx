@@ -89,6 +89,31 @@ export default function EngagementOrders() {
     refetchInterval: 15000,
   });
 
+  // Realtime: auto-refresh on any change to this user's orders / items
+  useEffect(() => {
+    if (!user) return;
+    let timer: any;
+    const debouncedRefetch = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => refetch(), 400);
+    };
+    const channel = supabase
+      .channel(`engagement-orders-${user.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'engagement_orders',
+        filter: `user_id=eq.${user.id}`,
+      }, debouncedRefetch)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'engagement_order_items',
+      }, debouncedRefetch)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetch]);
+
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
