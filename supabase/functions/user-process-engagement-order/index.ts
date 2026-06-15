@@ -297,17 +297,30 @@ Deno.serve(async (req) => {
       if (time_limit_hours && time_limit_hours > 0) {
         const totalMinutes = time_limit_hours * 60;
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
+        // How many runs are actually possible without going below provider minimum
+        const maxSplitByMin = Math.max(1, Math.floor(quantity / Math.max(1, providerMin)));
         const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
         const idealRuns = Math.max(1, Math.floor(totalMinutes / Math.max(MIN_INTERVAL, c.baseInterval / 2)));
-        if (runsAtBaseBatch <= idealRuns) {
-          targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
+        // Always try to split into at least 2 runs if quantity allows it, so the
+        // chosen timeframe actually spreads delivery — never dump everything instantly.
+        const desired = Math.min(
+          maxSplitByMin,
+          maxRunsByTime,
+          Math.max(runsAtBaseBatch, Math.min(idealRuns, c.maxRuns))
+        );
+        if (runsAtBaseBatch <= idealRuns && maxSplitByMin >= 2) {
+          targetRuns = Math.max(2, Math.max(c.minRuns, Math.min(c.maxRuns, desired)));
+        } else if (runsAtBaseBatch <= idealRuns) {
+          // qty too small to split → single run, but we'll schedule it inside the window below
+          targetRuns = 1;
         } else {
-          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, maxRunsByTime));
+          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, Math.min(maxRunsByTime, maxSplitByMin)));
           const avgRequired = quantity / targetRuns;
           effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
           effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
         }
-        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / targetRuns);
+        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / Math.max(1, targetRuns));
+
       } else if (is_organic_mode) {
         const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
         if (runsAtBaseBatch <= c.maxRuns) {
