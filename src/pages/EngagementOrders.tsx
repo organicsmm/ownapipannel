@@ -297,7 +297,19 @@ export default function EngagementOrders() {
 }
 
 
-function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
+function OrderCard({
+  order,
+  onClick,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
+}: {
+  order: any;
+  onClick: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+}) {
   const { formatPrice } = useCurrency();
   const StatusIcon = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.icon || Clock;
   const statusColor = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG]?.color || "";
@@ -319,13 +331,19 @@ function OrderCard({ order, onClick }: { order: any; onClick: () => void }) {
   const nextRun = nextPendingAt ? { scheduled_at: nextPendingAt } : null;
 
   return (
-    <Card 
-      className="glass-card overflow-hidden cursor-pointer hover:border-muted-foreground/50 transition-all"
+    <Card
+      className={`glass-card overflow-hidden cursor-pointer hover:border-muted-foreground/50 transition-all ${selected ? 'ring-2 ring-primary' : ''}`}
       onClick={onClick}
     >
       <CardHeader className="pb-3 border-b border-border">
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          {selectMode && (
+            <div className="pt-1" onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}>
+              <Checkbox checked={selected} onCheckedChange={() => onToggleSelect?.()} />
+            </div>
+          )}
+          <div className="flex-1">
+
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <CardTitle className="text-lg text-foreground">Order #{order.order_number}</CardTitle>
               <Badge className={statusColor}>
