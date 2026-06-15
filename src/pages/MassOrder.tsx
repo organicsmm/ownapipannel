@@ -713,8 +713,9 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                         ))}
                       </div>
                       <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
-                        <span className="text-muted-foreground">
-                          ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label || `${r.timeLimitHours}h`}
+                        <span className={isValidTimeframe(r.timeLimitHours) ? "text-muted-foreground" : "text-destructive font-semibold"}>
+                          ⏱ {TIMEFRAMES.find(tf => tf.value === r.timeLimitHours)?.label
+                              || (isValidTimeframe(r.timeLimitHours) ? `${r.timeLimitHours}h` : `${r.timeLimitHours}h · invalid`)}
                         </span>
                         <span className="font-bold">₹{t.totalPrice.toFixed(2)}</span>
                       </div>
