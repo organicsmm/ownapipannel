@@ -11,6 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -926,9 +930,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 function BatchHistory() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [openBatchId, setOpenBatchId] = useState<string | null>(null);
+  const [deleteBatchId, setDeleteBatchId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { data: batches, isLoading, refetch } = useQuery({
     queryKey: ["mass-batches", user?.id],
@@ -1008,6 +1015,58 @@ function BatchHistory() {
     a.download = `${batchName.replace(/[^a-z0-9-_]+/gi, "_")}_${batchId.slice(0, 8)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function deleteBatch(batchId: string) {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      // 1. Get all engagement_order_ids linked to this batch
+      const { data: items, error: itemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .select("engagement_order_id")
+        .eq("batch_id", batchId)
+        .eq("user_id", user.id);
+      if (itemsErr) throw itemsErr;
+
+      const orderIds = (items || [])
+        .map((i: any) => i.engagement_order_id)
+        .filter((x: any) => !!x);
+
+      // 2. Cancel + hard-delete linked engagement orders (runs/items/orders) via RPC
+      if (orderIds.length > 0) {
+        const { error: rpcErr } = await supabase.rpc(
+          'user_cancel_and_delete_engagement_orders' as any,
+          { _order_ids: orderIds }
+        );
+        if (rpcErr) throw rpcErr;
+      }
+
+      // 3. Delete batch items
+      const { error: delItemsErr } = await supabase
+        .from("mass_order_batch_items")
+        .delete()
+        .eq("batch_id", batchId)
+        .eq("user_id", user.id);
+      if (delItemsErr) throw delItemsErr;
+
+      // 4. Delete batch row
+      const { error: delBatchErr } = await supabase
+        .from("mass_order_batches")
+        .delete()
+        .eq("id", batchId)
+        .eq("user_id", user.id);
+      if (delBatchErr) throw delBatchErr;
+
+      toast({ title: "Batch deleted", description: `${orderIds.length} order(s) cancelled & removed from DB` });
+      qc.invalidateQueries({ queryKey: ["mass-batches"] });
+      qc.invalidateQueries({ queryKey: ["user-engagement-orders"] });
+      setDeleteBatchId(null);
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -1096,6 +1155,14 @@ function BatchHistory() {
                     <Button variant="outline" size="sm" onClick={() => downloadCSV(b.id, b.name || b.id)}>
                       <Download className="w-3.5 h-3.5 mr-1" /> CSV
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => setDeleteBatchId(b.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1105,6 +1172,28 @@ function BatchHistory() {
       )}
 
       <BatchDetailDialog batchId={openBatchId} onClose={() => setOpenBatchId(null)} />
+
+      <AlertDialog open={!!deleteBatchId} onOpenChange={(o) => !o && !deleting && setDeleteBatchId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Batch ke saare engagement orders cancel honge, pending runs providers ke pass nahi jayenge,
+              aur batch + orders permanently DB se delete ho jayenge. Ye action undo nahi ho sakta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => { e.preventDefault(); if (deleteBatchId) deleteBatch(deleteBatchId); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Deleting...</> : "Yes, delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
