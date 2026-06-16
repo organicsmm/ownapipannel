@@ -994,7 +994,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                   {editingRow.qtyOverrides && Object.keys(editingRow.qtyOverrides).length > 0 && (
                     <button
                       type="button"
-                      onClick={() => updateRow(editingRow.id, { qtyOverrides: {} })}
+                      onClick={() => updateRow(editingRow.id, { qtyOverrides: {}, manualTypes: {} })}
                       className="text-[11px] text-primary hover:underline"
                     >
                       Reset to base ratio
