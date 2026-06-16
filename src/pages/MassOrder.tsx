@@ -1480,6 +1480,53 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                   Tip: har service ki quantity yahan independently set kar sakte ho (views, likes, shares — sab alag).
                 </p>
               </div>
+              {/* Variations override — per-row */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Variations</Label>
+                  {(editingRow.manualVariance || editingRow.manualPeak) && (
+                    <button
+                      type="button"
+                      onClick={() => updateRow(editingRow.id, {
+                        variancePercent: defaultVariance,
+                        peakHoursEnabled: defaultPeakHours,
+                        manualVariance: false,
+                        manualPeak: false,
+                      })}
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      Reset to defaults
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-md border border-border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">🎲 Random Variance</span>
+                    <span className="text-xs font-bold text-primary">±{editingRow.variancePercent}%</span>
+                  </div>
+                  <input
+                    type="range" min={10} max={50} step={5}
+                    value={editingRow.variancePercent}
+                    onChange={(e) => updateRow(editingRow.id, { variancePercent: Number(e.target.value) })}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>10%</span><span>25%</span><span>50%</span>
+                  </div>
+                </div>
+                <label className="rounded-md border border-border p-3 flex items-center justify-between gap-2 cursor-pointer">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">🔥 Peak Hours Boost</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">More during 6–11 PM IST</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editingRow.peakHoursEnabled}
+                    onChange={(e) => updateRow(editingRow.id, { peakHoursEnabled: e.target.checked })}
+                    className="w-5 h-5 accent-primary"
+                  />
+                </label>
+              </div>
               <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
                 {computeRowTotals(editingRow).breakdown.map(b => (
                   <div key={b.type} className="flex justify-between">
