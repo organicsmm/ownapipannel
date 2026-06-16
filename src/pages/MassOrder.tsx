@@ -45,6 +45,10 @@ interface OrderRow {
   enabledTypes: Record<EngagementType, boolean>;
   /** Per-type quantity overrides. If set for a type, used instead of ratio-based calc. */
   qtyOverrides?: Partial<Record<EngagementType, number>>;
+  /** Manual-edit flags — when true, defaults won't overwrite this row's field. */
+  manualBase?: boolean;
+  manualTimeframe?: boolean;
+  manualTypes?: Partial<Record<EngagementType, boolean>>;
   status: "idle" | "submitting" | "success" | "failed";
   message?: string;
   orderNumber?: number;
@@ -178,24 +182,39 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const prevByLink = new Map(prev.map(r => [r.link, r]));
       return unique.map((l) => {
         const existing = prevByLink.get(l);
-        if (existing) return existing;
         const enabled: Record<string, boolean> = {};
-        const overrides: Partial<Record<EngagementType, number>> = {};
+        const overrides: Partial<Record<EngagementType, number>> = existing?.qtyOverrides ? { ...existing.qtyOverrides } : {};
         activeTypes.forEach(t => {
-          enabled[t] = true;
+          enabled[t] = existing ? (existing.enabledTypes[t] ?? true) : true;
           const isBase = t === "views" || itemByType[t]?.is_base;
-          if (!isBase && defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
-            overrides[t] = defaultQtyByType[t];
+          if (!isBase) {
+            const isManual = existing?.manualTypes?.[t];
+            if (!isManual) {
+              if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
+                overrides[t] = defaultQtyByType[t];
+              } else {
+                delete overrides[t];
+              }
+            }
           }
         });
+        const nextBase = existing?.manualBase ? existing.baseQuantity : defaultBaseQty;
+        const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
         return {
-          id: uid(),
+          id: existing?.id ?? uid(),
           link: l,
-          baseQuantity: defaultBaseQty,
-          timeLimitHours: defaultTimeframe,
+          baseQuantity: nextBase,
+          timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-          status: "idle" as const,
+          manualBase: existing?.manualBase,
+          manualTimeframe: existing?.manualTimeframe,
+          manualTypes: existing?.manualTypes,
+          status: existing?.status ?? "idle" as const,
+          message: existing?.message,
+          orderNumber: existing?.orderNumber,
+          orderId: existing?.orderId,
+          price: existing?.price,
         };
       });
     });
@@ -279,7 +298,25 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   }, [rows]);
 
   const updateRow = useCallback((id: string, patch: Partial<OrderRow>) => {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+    setRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next: OrderRow = { ...r, ...patch };
+      if (patch.baseQuantity !== undefined && patch.manualBase === undefined) next.manualBase = true;
+      if (patch.timeLimitHours !== undefined && patch.manualTimeframe === undefined) next.manualTimeframe = true;
+      if (patch.qtyOverrides !== undefined && patch.manualTypes === undefined) {
+        const mt: Partial<Record<EngagementType, boolean>> = { ...(r.manualTypes || {}) };
+        const prevOv = r.qtyOverrides || {};
+        const newOv = patch.qtyOverrides || {};
+        const keys = new Set<string>([...Object.keys(prevOv), ...Object.keys(newOv)]);
+        keys.forEach(k => {
+          if (prevOv[k as EngagementType] !== newOv[k as EngagementType]) {
+            mt[k as EngagementType] = true;
+          }
+        });
+        next.manualTypes = mt;
+      }
+      return next;
+    }));
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
