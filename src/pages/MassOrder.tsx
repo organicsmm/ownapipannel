@@ -666,8 +666,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
               quantity: bd.qty,
               price: bd.price,
               time_limit_hours: r.timeLimitHours,
-              variance_percent: 25,
-              peak_hours_enabled: false,
+              variance_percent: r.variancePercent,
+              peak_hours_enabled: r.peakHoursEnabled,
             };
           }),
         };
