@@ -1055,6 +1055,47 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         );
       })()}
 
+      {/* Schedule (optional) */}
+      <Card className="glass-card border-2 border-border">
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-primary" />
+            <Label className="text-sm font-bold">Schedule (Optional)</Label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+            <Input
+              type="datetime-local"
+              value={scheduledAt}
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className={`h-11 ${scheduleError ? "border-destructive" : ""}`}
+              disabled={submitting}
+            />
+            {scheduledAt && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setScheduledAt("")}
+                disabled={submitting}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          {scheduleError ? (
+            <p className="text-[11px] text-destructive">{scheduleError}</p>
+          ) : isScheduledMode ? (
+            <p className="text-[11px] text-primary font-semibold">
+              ⏰ Auto-submit at {scheduledDate!.toLocaleString()} ({Math.max(1, Math.round((scheduledDate!.getTime() - Date.now()) / 60_000))} min se)
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Khali chhoda toh order ab submit hoga. Future date/time set karne par batch background me uss time pe auto-process hogi.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Submit */}
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -1075,14 +1116,21 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           </div>
           <Button
             size="lg"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !!scheduleError}
             onClick={handleSubmitAll}
             className="w-full sm:w-auto min-w-[200px]"
           >
-            {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</> : <><Rocket className="w-4 h-4 mr-2" /> Submit All Orders</>}
+            {submitting ? (
+              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {isScheduledMode ? "Scheduling..." : "Submitting..."}</>
+            ) : isScheduledMode ? (
+              <><CalendarClock className="w-4 h-4 mr-2" /> Schedule Batch</>
+            ) : (
+              <><Rocket className="w-4 h-4 mr-2" /> Submit All Orders</>
+            )}
           </Button>
         </CardContent>
       </Card>
+
 
 
       {/* Edit dialog */}
