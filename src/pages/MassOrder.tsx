@@ -328,6 +328,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [linksText, setLinksText] = useState("");
   const [defaultBaseQty, setDefaultBaseQty] = useState(10000);
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
+  const [defaultVariance, setDefaultVariance] = useState<number>(25);
+  const [defaultPeakHours, setDefaultPeakHours] = useState<boolean>(false);
   const [defaultQtyByType, setDefaultQtyByType] = useState<Partial<Record<EngagementType, number>>>({});
   const [rows, setRows] = useState<OrderRow[]>([]);
   // Per-link configuration parsed from CSV/TXT upload (URL | Type | Qty format).
