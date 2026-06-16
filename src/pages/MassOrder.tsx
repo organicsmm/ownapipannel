@@ -174,6 +174,13 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
   const [defaultQtyByType, setDefaultQtyByType] = useState<Partial<Record<EngagementType, number>>>({});
   const [rows, setRows] = useState<OrderRow[]>([]);
+  // Per-link configuration parsed from CSV/TXT upload (URL | Type | Qty format).
+  // When a brand-new row is created for a link, these initial values are seeded
+  // as MANUAL edits so the user's defaults don't overwrite them.
+  const [uploadedConfigs, setUploadedConfigs] = useState<Map<string, ParsedLink>>(new Map());
+  // Optional schedule: ISO string (datetime-local). When set + in future, batch is
+  // saved as `status='scheduled'` with a payload; a background poller picks it up.
+  const [scheduledAt, setScheduledAt] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; ok: number; fail: number; total: number } | null>(null);
