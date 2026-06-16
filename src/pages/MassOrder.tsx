@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Rocket, Link as LinkIcon, Package, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle,
-  Upload, Download, History, FileText,
+  Upload, Download, History, FileText, Clock, CalendarClock, Play,
 } from "lucide-react";
 import {
   EngagementType, DEFAULT_RATIOS, ENGAGEMENT_CONFIG,
@@ -65,19 +65,69 @@ function isValidUrl(s: string) {
   } catch { return false; }
 }
 
-// Extract URLs from CSV / TXT content. CSV: first column or any column with http(s).
-function extractUrlsFromText(text: string): string[] {
-  const out: string[] = [];
-  text.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    // Split on common CSV delimiters; pick first http(s) token, else whole line
-    const tokens = trimmed.split(/[,;\t]/).map(t => t.trim().replace(/^"|"$/g, ""));
-    const url = tokens.find(t => /^https?:\/\//i.test(t)) ?? tokens[0];
-    if (url) out.push(url);
-  });
+// Map common type aliases (singular/plural/short forms) → canonical EngagementType
+const TYPE_ALIASES: Record<string, EngagementType> = {
+  like: "likes", likes: "likes",
+  view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
+  share: "shares", shares: "shares",
+  comment: "comments", comments: "comments",
+  follower: "followers", followers: "followers", follow: "followers", follows: "followers",
+  save: "saves", saves: "saves",
+  repost: "reposts", reposts: "reposts",
+  retweet: "retweets", retweets: "retweets",
+  subscriber: "subscribers", subscribers: "subscribers", sub: "subscribers", subs: "subscribers",
+  watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
+};
+
+export interface ParsedLink {
+  url: string;
+  baseQty?: number;
+  perTypeQty?: Partial<Record<EngagementType, number>>;
+}
+
+// Smart parser: supports plain URLs, "URL | Type | Qty", "URL,Type,Qty",
+// "URL | likes:1000 | comments:50 | shares:30", "URL | 5000" (base qty only).
+function parseLinksFromText(text: string): ParsedLink[] {
+  const out: ParsedLink[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const parts = line.split(/[|,;\t]/).map((p) => p.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    const urlIdx = parts.findIndex((p) => /^https?:\/\//i.test(p));
+    if (urlIdx === -1) continue;
+    const url = parts[urlIdx];
+    const rest = parts.filter((_, i) => i !== urlIdx);
+    const parsed: ParsedLink = { url };
+    const perType: Partial<Record<EngagementType, number>> = {};
+    let pendingType: EngagementType | undefined;
+    for (const tokRaw of rest) {
+      const tok = tokRaw.trim();
+      // "likes:1000" / "likes=1000"
+      const kv = tok.match(/^([a-z_]+)\s*[:=]\s*(\d[\d_,]*)$/i);
+      if (kv) {
+        const t = TYPE_ALIASES[kv[1].toLowerCase().replace(/\s+/g, "")];
+        const q = Number(kv[2].replace(/[_,]/g, ""));
+        if (t && q > 0) perType[t] = q;
+        pendingType = undefined;
+        continue;
+      }
+      // Pure number
+      if (/^\d[\d_,]*$/.test(tok)) {
+        const q = Number(tok.replace(/[_,]/g, ""));
+        if (pendingType) { perType[pendingType] = q; pendingType = undefined; }
+        else if (parsed.baseQty == null) parsed.baseQty = q;
+        continue;
+      }
+      // Pure type word — next number applies to it
+      const t = TYPE_ALIASES[tok.toLowerCase().replace(/\s+/g, "")];
+      if (t) { pendingType = t; }
+    }
+    if (Object.keys(perType).length > 0) parsed.perTypeQty = perType;
+    out.push(parsed);
+  }
   return out;
 }
+
 
 export default function MassOrder() {
   return (
@@ -89,6 +139,7 @@ export default function MassOrder() {
 
 function Inner() {
   const [tab, setTab] = useState<"create" | "history">("create");
+  useScheduledBatchProcessor();
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pb-10">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
@@ -108,6 +159,156 @@ function Inner() {
 }
 
 /* ============================================================
+   SCHEDULED BATCH PROCESSOR
+   ----------------------------------------------------------------
+   Polls every 30s for the current user's scheduled batches that are
+   due (scheduled_at <= now). Atomically claims them and runs each
+   row through the same edge function used by immediate submissions.
+   Runs only while the Mass Order page is open. Multi-tab safe via
+   the conditional UPDATE claim.
+   ============================================================ */
+function useScheduledBatchProcessor() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const runningRef = useRef(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function tick() {
+      if (runningRef.current || cancelled) return;
+      runningRef.current = true;
+      try {
+        const { data: due } = await supabase
+          .from("mass_order_batches")
+          .select("id, name, user_bundle_id, payload, scheduled_at")
+          .eq("user_id", user!.id)
+          .eq("status", "scheduled")
+          .lte("scheduled_at", new Date().toISOString())
+          .order("scheduled_at", { ascending: true })
+          .limit(3);
+        if (!due || due.length === 0 || cancelled) return;
+
+        for (const batch of due) {
+          // Atomic claim — only this tab/user wins the race
+          const { data: claimed } = await supabase
+            .from("mass_order_batches")
+            .update({ status: "processing" })
+            .eq("id", batch.id)
+            .eq("status", "scheduled")
+            .select("id")
+            .maybeSingle();
+          if (!claimed) continue;
+
+          const payload = (batch.payload || {}) as any;
+          const rowsArr: any[] = Array.isArray(payload.rows) ? payload.rows : [];
+          if (rowsArr.length === 0) {
+            await supabase.from("mass_order_batches")
+              .update({ status: "failed", failed_count: 0 })
+              .eq("id", batch.id);
+            continue;
+          }
+
+          toast({
+            title: "⏰ Scheduled batch started",
+            description: `${batch.name || "Batch"} — ${rowsArr.length} order(s) submit ho rahe hain`,
+          });
+
+          let ok = 0, fail = 0;
+          // Bounded concurrency = 4 (lower than UI loop to be polite in background)
+          const CONCURRENCY = 4;
+          const queue = [...rowsArr];
+
+          async function processRow(row: any) {
+            // Insert batch_item record first
+            const { data: itemRow } = await supabase
+              .from("mass_order_batch_items")
+              .insert({
+                batch_id: batch.id,
+                user_id: user!.id,
+                link: row.link,
+                base_quantity: row.base_quantity,
+                time_limit_hours: row.time_limit_hours,
+                enabled_types: row.enabled_types as any,
+                price: row.total_price,
+                status: "pending",
+              })
+              .select("id")
+              .single();
+            const itemId = itemRow?.id as string | undefined;
+            try {
+              const { data, error } = await supabase.functions.invoke("user-process-engagement-order", {
+                body: {
+                  user_bundle_id: payload.bundle_id || batch.user_bundle_id,
+                  link: row.link,
+                  base_quantity: row.base_quantity,
+                  is_organic_mode: true,
+                  items: row.items,
+                },
+              });
+              if (error) throw new Error(error.message || "Invoke failed");
+              if ((data as any)?.error) throw new Error((data as any).error);
+              ok++;
+              if (itemId) {
+                supabase.from("mass_order_batch_items").update({
+                  status: "success",
+                  engagement_order_id: (data as any)?.order_id ?? null,
+                  engagement_order_number: (data as any)?.order_number ?? null,
+                }).eq("id", itemId).then(() => {});
+              }
+            } catch (e: any) {
+              fail++;
+              if (itemId) {
+                supabase.from("mass_order_batch_items").update({
+                  status: "failed",
+                  error_message: e?.message || "Failed",
+                }).eq("id", itemId).then(() => {});
+              }
+            }
+          }
+
+          async function worker() {
+            while (queue.length > 0 && !cancelled) {
+              const r = queue.shift();
+              if (!r) return;
+              await processRow(r);
+            }
+          }
+          await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+
+          const finalStatus = fail === 0 ? "completed" : (ok === 0 ? "failed" : "partial");
+          await supabase.from("mass_order_batches").update({
+            success_count: ok,
+            failed_count: fail,
+            status: finalStatus,
+          }).eq("id", batch.id);
+
+          qc.invalidateQueries({ queryKey: ["mass-batches"] });
+          toast({
+            title: fail === 0 ? "✅ Scheduled batch done" : "⚠️ Scheduled batch finished with errors",
+            description: `${batch.name || "Batch"}: ${ok} success, ${fail} failed`,
+            variant: fail === 0 ? "default" : "destructive",
+          });
+        }
+      } finally {
+        runningRef.current = false;
+      }
+    }
+
+    // First tick after 5s (let page settle), then every 30s
+    const initial = window.setTimeout(tick, 5_000);
+    const interval = window.setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, [user, toast, qc]);
+}
+
+/* ============================================================
    CREATE
    ============================================================ */
 
@@ -124,6 +325,13 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
   const [defaultQtyByType, setDefaultQtyByType] = useState<Partial<Record<EngagementType, number>>>({});
   const [rows, setRows] = useState<OrderRow[]>([]);
+  // Per-link configuration parsed from CSV/TXT upload (URL | Type | Qty format).
+  // When a brand-new row is created for a link, these initial values are seeded
+  // as MANUAL edits so the user's defaults don't overwrite them.
+  const [uploadedConfigs, setUploadedConfigs] = useState<Map<string, ParsedLink>>(new Map());
+  // Optional schedule: ISO string (datetime-local). When set + in future, batch is
+  // saved as `status='scheduled'` with a payload; a background poller picks it up.
+  const [scheduledAt, setScheduledAt] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; ok: number; fail: number; total: number } | null>(null);
@@ -183,26 +391,38 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const activeSet = new Set<EngagementType>(activeTypes);
       return unique.map((l) => {
         const existing = prevByLink.get(l);
+        // Seed values from parsed CSV/TXT upload — applied only for BRAND-NEW rows
+        // (not existing ones the user may have already edited).
+        const seed = existing ? undefined : uploadedConfigs.get(l);
         const enabled: Record<string, boolean> = {};
-        // Start fresh — only carry forward overrides for currently-active types
         const overrides: Partial<Record<EngagementType, number>> = {};
         if (existing?.qtyOverrides) {
           for (const k of Object.keys(existing.qtyOverrides) as EngagementType[]) {
             if (activeSet.has(k)) overrides[k] = existing.qtyOverrides[k];
           }
         }
-        // Same cleanup for manualTypes — drop flags for removed variations
+        // Seed per-type overrides from upload
+        if (seed?.perTypeQty) {
+          for (const k of Object.keys(seed.perTypeQty) as EngagementType[]) {
+            if (activeSet.has(k) && seed.perTypeQty[k]! > 0) overrides[k] = seed.perTypeQty[k]!;
+          }
+        }
         const manualTypes: Partial<Record<EngagementType, boolean>> = {};
         if (existing?.manualTypes) {
           for (const k of Object.keys(existing.manualTypes) as EngagementType[]) {
             if (activeSet.has(k) && existing.manualTypes[k]) manualTypes[k] = true;
           }
         }
+        // Mark seeded types as manual so global defaults don't overwrite them
+        if (seed?.perTypeQty) {
+          for (const k of Object.keys(seed.perTypeQty) as EngagementType[]) {
+            if (activeSet.has(k)) manualTypes[k] = true;
+          }
+        }
         activeTypes.forEach(t => {
           enabled[t] = existing ? (existing.enabledTypes[t] ?? true) : true;
           const isBase = t === "views" || itemByType[t]?.is_base;
           if (!isBase && !manualTypes[t]) {
-            // Auto-apply latest default to non-manual rows in real-time
             if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
               overrides[t] = defaultQtyByType[t];
             } else {
@@ -210,8 +430,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             }
           }
         });
-        const nextBase = existing?.manualBase ? existing.baseQuantity : defaultBaseQty;
+        const seedBase = seed?.baseQty && seed.baseQty > 0 ? seed.baseQty : undefined;
+        const nextBase = existing?.manualBase
+          ? existing.baseQuantity
+          : (seedBase ?? defaultBaseQty);
         const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
+        const nextManualBase = existing?.manualBase || (seedBase != null);
         return {
           id: existing?.id ?? uid(),
           link: l,
@@ -219,7 +443,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-          manualBase: existing?.manualBase,
+          manualBase: nextManualBase,
           manualTimeframe: existing?.manualTimeframe,
           manualTypes: Object.keys(manualTypes).length > 0 ? manualTypes : undefined,
           status: existing?.status ?? "idle" as const,
@@ -230,7 +454,18 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         };
       });
     });
-  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType]);
+    // Garbage-collect uploadedConfigs entries for links no longer in textarea
+    setUploadedConfigs(prev => {
+      if (prev.size === 0) return prev;
+      const keep = new Set(unique);
+      let changed = false;
+      const next = new Map<string, ParsedLink>();
+      for (const [k, v] of prev) {
+        if (keep.has(k)) next.set(k, v); else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType, uploadedConfigs]);
 
 
   // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
@@ -340,24 +575,90 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }
     try {
       const text = await file.text();
-      const urls = extractUrlsFromText(text);
-      if (urls.length === 0) {
-        toast({ title: "No URLs found", description: "File me koi link nahi mila", variant: "destructive" });
+      const parsed = parseLinksFromText(text);
+      if (parsed.length === 0) {
+        toast({ title: "No URLs found", description: "File me koi valid link nahi mila", variant: "destructive" });
         return;
       }
-      // Merge with existing
+      // Merge with existing textarea links (de-dupe by URL)
       const existing = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      const merged = [...existing, ...urls];
-      const seen = new Set<string>(); const unique: string[] = [];
-      for (const u of merged) { if (!seen.has(u)) { seen.add(u); unique.push(u); } }
-      setLinksText(unique.join("\n"));
-      toast({ title: `${urls.length} links loaded`, description: `Total unique: ${unique.length}` });
+      const seen = new Set<string>(existing);
+      const appended: string[] = [];
+      const configsToAdd: Array<[string, ParsedLink]> = [];
+      let withConfig = 0;
+      for (const p of parsed) {
+        if (!seen.has(p.url)) { seen.add(p.url); appended.push(p.url); }
+        if (p.baseQty || p.perTypeQty) {
+          configsToAdd.push([p.url, p]);
+          withConfig++;
+        }
+      }
+      setUploadedConfigs(prev => {
+        const next = new Map(prev);
+        for (const [k, v] of configsToAdd) next.set(k, v);
+        return next;
+      });
+      const merged = [...existing, ...appended];
+      setLinksText(merged.join("\n"));
+      toast({
+        title: `${parsed.length} link(s) loaded`,
+        description: withConfig > 0
+          ? `${withConfig} link(s) ke saath custom quantity bhi mili • Total unique: ${merged.length}`
+          : `Total unique: ${merged.length}`,
+      });
     } catch (err: any) {
       toast({ title: "File read failed", description: err.message, variant: "destructive" });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  // Validate schedule (datetime-local string). Empty = not scheduled. Else must
+  // parse to a Date in the future (allow 30s grace for clock skew).
+  const scheduledDate = useMemo(() => {
+    if (!scheduledAt) return null;
+    const d = new Date(scheduledAt);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }, [scheduledAt]);
+  const scheduleError = scheduledAt && !scheduledDate
+    ? "Invalid date/time"
+    : (scheduledDate && scheduledDate.getTime() < Date.now() - 30_000
+        ? "Schedule time past me hai"
+        : null);
+  const isScheduledMode = !!scheduledDate && !scheduleError && scheduledDate.getTime() > Date.now();
+
+  // Build the snapshot payload for a scheduled batch — everything the background
+  // processor needs to recreate identical orders later, without re-reading state.
+  function buildSchedulePayload() {
+    return {
+      bundle_id: bundle!.id,
+      created_from: "mass_order_ui_v2",
+      rows: validRows.map((r) => {
+        const totals = computeRowTotals(r);
+        const enabled = activeTypes.filter(t => r.enabledTypes[t]);
+        return {
+          link: r.link,
+          base_quantity: r.baseQuantity,
+          time_limit_hours: r.timeLimitHours,
+          enabled_types: enabled,
+          total_price: totals.totalPrice,
+          items: enabled.map((type) => {
+            const item = itemByType[type];
+            const bd = totals.breakdown.find(b => b.type === type)!;
+            return {
+              user_bundle_item_id: item.id,
+              engagement_type: type,
+              quantity: bd.qty,
+              price: bd.price,
+              time_limit_hours: r.timeLimitHours,
+              variance_percent: 25,
+              peak_hours_enabled: false,
+            };
+          }),
+        };
+      }),
+    };
+  }
 
   async function handleSubmitAll() {
     if (submitting || !bundle || !user) return;
@@ -373,9 +674,46 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       });
       return;
     }
+    if (scheduleError) {
+      toast({ title: "Schedule galat hai", description: scheduleError, variant: "destructive" });
+      return;
+    }
     if (!canSubmit) return;
+
+    // -------- SCHEDULED BRANCH --------
+    if (isScheduledMode) {
+      setSubmitting(true);
+      const payload = buildSchedulePayload();
+      const { error } = await supabase.from("mass_order_batches").insert({
+        user_id: user.id,
+        user_bundle_id: bundle.id,
+        name: batchName.trim() || `Scheduled ${scheduledDate!.toLocaleString()}`,
+        total_links: validRows.length,
+        total_price: grandTotal,
+        status: "scheduled",
+        scheduled_at: scheduledDate!.toISOString(),
+        payload: payload as any,
+      });
+      setSubmitting(false);
+      if (error) {
+        toast({ title: "Schedule failed", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "✅ Batch scheduled",
+        description: `${validRows.length} order(s) ${scheduledDate!.toLocaleString()} pe auto-submit honge. (Tab open ya koi bhi user open kare jab time aaye)`,
+      });
+      qc.invalidateQueries({ queryKey: ["mass-batches"] });
+      setLinksText("");
+      setScheduledAt("");
+      setTimeout(() => onSubmitted(), 1200);
+      return;
+    }
+
+    // -------- IMMEDIATE BRANCH --------
     setSubmitting(true);
     setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
+
 
     // 1. Create batch record
     const { data: batch, error: batchErr } = await supabase
@@ -644,7 +982,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             </div>
           </div>
           <Textarea
-            placeholder={`Ek line par ek link.\nhttps://instagram.com/p/abc\nhttps://instagram.com/p/xyz\n\nYa CSV upload karo (first column = link).`}
+            placeholder={`Ek line par ek link (plain):\nhttps://instagram.com/p/abc\nhttps://instagram.com/reel/xyz\n\nYa CSV/TXT smart format:\nhttps://instagram.com/reel/abc | likes:1000 | comments:50 | shares:30\nhttps://instagram.com/reel/xyz | Views | 5000\nhttps://instagram.com/p/aaa, Likes, 2000\n\nDelimiter: | , ; ya tab. Type aliases: like/likes, view/views, share, comment, follower, save, repost, retweet, sub.`}
             value={linksText}
             onChange={(e) => setLinksText(e.target.value)}
             className="min-h-[160px] font-mono text-sm"
@@ -868,6 +1206,47 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         );
       })()}
 
+      {/* Schedule (optional) */}
+      <Card className="glass-card border-2 border-border">
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-primary" />
+            <Label className="text-sm font-bold">Schedule (Optional)</Label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+            <Input
+              type="datetime-local"
+              value={scheduledAt}
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className={`h-11 ${scheduleError ? "border-destructive" : ""}`}
+              disabled={submitting}
+            />
+            {scheduledAt && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setScheduledAt("")}
+                disabled={submitting}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          {scheduleError ? (
+            <p className="text-[11px] text-destructive">{scheduleError}</p>
+          ) : isScheduledMode ? (
+            <p className="text-[11px] text-primary font-semibold">
+              ⏰ Auto-submit at {scheduledDate!.toLocaleString()} ({Math.max(1, Math.round((scheduledDate!.getTime() - Date.now()) / 60_000))} min se)
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Khali chhoda toh order ab submit hoga. Future date/time set karne par batch background me uss time pe auto-process hogi.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Submit */}
       <Card className="glass-card border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-transparent to-primary/10">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -888,14 +1267,21 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           </div>
           <Button
             size="lg"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !!scheduleError}
             onClick={handleSubmitAll}
             className="w-full sm:w-auto min-w-[200px]"
           >
-            {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</> : <><Rocket className="w-4 h-4 mr-2" /> Submit All Orders</>}
+            {submitting ? (
+              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {isScheduledMode ? "Scheduling..." : "Submitting..."}</>
+            ) : isScheduledMode ? (
+              <><CalendarClock className="w-4 h-4 mr-2" /> Schedule Batch</>
+            ) : (
+              <><Rocket className="w-4 h-4 mr-2" /> Submit All Orders</>
+            )}
           </Button>
         </CardContent>
       </Card>
+
 
 
       {/* Edit dialog */}
@@ -1243,6 +1629,7 @@ function BatchHistory() {
             <SelectTrigger className="h-10 sm:w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="scheduled">Scheduled</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="partial">Partial</SelectItem>
@@ -1272,8 +1659,12 @@ function BatchHistory() {
             const statusColor =
               b.status === "completed" ? "bg-green-600/15 text-green-600 border-green-600/30"
               : b.status === "processing" ? "bg-primary/15 text-primary border-primary/30"
+              : b.status === "scheduled" ? "bg-blue-600/15 text-blue-600 border-blue-600/30"
               : b.status === "partial" ? "bg-yellow-600/15 text-yellow-600 border-yellow-600/30"
               : "bg-destructive/15 text-destructive border-destructive/30";
+            const scheduledIn = b.status === "scheduled" && b.scheduled_at
+              ? Math.round((new Date(b.scheduled_at).getTime() - Date.now()) / 60_000)
+              : null;
             return (
               <Card key={b.id} className="border-2 border-border hover:border-primary/30 transition-colors">
                 <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -1281,9 +1672,18 @@ function BatchHistory() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold truncate">{b.name || `Batch ${b.id.slice(0, 8)}`}</span>
                       <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${statusColor}`}>{b.status}</span>
+                      {scheduledIn !== null && (
+                        <span className="text-[10px] text-blue-600 font-semibold">
+                          <Clock className="w-3 h-3 inline mr-0.5" />
+                          {scheduledIn > 0 ? `in ${scheduledIn} min` : "due now"}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {new Date(b.created_at).toLocaleString()} • {b.total_links} links • ₹{Number(b.total_price).toFixed(2)}
+                      {b.scheduled_at && (
+                        <span className="ml-2 text-blue-600">⏰ {new Date(b.scheduled_at).toLocaleString()}</span>
+                      )}
                     </div>
                     <div className="text-xs mt-1">
                       <span className="text-green-600 font-semibold">{b.success_count} success</span>
