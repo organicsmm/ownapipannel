@@ -298,7 +298,25 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   }, [rows]);
 
   const updateRow = useCallback((id: string, patch: Partial<OrderRow>) => {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+    setRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next: OrderRow = { ...r, ...patch };
+      if (patch.baseQuantity !== undefined && patch.manualBase === undefined) next.manualBase = true;
+      if (patch.timeLimitHours !== undefined && patch.manualTimeframe === undefined) next.manualTimeframe = true;
+      if (patch.qtyOverrides !== undefined && patch.manualTypes === undefined) {
+        const mt: Partial<Record<EngagementType, boolean>> = { ...(r.manualTypes || {}) };
+        const prevOv = r.qtyOverrides || {};
+        const newOv = patch.qtyOverrides || {};
+        const keys = new Set<string>([...Object.keys(prevOv), ...Object.keys(newOv)]);
+        keys.forEach(k => {
+          if (prevOv[k as EngagementType] !== newOv[k as EngagementType]) {
+            mt[k as EngagementType] = true;
+          }
+        });
+        next.manualTypes = mt;
+      }
+      return next;
+    }));
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
