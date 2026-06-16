@@ -118,6 +118,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [linksText, setLinksText] = useState("");
   const [defaultBaseQty, setDefaultBaseQty] = useState(10000);
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
+  const [defaultQtyByType, setDefaultQtyByType] = useState<Partial<Record<EngagementType, number>>>({});
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -179,18 +180,27 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         const existing = prevByLink.get(l);
         if (existing) return existing;
         const enabled: Record<string, boolean> = {};
-        activeTypes.forEach(t => { enabled[t] = true; });
+        const overrides: Partial<Record<EngagementType, number>> = {};
+        activeTypes.forEach(t => {
+          enabled[t] = true;
+          const isBase = t === "views" || itemByType[t]?.is_base;
+          if (!isBase && defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
+            overrides[t] = defaultQtyByType[t];
+          }
+        });
         return {
           id: uid(),
           link: l,
           baseQuantity: defaultBaseQty,
           timeLimitHours: defaultTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
+          qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
           status: "idle" as const,
         };
       });
     });
-  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe]);
+  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType]);
+
 
   // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
   const rowTotalsById = useMemo(() => {
