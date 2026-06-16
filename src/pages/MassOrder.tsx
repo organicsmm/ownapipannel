@@ -442,6 +442,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           ? existing.baseQuantity
           : (seedBase ?? defaultBaseQty);
         const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
+        const nextVariance = existing?.manualVariance ? existing.variancePercent : defaultVariance;
+        const nextPeak = existing?.manualPeak ? existing.peakHoursEnabled : defaultPeakHours;
         const nextManualBase = existing?.manualBase || (seedBase != null);
         return {
           id: existing?.id ?? uid(),
@@ -450,8 +452,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+          variancePercent: nextVariance,
+          peakHoursEnabled: nextPeak,
           manualBase: nextManualBase,
           manualTimeframe: existing?.manualTimeframe,
+          manualVariance: existing?.manualVariance,
+          manualPeak: existing?.manualPeak,
           manualTypes: Object.keys(manualTypes).length > 0 ? manualTypes : undefined,
           status: existing?.status ?? "idle" as const,
           message: existing?.message,
