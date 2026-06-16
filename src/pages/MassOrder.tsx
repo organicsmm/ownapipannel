@@ -424,18 +424,37 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }
     try {
       const text = await file.text();
-      const urls = extractUrlsFromText(text);
-      if (urls.length === 0) {
-        toast({ title: "No URLs found", description: "File me koi link nahi mila", variant: "destructive" });
+      const parsed = parseLinksFromText(text);
+      if (parsed.length === 0) {
+        toast({ title: "No URLs found", description: "File me koi valid link nahi mila", variant: "destructive" });
         return;
       }
-      // Merge with existing
+      // Merge with existing textarea links (de-dupe by URL)
       const existing = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      const merged = [...existing, ...urls];
-      const seen = new Set<string>(); const unique: string[] = [];
-      for (const u of merged) { if (!seen.has(u)) { seen.add(u); unique.push(u); } }
-      setLinksText(unique.join("\n"));
-      toast({ title: `${urls.length} links loaded`, description: `Total unique: ${unique.length}` });
+      const seen = new Set<string>(existing);
+      const appended: string[] = [];
+      const configsToAdd: Array<[string, ParsedLink]> = [];
+      let withConfig = 0;
+      for (const p of parsed) {
+        if (!seen.has(p.url)) { seen.add(p.url); appended.push(p.url); }
+        if (p.baseQty || p.perTypeQty) {
+          configsToAdd.push([p.url, p]);
+          withConfig++;
+        }
+      }
+      setUploadedConfigs(prev => {
+        const next = new Map(prev);
+        for (const [k, v] of configsToAdd) next.set(k, v);
+        return next;
+      });
+      const merged = [...existing, ...appended];
+      setLinksText(merged.join("\n"));
+      toast({
+        title: `${parsed.length} link(s) loaded`,
+        description: withConfig > 0
+          ? `${withConfig} link(s) ke saath custom quantity bhi mili • Total unique: ${merged.length}`
+          : `Total unique: ${merged.length}`,
+      });
     } catch (err: any) {
       toast({ title: "File read failed", description: err.message, variant: "destructive" });
     } finally {
