@@ -478,7 +478,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       }
       return changed ? next : prev;
     });
-  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType, uploadedConfigs]);
+  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultVariance, defaultPeakHours, defaultQtyByType, itemByType, uploadedConfigs]);
 
 
   // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
