@@ -510,6 +510,8 @@ export type Database = {
           failed_count: number
           id: string
           name: string | null
+          payload: Json | null
+          scheduled_at: string | null
           status: string
           success_count: number
           total_links: number
@@ -523,6 +525,8 @@ export type Database = {
           failed_count?: number
           id?: string
           name?: string | null
+          payload?: Json | null
+          scheduled_at?: string | null
           status?: string
           success_count?: number
           total_links?: number
@@ -536,6 +540,8 @@ export type Database = {
           failed_count?: number
           id?: string
           name?: string | null
+          payload?: Json | null
+          scheduled_at?: string | null
           status?: string
           success_count?: number
           total_links?: number
