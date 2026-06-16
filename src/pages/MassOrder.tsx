@@ -45,9 +45,14 @@ interface OrderRow {
   enabledTypes: Record<EngagementType, boolean>;
   /** Per-type quantity overrides. If set for a type, used instead of ratio-based calc. */
   qtyOverrides?: Partial<Record<EngagementType, number>>;
+  /** Variations (organic delivery tuning) — global defaults se aate hain, per-row override possible. */
+  variancePercent: number;        // 10-50 (%)
+  peakHoursEnabled: boolean;
   /** Manual-edit flags — when true, defaults won't overwrite this row's field. */
   manualBase?: boolean;
   manualTimeframe?: boolean;
+  manualVariance?: boolean;
+  manualPeak?: boolean;
   manualTypes?: Partial<Record<EngagementType, boolean>>;
   status: "idle" | "submitting" | "success" | "failed";
   message?: string;
@@ -323,6 +328,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const [linksText, setLinksText] = useState("");
   const [defaultBaseQty, setDefaultBaseQty] = useState(10000);
   const [defaultTimeframe, setDefaultTimeframe] = useState<number>(24);
+  const [defaultVariance, setDefaultVariance] = useState<number>(25);
+  const [defaultPeakHours, setDefaultPeakHours] = useState<boolean>(false);
   const [defaultQtyByType, setDefaultQtyByType] = useState<Partial<Record<EngagementType, number>>>({});
   const [rows, setRows] = useState<OrderRow[]>([]);
   // Per-link configuration parsed from CSV/TXT upload (URL | Type | Qty format).
@@ -435,6 +442,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           ? existing.baseQuantity
           : (seedBase ?? defaultBaseQty);
         const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
+        const nextVariance = existing?.manualVariance ? existing.variancePercent : defaultVariance;
+        const nextPeak = existing?.manualPeak ? existing.peakHoursEnabled : defaultPeakHours;
         const nextManualBase = existing?.manualBase || (seedBase != null);
         return {
           id: existing?.id ?? uid(),
@@ -443,8 +452,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+          variancePercent: nextVariance,
+          peakHoursEnabled: nextPeak,
           manualBase: nextManualBase,
           manualTimeframe: existing?.manualTimeframe,
+          manualVariance: existing?.manualVariance,
+          manualPeak: existing?.manualPeak,
           manualTypes: Object.keys(manualTypes).length > 0 ? manualTypes : undefined,
           status: existing?.status ?? "idle" as const,
           message: existing?.message,
@@ -465,7 +478,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       }
       return changed ? next : prev;
     });
-  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType, uploadedConfigs]);
+  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultVariance, defaultPeakHours, defaultQtyByType, itemByType, uploadedConfigs]);
 
 
   // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
@@ -550,6 +563,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const next: OrderRow = { ...r, ...patch };
       if (patch.baseQuantity !== undefined && patch.manualBase === undefined) next.manualBase = true;
       if (patch.timeLimitHours !== undefined && patch.manualTimeframe === undefined) next.manualTimeframe = true;
+      if (patch.variancePercent !== undefined && patch.manualVariance === undefined) next.manualVariance = true;
+      if (patch.peakHoursEnabled !== undefined && patch.manualPeak === undefined) next.manualPeak = true;
       if (patch.qtyOverrides !== undefined && patch.manualTypes === undefined) {
         const mt: Partial<Record<EngagementType, boolean>> = { ...(r.manualTypes || {}) };
         const prevOv = r.qtyOverrides || {};
@@ -651,8 +666,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
               quantity: bd.qty,
               price: bd.price,
               time_limit_hours: r.timeLimitHours,
-              variance_percent: 25,
-              peak_hours_enabled: false,
+              variance_percent: r.variancePercent,
+              peak_hours_enabled: r.peakHoursEnabled,
             };
           }),
         };
@@ -804,8 +819,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             quantity: bd.qty,
             price: bd.price,
             time_limit_hours: r.timeLimitHours,
-            variance_percent: 25,
-            peak_hours_enabled: false,
+            variance_percent: r.variancePercent,
+            peak_hours_enabled: r.peakHoursEnabled,
           };
         });
 
@@ -1125,6 +1140,45 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             </div>
           )}
 
+          {/* Default Variations (organic delivery tuning) — applies live to all non-manually edited rows */}
+          <div className="pt-2 space-y-3 border-t border-border">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground block">
+              Default Variations (organic tuning)
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">🎲 Random Variance</span>
+                  <span className="text-xs font-bold text-primary">±{defaultVariance}%</span>
+                </div>
+                <input
+                  type="range" min={10} max={50} step={5}
+                  value={defaultVariance}
+                  onChange={(e) => setDefaultVariance(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>10%</span><span>25%</span><span>50%</span>
+                </div>
+              </div>
+              <label className="rounded-lg border border-border bg-muted/20 p-3 flex items-center justify-between gap-2 cursor-pointer">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider">🔥 Peak Hours Boost</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">More during 6–11 PM IST</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={defaultPeakHours}
+                  onChange={(e) => setDefaultPeakHours(e.target.checked)}
+                  className="w-5 h-5 accent-primary"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Yeh defaults sabhi rows pe apply hote hain. Kisi row me alag chahiye toh edit dialog se override karo.
+            </p>
+          </div>
+
           <p className="text-[11px] text-muted-foreground">
             Defaults sabhi rows par live apply hote hain. Manually edit ki hui rows preserved rehti hain — unhe row edit me "Reset to base ratio" se defaults par wapas la sakte ho.
           </p>
@@ -1425,6 +1479,53 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                 <p className="text-[11px] text-muted-foreground mt-2">
                   Tip: har service ki quantity yahan independently set kar sakte ho (views, likes, shares — sab alag).
                 </p>
+              </div>
+              {/* Variations override — per-row */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Variations</Label>
+                  {(editingRow.manualVariance || editingRow.manualPeak) && (
+                    <button
+                      type="button"
+                      onClick={() => updateRow(editingRow.id, {
+                        variancePercent: defaultVariance,
+                        peakHoursEnabled: defaultPeakHours,
+                        manualVariance: false,
+                        manualPeak: false,
+                      })}
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      Reset to defaults
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-md border border-border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">🎲 Random Variance</span>
+                    <span className="text-xs font-bold text-primary">±{editingRow.variancePercent}%</span>
+                  </div>
+                  <input
+                    type="range" min={10} max={50} step={5}
+                    value={editingRow.variancePercent}
+                    onChange={(e) => updateRow(editingRow.id, { variancePercent: Number(e.target.value) })}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>10%</span><span>25%</span><span>50%</span>
+                  </div>
+                </div>
+                <label className="rounded-md border border-border p-3 flex items-center justify-between gap-2 cursor-pointer">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">🔥 Peak Hours Boost</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">More during 6–11 PM IST</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editingRow.peakHoursEnabled}
+                    onChange={(e) => updateRow(editingRow.id, { peakHoursEnabled: e.target.checked })}
+                    className="w-5 h-5 accent-primary"
+                  />
+                </label>
               </div>
               <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
                 {computeRowTotals(editingRow).breakdown.map(b => (
