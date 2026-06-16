@@ -782,13 +782,13 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                   })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Empty chhoda toh views ratio se auto-calc hoga. Value set karne par sabhi naye links par yahi quantity lagegi.
+                Empty chhoda toh views ratio se auto-calc hoga. Value badalne par sabhi rows (jo manually edit nahi hue) real-time update ho jayenge.
               </p>
             </div>
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            Defaults sirf naye links par apply hote hain. Existing rows ko edit karke per-link override karo.
+            Defaults sabhi rows par live apply hote hain. Manually edit ki hui rows preserved rehti hain — unhe row edit me "Reset to base ratio" se defaults par wapas la sakte ho.
           </p>
         </CardContent>
       </Card>
