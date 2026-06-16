@@ -182,24 +182,39 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const prevByLink = new Map(prev.map(r => [r.link, r]));
       return unique.map((l) => {
         const existing = prevByLink.get(l);
-        if (existing) return existing;
         const enabled: Record<string, boolean> = {};
-        const overrides: Partial<Record<EngagementType, number>> = {};
+        const overrides: Partial<Record<EngagementType, number>> = existing?.qtyOverrides ? { ...existing.qtyOverrides } : {};
         activeTypes.forEach(t => {
-          enabled[t] = true;
+          enabled[t] = existing ? (existing.enabledTypes[t] ?? true) : true;
           const isBase = t === "views" || itemByType[t]?.is_base;
-          if (!isBase && defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
-            overrides[t] = defaultQtyByType[t];
+          if (!isBase) {
+            const isManual = existing?.manualTypes?.[t];
+            if (!isManual) {
+              if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
+                overrides[t] = defaultQtyByType[t];
+              } else {
+                delete overrides[t];
+              }
+            }
           }
         });
+        const nextBase = existing?.manualBase ? existing.baseQuantity : defaultBaseQty;
+        const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
         return {
-          id: uid(),
+          id: existing?.id ?? uid(),
           link: l,
-          baseQuantity: defaultBaseQty,
-          timeLimitHours: defaultTimeframe,
+          baseQuantity: nextBase,
+          timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-          status: "idle" as const,
+          manualBase: existing?.manualBase,
+          manualTimeframe: existing?.manualTimeframe,
+          manualTypes: existing?.manualTypes,
+          status: existing?.status ?? "idle" as const,
+          message: existing?.message,
+          orderNumber: existing?.orderNumber,
+          orderId: existing?.orderId,
+          price: existing?.price,
         };
       });
     });
