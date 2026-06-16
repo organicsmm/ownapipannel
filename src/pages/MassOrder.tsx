@@ -180,21 +180,33 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
     setRows((prev) => {
       const prevByLink = new Map(prev.map(r => [r.link, r]));
+      const activeSet = new Set<EngagementType>(activeTypes);
       return unique.map((l) => {
         const existing = prevByLink.get(l);
         const enabled: Record<string, boolean> = {};
-        const overrides: Partial<Record<EngagementType, number>> = existing?.qtyOverrides ? { ...existing.qtyOverrides } : {};
+        // Start fresh — only carry forward overrides for currently-active types
+        const overrides: Partial<Record<EngagementType, number>> = {};
+        if (existing?.qtyOverrides) {
+          for (const k of Object.keys(existing.qtyOverrides) as EngagementType[]) {
+            if (activeSet.has(k)) overrides[k] = existing.qtyOverrides[k];
+          }
+        }
+        // Same cleanup for manualTypes — drop flags for removed variations
+        const manualTypes: Partial<Record<EngagementType, boolean>> = {};
+        if (existing?.manualTypes) {
+          for (const k of Object.keys(existing.manualTypes) as EngagementType[]) {
+            if (activeSet.has(k) && existing.manualTypes[k]) manualTypes[k] = true;
+          }
+        }
         activeTypes.forEach(t => {
           enabled[t] = existing ? (existing.enabledTypes[t] ?? true) : true;
           const isBase = t === "views" || itemByType[t]?.is_base;
-          if (!isBase) {
-            const isManual = existing?.manualTypes?.[t];
-            if (!isManual) {
-              if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
-                overrides[t] = defaultQtyByType[t];
-              } else {
-                delete overrides[t];
-              }
+          if (!isBase && !manualTypes[t]) {
+            // Auto-apply latest default to non-manual rows in real-time
+            if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
+              overrides[t] = defaultQtyByType[t];
+            } else {
+              delete overrides[t];
             }
           }
         });
@@ -209,7 +221,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
           manualBase: existing?.manualBase,
           manualTimeframe: existing?.manualTimeframe,
-          manualTypes: existing?.manualTypes,
+          manualTypes: Object.keys(manualTypes).length > 0 ? manualTypes : undefined,
           status: existing?.status ?? "idle" as const,
           message: existing?.message,
           orderNumber: existing?.orderNumber,
