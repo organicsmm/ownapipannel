@@ -611,6 +611,9 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
               {(() => {
                 const isPreset = TIMEFRAMES.some(tf => tf.value === defaultTimeframe);
                 const selectVal = isPreset ? String(defaultTimeframe) : "custom";
+                const triggerLabel = isPreset
+                  ? (TIMEFRAMES.find(tf => tf.value === defaultTimeframe)?.label ?? "")
+                  : (defaultTimeframe > 0 ? `Custom: ${defaultTimeframe} hour${defaultTimeframe === 1 ? "" : "s"}` : "Custom (hours)");
                 return (
                   <div className="space-y-2">
                     <Select
@@ -623,7 +626,9 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                         }
                       }}
                     >
-                      <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-12">
+                        <span className="truncate">{triggerLabel}</span>
+                      </SelectTrigger>
                       <SelectContent>
                         {TIMEFRAMES.map(tf => (
                           <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>
@@ -633,6 +638,18 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                     </Select>
                     {selectVal === "custom" && (
                       <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[1, 3, 6, 12, 48, 96].map(h => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => setDefaultTimeframe(h)}
+                              className={`text-[11px] px-2 py-1 rounded-md border transition ${defaultTimeframe === h ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"}`}
+                            >
+                              {h}h
+                            </button>
+                          ))}
+                        </div>
                         <Input
                           type="number"
                           min={1}
@@ -784,68 +801,83 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Link</Label>
                 <Input value={editingRow.link} onChange={(e) => updateRow(editingRow.id, { link: e.target.value })} className="h-11 font-mono text-sm" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Base Quantity</Label>
-                  <Input type="number" min={1} value={editingRow.baseQuantity}
-                    onChange={(e) => updateRow(editingRow.id, { baseQuantity: Math.max(1, Number(e.target.value) || 0) })}
-                    className="h-11 font-semibold" />
-                </div>
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Timeframe</Label>
-                  {(() => {
-                    const isPreset = TIMEFRAMES.some(tf => tf.value === editingRow.timeLimitHours);
-                    const selectVal = isPreset ? String(editingRow.timeLimitHours) : "custom";
-                    return (
-                      <div className="space-y-2">
-                        <Select
-                          value={selectVal}
-                          onValueChange={(v) => {
-                            if (v === "custom") {
-                              updateRow(editingRow.id, { timeLimitHours: editingRow.timeLimitHours || 1 });
-                            } else {
-                              updateRow(editingRow.id, { timeLimitHours: Number(v) });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {TIMEFRAMES.map(tf => <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>)}
-                            <SelectItem value="custom">Custom (hours)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {selectVal === "custom" && (() => {
-                          const rowErr = isValidTimeframe(editingRow.timeLimitHours) ? null : TIMEFRAME_ERR;
-                          return (
-                            <>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={720}
-                                step={1}
-                                placeholder="Hours (1–720)"
-                                value={editingRow.timeLimitHours || ""}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  if (raw === "") { updateRow(editingRow.id, { timeLimitHours: 0 }); return; }
-                                  const n = Number(raw);
-                                  updateRow(editingRow.id, { timeLimitHours: Number.isFinite(n) ? Math.floor(n) : 0 });
-                                }}
-                                aria-invalid={!!rowErr}
-                                className={`h-10 font-semibold ${rowErr ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                              />
-                              {rowErr ? (
-                                <p className="text-[11px] text-destructive">{rowErr}</p>
-                              ) : (
-                                <p className="text-[11px] text-muted-foreground">Allowed: 1–720 hours (30 days max)</p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })()}
-                </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Base Quantity</Label>
+                <Input type="number" min={1} value={editingRow.baseQuantity}
+                  onChange={(e) => updateRow(editingRow.id, { baseQuantity: Math.max(1, Number(e.target.value) || 0) })}
+                  className="h-11 font-semibold" />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Timeframe</Label>
+                {(() => {
+                  const isPreset = TIMEFRAMES.some(tf => tf.value === editingRow.timeLimitHours);
+                  const selectVal = isPreset ? String(editingRow.timeLimitHours) : "custom";
+                  const triggerLabel = isPreset
+                    ? (TIMEFRAMES.find(tf => tf.value === editingRow.timeLimitHours)?.label ?? "")
+                    : (editingRow.timeLimitHours > 0 ? `Custom: ${editingRow.timeLimitHours} hour${editingRow.timeLimitHours === 1 ? "" : "s"}` : "Custom (hours)");
+                  return (
+                    <div className="space-y-2">
+                      <Select
+                        value={selectVal}
+                        onValueChange={(v) => {
+                          if (v === "custom") {
+                            updateRow(editingRow.id, { timeLimitHours: editingRow.timeLimitHours || 1 });
+                          } else {
+                            updateRow(editingRow.id, { timeLimitHours: Number(v) });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-11">
+                          <span className="truncate">{triggerLabel}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIMEFRAMES.map(tf => <SelectItem key={tf.value} value={String(tf.value)}>{tf.label}</SelectItem>)}
+                          <SelectItem value="custom">Custom (hours)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {selectVal === "custom" && (() => {
+                        const rowErr = isValidTimeframe(editingRow.timeLimitHours) ? null : TIMEFRAME_ERR;
+                        return (
+                          <>
+                            <div className="flex flex-wrap gap-1.5">
+                              {[1, 3, 6, 12, 48, 96].map(h => (
+                                <button
+                                  key={h}
+                                  type="button"
+                                  onClick={() => updateRow(editingRow.id, { timeLimitHours: h })}
+                                  className={`text-[11px] px-2 py-1 rounded-md border transition ${editingRow.timeLimitHours === h ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"}`}
+                                >
+                                  {h}h
+                                </button>
+                              ))}
+                            </div>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={720}
+                              step={1}
+                              placeholder="Hours (1–720)"
+                              value={editingRow.timeLimitHours || ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === "") { updateRow(editingRow.id, { timeLimitHours: 0 }); return; }
+                                const n = Number(raw);
+                                updateRow(editingRow.id, { timeLimitHours: Number.isFinite(n) ? Math.floor(n) : 0 });
+                              }}
+                              aria-invalid={!!rowErr}
+                              className={`h-10 font-semibold ${rowErr ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                            />
+                            {rowErr ? (
+                              <p className="text-[11px] text-destructive">{rowErr}</p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground">Allowed: 1–720 hours (30 days max)</p>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
