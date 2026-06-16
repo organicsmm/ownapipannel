@@ -462,6 +462,53 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }
   };
 
+  // Validate schedule (datetime-local string). Empty = not scheduled. Else must
+  // parse to a Date in the future (allow 30s grace for clock skew).
+  const scheduledDate = useMemo(() => {
+    if (!scheduledAt) return null;
+    const d = new Date(scheduledAt);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }, [scheduledAt]);
+  const scheduleError = scheduledAt && !scheduledDate
+    ? "Invalid date/time"
+    : (scheduledDate && scheduledDate.getTime() < Date.now() - 30_000
+        ? "Schedule time past me hai"
+        : null);
+  const isScheduledMode = !!scheduledDate && !scheduleError && scheduledDate.getTime() > Date.now();
+
+  // Build the snapshot payload for a scheduled batch — everything the background
+  // processor needs to recreate identical orders later, without re-reading state.
+  function buildSchedulePayload() {
+    return {
+      bundle_id: bundle!.id,
+      created_from: "mass_order_ui_v2",
+      rows: validRows.map((r) => {
+        const totals = computeRowTotals(r);
+        const enabled = activeTypes.filter(t => r.enabledTypes[t]);
+        return {
+          link: r.link,
+          base_quantity: r.baseQuantity,
+          time_limit_hours: r.timeLimitHours,
+          enabled_types: enabled,
+          total_price: totals.totalPrice,
+          items: enabled.map((type) => {
+            const item = itemByType[type];
+            const bd = totals.breakdown.find(b => b.type === type)!;
+            return {
+              user_bundle_item_id: item.id,
+              engagement_type: type,
+              quantity: bd.qty,
+              price: bd.price,
+              time_limit_hours: r.timeLimitHours,
+              variance_percent: 25,
+              peak_hours_enabled: false,
+            };
+          }),
+        };
+      }),
+    };
+  }
+
   async function handleSubmitAll() {
     if (submitting || !bundle || !user) return;
     if (defaultTimeframeError) {
@@ -476,9 +523,46 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       });
       return;
     }
+    if (scheduleError) {
+      toast({ title: "Schedule galat hai", description: scheduleError, variant: "destructive" });
+      return;
+    }
     if (!canSubmit) return;
+
+    // -------- SCHEDULED BRANCH --------
+    if (isScheduledMode) {
+      setSubmitting(true);
+      const payload = buildSchedulePayload();
+      const { error } = await supabase.from("mass_order_batches").insert({
+        user_id: user.id,
+        user_bundle_id: bundle.id,
+        name: batchName.trim() || `Scheduled ${scheduledDate!.toLocaleString()}`,
+        total_links: validRows.length,
+        total_price: grandTotal,
+        status: "scheduled",
+        scheduled_at: scheduledDate!.toISOString(),
+        payload: payload as any,
+      });
+      setSubmitting(false);
+      if (error) {
+        toast({ title: "Schedule failed", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "✅ Batch scheduled",
+        description: `${validRows.length} order(s) ${scheduledDate!.toLocaleString()} pe auto-submit honge. (Tab open ya koi bhi user open kare jab time aaye)`,
+      });
+      qc.invalidateQueries({ queryKey: ["mass-batches"] });
+      setLinksText("");
+      setScheduledAt("");
+      setTimeout(() => onSubmitted(), 1200);
+      return;
+    }
+
+    // -------- IMMEDIATE BRANCH --------
     setSubmitting(true);
     setProgress({ done: 0, ok: 0, fail: 0, total: validRows.length });
+
 
     // 1. Create batch record
     const { data: batch, error: batchErr } = await supabase
