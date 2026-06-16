@@ -45,6 +45,10 @@ interface OrderRow {
   enabledTypes: Record<EngagementType, boolean>;
   /** Per-type quantity overrides. If set for a type, used instead of ratio-based calc. */
   qtyOverrides?: Partial<Record<EngagementType, number>>;
+  /** Manual-edit flags — when true, defaults won't overwrite this row's field. */
+  manualBase?: boolean;
+  manualTimeframe?: boolean;
+  manualTypes?: Partial<Record<EngagementType, boolean>>;
   status: "idle" | "submitting" | "success" | "failed";
   message?: string;
   orderNumber?: number;
