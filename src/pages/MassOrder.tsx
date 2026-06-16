@@ -240,26 +240,38 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const activeSet = new Set<EngagementType>(activeTypes);
       return unique.map((l) => {
         const existing = prevByLink.get(l);
+        // Seed values from parsed CSV/TXT upload — applied only for BRAND-NEW rows
+        // (not existing ones the user may have already edited).
+        const seed = existing ? undefined : uploadedConfigs.get(l);
         const enabled: Record<string, boolean> = {};
-        // Start fresh — only carry forward overrides for currently-active types
         const overrides: Partial<Record<EngagementType, number>> = {};
         if (existing?.qtyOverrides) {
           for (const k of Object.keys(existing.qtyOverrides) as EngagementType[]) {
             if (activeSet.has(k)) overrides[k] = existing.qtyOverrides[k];
           }
         }
-        // Same cleanup for manualTypes — drop flags for removed variations
+        // Seed per-type overrides from upload
+        if (seed?.perTypeQty) {
+          for (const k of Object.keys(seed.perTypeQty) as EngagementType[]) {
+            if (activeSet.has(k) && seed.perTypeQty[k]! > 0) overrides[k] = seed.perTypeQty[k]!;
+          }
+        }
         const manualTypes: Partial<Record<EngagementType, boolean>> = {};
         if (existing?.manualTypes) {
           for (const k of Object.keys(existing.manualTypes) as EngagementType[]) {
             if (activeSet.has(k) && existing.manualTypes[k]) manualTypes[k] = true;
           }
         }
+        // Mark seeded types as manual so global defaults don't overwrite them
+        if (seed?.perTypeQty) {
+          for (const k of Object.keys(seed.perTypeQty) as EngagementType[]) {
+            if (activeSet.has(k)) manualTypes[k] = true;
+          }
+        }
         activeTypes.forEach(t => {
           enabled[t] = existing ? (existing.enabledTypes[t] ?? true) : true;
           const isBase = t === "views" || itemByType[t]?.is_base;
           if (!isBase && !manualTypes[t]) {
-            // Auto-apply latest default to non-manual rows in real-time
             if (defaultQtyByType[t] != null && defaultQtyByType[t]! > 0) {
               overrides[t] = defaultQtyByType[t];
             } else {
@@ -267,8 +279,12 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             }
           }
         });
-        const nextBase = existing?.manualBase ? existing.baseQuantity : defaultBaseQty;
+        const seedBase = seed?.baseQty && seed.baseQty > 0 ? seed.baseQty : undefined;
+        const nextBase = existing?.manualBase
+          ? existing.baseQuantity
+          : (seedBase ?? defaultBaseQty);
         const nextTimeframe = existing?.manualTimeframe ? existing.timeLimitHours : defaultTimeframe;
+        const nextManualBase = existing?.manualBase || (seedBase != null);
         return {
           id: existing?.id ?? uid(),
           link: l,
@@ -276,7 +292,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           timeLimitHours: nextTimeframe,
           enabledTypes: enabled as Record<EngagementType, boolean>,
           qtyOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-          manualBase: existing?.manualBase,
+          manualBase: nextManualBase,
           manualTimeframe: existing?.manualTimeframe,
           manualTypes: Object.keys(manualTypes).length > 0 ? manualTypes : undefined,
           status: existing?.status ?? "idle" as const,
@@ -287,7 +303,18 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
         };
       });
     });
-  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType]);
+    // Garbage-collect uploadedConfigs entries for links no longer in textarea
+    setUploadedConfigs(prev => {
+      if (prev.size === 0) return prev;
+      const keep = new Set(unique);
+      let changed = false;
+      const next = new Map<string, ParsedLink>();
+      for (const [k, v] of prev) {
+        if (keep.has(k)) next.set(k, v); else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [linksText, activeTypes.join(","), defaultBaseQty, defaultTimeframe, defaultQtyByType, itemByType, uploadedConfigs]);
 
 
   // Memoized totals per row → O(1) lookup, O(N) total compute per dep-change
