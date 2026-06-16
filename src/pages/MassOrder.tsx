@@ -831,7 +831,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             </div>
           </div>
           <Textarea
-            placeholder={`Ek line par ek link.\nhttps://instagram.com/p/abc\nhttps://instagram.com/p/xyz\n\nYa CSV upload karo (first column = link).`}
+            placeholder={`Ek line par ek link (plain):\nhttps://instagram.com/p/abc\nhttps://instagram.com/reel/xyz\n\nYa CSV/TXT smart format:\nhttps://instagram.com/reel/abc | likes:1000 | comments:50 | shares:30\nhttps://instagram.com/reel/xyz | Views | 5000\nhttps://instagram.com/p/aaa, Likes, 2000\n\nDelimiter: | , ; ya tab. Type aliases: like/likes, view/views, share, comment, follower, save, repost, retweet, sub.`}
             value={linksText}
             onChange={(e) => setLinksText(e.target.value)}
             className="min-h-[160px] font-mono text-sm"
