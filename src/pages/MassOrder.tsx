@@ -1659,8 +1659,12 @@ function BatchHistory() {
             const statusColor =
               b.status === "completed" ? "bg-green-600/15 text-green-600 border-green-600/30"
               : b.status === "processing" ? "bg-primary/15 text-primary border-primary/30"
+              : b.status === "scheduled" ? "bg-blue-600/15 text-blue-600 border-blue-600/30"
               : b.status === "partial" ? "bg-yellow-600/15 text-yellow-600 border-yellow-600/30"
               : "bg-destructive/15 text-destructive border-destructive/30";
+            const scheduledIn = b.status === "scheduled" && b.scheduled_at
+              ? Math.round((new Date(b.scheduled_at).getTime() - Date.now()) / 60_000)
+              : null;
             return (
               <Card key={b.id} className="border-2 border-border hover:border-primary/30 transition-colors">
                 <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -1668,9 +1672,18 @@ function BatchHistory() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold truncate">{b.name || `Batch ${b.id.slice(0, 8)}`}</span>
                       <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${statusColor}`}>{b.status}</span>
+                      {scheduledIn !== null && (
+                        <span className="text-[10px] text-blue-600 font-semibold">
+                          <Clock className="w-3 h-3 inline mr-0.5" />
+                          {scheduledIn > 0 ? `in ${scheduledIn} min` : "due now"}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {new Date(b.created_at).toLocaleString()} • {b.total_links} links • ₹{Number(b.total_price).toFixed(2)}
+                      {b.scheduled_at && (
+                        <span className="ml-2 text-blue-600">⏰ {new Date(b.scheduled_at).toLocaleString()}</span>
+                      )}
                     </div>
                     <div className="text-xs mt-1">
                       <span className="text-green-600 font-semibold">{b.success_count} success</span>
