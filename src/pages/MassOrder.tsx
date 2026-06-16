@@ -563,6 +563,8 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const next: OrderRow = { ...r, ...patch };
       if (patch.baseQuantity !== undefined && patch.manualBase === undefined) next.manualBase = true;
       if (patch.timeLimitHours !== undefined && patch.manualTimeframe === undefined) next.manualTimeframe = true;
+      if (patch.variancePercent !== undefined && patch.manualVariance === undefined) next.manualVariance = true;
+      if (patch.peakHoursEnabled !== undefined && patch.manualPeak === undefined) next.manualPeak = true;
       if (patch.qtyOverrides !== undefined && patch.manualTypes === undefined) {
         const mt: Partial<Record<EngagementType, boolean>> = { ...(r.manualTypes || {}) };
         const prevOv = r.qtyOverrides || {};
