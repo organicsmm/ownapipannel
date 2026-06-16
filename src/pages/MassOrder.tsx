@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Rocket, Link as LinkIcon, Package, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle,
-  Upload, Download, History, FileText,
+  Upload, Download, History, FileText, Clock, CalendarClock, Play,
 } from "lucide-react";
 import {
   EngagementType, DEFAULT_RATIOS, ENGAGEMENT_CONFIG,
