@@ -139,6 +139,7 @@ export default function MassOrder() {
 
 function Inner() {
   const [tab, setTab] = useState<"create" | "history">("create");
+  useScheduledBatchProcessor();
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pb-10">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
@@ -155,6 +156,156 @@ function Inner() {
       </Tabs>
     </div>
   );
+}
+
+/* ============================================================
+   SCHEDULED BATCH PROCESSOR
+   ----------------------------------------------------------------
+   Polls every 30s for the current user's scheduled batches that are
+   due (scheduled_at <= now). Atomically claims them and runs each
+   row through the same edge function used by immediate submissions.
+   Runs only while the Mass Order page is open. Multi-tab safe via
+   the conditional UPDATE claim.
+   ============================================================ */
+function useScheduledBatchProcessor() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const runningRef = useRef(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function tick() {
+      if (runningRef.current || cancelled) return;
+      runningRef.current = true;
+      try {
+        const { data: due } = await supabase
+          .from("mass_order_batches")
+          .select("id, name, user_bundle_id, payload, scheduled_at")
+          .eq("user_id", user!.id)
+          .eq("status", "scheduled")
+          .lte("scheduled_at", new Date().toISOString())
+          .order("scheduled_at", { ascending: true })
+          .limit(3);
+        if (!due || due.length === 0 || cancelled) return;
+
+        for (const batch of due) {
+          // Atomic claim — only this tab/user wins the race
+          const { data: claimed } = await supabase
+            .from("mass_order_batches")
+            .update({ status: "processing" })
+            .eq("id", batch.id)
+            .eq("status", "scheduled")
+            .select("id")
+            .maybeSingle();
+          if (!claimed) continue;
+
+          const payload = (batch.payload || {}) as any;
+          const rowsArr: any[] = Array.isArray(payload.rows) ? payload.rows : [];
+          if (rowsArr.length === 0) {
+            await supabase.from("mass_order_batches")
+              .update({ status: "failed", failed_count: 0 })
+              .eq("id", batch.id);
+            continue;
+          }
+
+          toast({
+            title: "⏰ Scheduled batch started",
+            description: `${batch.name || "Batch"} — ${rowsArr.length} order(s) submit ho rahe hain`,
+          });
+
+          let ok = 0, fail = 0;
+          // Bounded concurrency = 4 (lower than UI loop to be polite in background)
+          const CONCURRENCY = 4;
+          const queue = [...rowsArr];
+
+          async function processRow(row: any) {
+            // Insert batch_item record first
+            const { data: itemRow } = await supabase
+              .from("mass_order_batch_items")
+              .insert({
+                batch_id: batch.id,
+                user_id: user!.id,
+                link: row.link,
+                base_quantity: row.base_quantity,
+                time_limit_hours: row.time_limit_hours,
+                enabled_types: row.enabled_types as any,
+                price: row.total_price,
+                status: "pending",
+              })
+              .select("id")
+              .single();
+            const itemId = itemRow?.id as string | undefined;
+            try {
+              const { data, error } = await supabase.functions.invoke("user-process-engagement-order", {
+                body: {
+                  user_bundle_id: payload.bundle_id || batch.user_bundle_id,
+                  link: row.link,
+                  base_quantity: row.base_quantity,
+                  is_organic_mode: true,
+                  items: row.items,
+                },
+              });
+              if (error) throw new Error(error.message || "Invoke failed");
+              if ((data as any)?.error) throw new Error((data as any).error);
+              ok++;
+              if (itemId) {
+                supabase.from("mass_order_batch_items").update({
+                  status: "success",
+                  engagement_order_id: (data as any)?.order_id ?? null,
+                  engagement_order_number: (data as any)?.order_number ?? null,
+                }).eq("id", itemId).then(() => {});
+              }
+            } catch (e: any) {
+              fail++;
+              if (itemId) {
+                supabase.from("mass_order_batch_items").update({
+                  status: "failed",
+                  error_message: e?.message || "Failed",
+                }).eq("id", itemId).then(() => {});
+              }
+            }
+          }
+
+          async function worker() {
+            while (queue.length > 0 && !cancelled) {
+              const r = queue.shift();
+              if (!r) return;
+              await processRow(r);
+            }
+          }
+          await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+
+          const finalStatus = fail === 0 ? "completed" : (ok === 0 ? "failed" : "partial");
+          await supabase.from("mass_order_batches").update({
+            success_count: ok,
+            failed_count: fail,
+            status: finalStatus,
+          }).eq("id", batch.id);
+
+          qc.invalidateQueries({ queryKey: ["mass-batches"] });
+          toast({
+            title: fail === 0 ? "✅ Scheduled batch done" : "⚠️ Scheduled batch finished with errors",
+            description: `${batch.name || "Batch"}: ${ok} success, ${fail} failed`,
+            variant: fail === 0 ? "default" : "destructive",
+          });
+        }
+      } finally {
+        runningRef.current = false;
+      }
+    }
+
+    // First tick after 5s (let page settle), then every 30s
+    const initial = window.setTimeout(tick, 5_000);
+    const interval = window.setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, [user, toast, qc]);
 }
 
 /* ============================================================
