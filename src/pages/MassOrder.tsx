@@ -1140,6 +1140,45 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
             </div>
           )}
 
+          {/* Default Variations (organic delivery tuning) — applies live to all non-manually edited rows */}
+          <div className="pt-2 space-y-3 border-t border-border">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground block">
+              Default Variations (organic tuning)
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">🎲 Random Variance</span>
+                  <span className="text-xs font-bold text-primary">±{defaultVariance}%</span>
+                </div>
+                <input
+                  type="range" min={10} max={50} step={5}
+                  value={defaultVariance}
+                  onChange={(e) => setDefaultVariance(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>10%</span><span>25%</span><span>50%</span>
+                </div>
+              </div>
+              <label className="rounded-lg border border-border bg-muted/20 p-3 flex items-center justify-between gap-2 cursor-pointer">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider">🔥 Peak Hours Boost</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">More during 6–11 PM IST</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={defaultPeakHours}
+                  onChange={(e) => setDefaultPeakHours(e.target.checked)}
+                  className="w-5 h-5 accent-primary"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Yeh defaults sabhi rows pe apply hote hain. Kisi row me alag chahiye toh edit dialog se override karo.
+            </p>
+          </div>
+
           <p className="text-[11px] text-muted-foreground">
             Defaults sabhi rows par live apply hote hain. Manually edit ki hui rows preserved rehti hain — unhe row edit me "Reset to base ratio" se defaults par wapas la sakte ho.
           </p>
