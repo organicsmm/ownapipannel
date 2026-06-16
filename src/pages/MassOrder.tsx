@@ -65,19 +65,69 @@ function isValidUrl(s: string) {
   } catch { return false; }
 }
 
-// Extract URLs from CSV / TXT content. CSV: first column or any column with http(s).
-function extractUrlsFromText(text: string): string[] {
-  const out: string[] = [];
-  text.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    // Split on common CSV delimiters; pick first http(s) token, else whole line
-    const tokens = trimmed.split(/[,;\t]/).map(t => t.trim().replace(/^"|"$/g, ""));
-    const url = tokens.find(t => /^https?:\/\//i.test(t)) ?? tokens[0];
-    if (url) out.push(url);
-  });
+// Map common type aliases (singular/plural/short forms) → canonical EngagementType
+const TYPE_ALIASES: Record<string, EngagementType> = {
+  like: "likes", likes: "likes",
+  view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
+  share: "shares", shares: "shares",
+  comment: "comments", comments: "comments",
+  follower: "followers", followers: "followers", follow: "followers", follows: "followers",
+  save: "saves", saves: "saves",
+  repost: "reposts", reposts: "reposts",
+  retweet: "retweets", retweets: "retweets",
+  subscriber: "subscribers", subscribers: "subscribers", sub: "subscribers", subs: "subscribers",
+  watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
+};
+
+export interface ParsedLink {
+  url: string;
+  baseQty?: number;
+  perTypeQty?: Partial<Record<EngagementType, number>>;
+}
+
+// Smart parser: supports plain URLs, "URL | Type | Qty", "URL,Type,Qty",
+// "URL | likes:1000 | comments:50 | shares:30", "URL | 5000" (base qty only).
+function parseLinksFromText(text: string): ParsedLink[] {
+  const out: ParsedLink[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const parts = line.split(/[|,;\t]/).map((p) => p.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    const urlIdx = parts.findIndex((p) => /^https?:\/\//i.test(p));
+    if (urlIdx === -1) continue;
+    const url = parts[urlIdx];
+    const rest = parts.filter((_, i) => i !== urlIdx);
+    const parsed: ParsedLink = { url };
+    const perType: Partial<Record<EngagementType, number>> = {};
+    let pendingType: EngagementType | undefined;
+    for (const tokRaw of rest) {
+      const tok = tokRaw.trim();
+      // "likes:1000" / "likes=1000"
+      const kv = tok.match(/^([a-z_]+)\s*[:=]\s*(\d[\d_,]*)$/i);
+      if (kv) {
+        const t = TYPE_ALIASES[kv[1].toLowerCase().replace(/\s+/g, "")];
+        const q = Number(kv[2].replace(/[_,]/g, ""));
+        if (t && q > 0) perType[t] = q;
+        pendingType = undefined;
+        continue;
+      }
+      // Pure number
+      if (/^\d[\d_,]*$/.test(tok)) {
+        const q = Number(tok.replace(/[_,]/g, ""));
+        if (pendingType) { perType[pendingType] = q; pendingType = undefined; }
+        else if (parsed.baseQty == null) parsed.baseQty = q;
+        continue;
+      }
+      // Pure type word — next number applies to it
+      const t = TYPE_ALIASES[tok.toLowerCase().replace(/\s+/g, "")];
+      if (t) { pendingType = t; }
+    }
+    if (Object.keys(perType).length > 0) parsed.perTypeQty = perType;
+    out.push(parsed);
+  }
   return out;
 }
+
 
 export default function MassOrder() {
   return (
