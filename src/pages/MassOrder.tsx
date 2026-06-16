@@ -688,6 +688,56 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
               })()}
             </div>
           </div>
+
+          {/* Default per-type quantities (likes, comments, shares, etc.) */}
+          {activeTypes.filter(t => !(t === "views" || itemByType[t]?.is_base)).length > 0 && (
+            <div className="pt-2 space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground block">
+                Default Per-Type Quantities
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {activeTypes
+                  .filter(t => !(t === "views" || itemByType[t]?.is_base))
+                  .map((t) => {
+                    const cfg = ENGAGEMENT_CONFIG[t];
+                    const ratio = DEFAULT_RATIOS[t] ?? 100;
+                    const computed = Math.round(defaultBaseQty * (ratio / 100));
+                    const val = defaultQtyByType[t];
+                    return (
+                      <div key={t} className={`rounded-lg border ${cfg.borderColor} ${cfg.bgColor} p-2`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">{cfg.emoji}</span>
+                          <span className={`text-[11px] font-semibold uppercase ${cfg.color}`}>{cfg.label}</span>
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder={String(computed)}
+                          value={val ?? ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setDefaultQtyByType((prev) => {
+                              const next = { ...prev };
+                              if (raw === "") { delete next[t]; }
+                              else {
+                                const n = Math.max(0, Math.floor(Number(raw) || 0));
+                                next[t] = n;
+                              }
+                              return next;
+                            });
+                          }}
+                          className="h-9 text-sm font-semibold bg-background"
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Empty chhoda toh views ratio se auto-calc hoga. Value set karne par sabhi naye links par yahi quantity lagegi.
+              </p>
+            </div>
+          )}
+
           <p className="text-[11px] text-muted-foreground">
             Defaults sirf naye links par apply hote hain. Existing rows ko edit karke per-link override karo.
           </p>
