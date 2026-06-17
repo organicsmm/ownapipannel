@@ -357,11 +357,14 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       return data || [];
     },
     placeholderData: keepPreviousData,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
+    // Bundle items can be edited/recreated by admin or in another tab. If we cache
+    // too long, MassOrder will send stale user_bundle_item_id values and the edge
+    // function returns "Bundle item <uuid> not found". Always refetch on mount.
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
@@ -863,6 +866,11 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       } catch (e: any) {
         fail++;
         const msg = e?.message || "Failed";
+        // If the edge function reports a stale bundle item, refresh the bundle
+        // cache so the next attempt picks up current IDs.
+        if (/bundle item .* not found/i.test(msg)) {
+          qc.invalidateQueries({ queryKey: ["user-bundles-with-items", user?.id] });
+        }
         queueRow(r, { status: "failed", message: msg });
         if (batchItemId) {
           supabase.from("mass_order_batch_items").update({
