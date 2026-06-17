@@ -87,7 +87,16 @@ export function TypeHistoryCard({
   const [isExpanded, setIsExpanded] = useState(true);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const config = ENGAGEMENT_CONFIG[engagementType as keyof typeof ENGAGEMENT_CONFIG] || ENGAGEMENT_CONFIG.views;
+  const normalizedType = (engagementType || '').toString().toLowerCase().trim().replace(/[\s-]+/g, '_');
+  const typeAliases: Record<string, keyof typeof ENGAGEMENT_CONFIG> = {
+    follower: 'followers', followers: 'followers', subscriber: 'subscribers', subscribers: 'subscribers',
+    view: 'views', views: 'views', reel_view: 'reel_views', reel_views: 'reel_views',
+    story_view: 'story_views', story_views: 'story_views',
+    like: 'likes', likes: 'likes', comment: 'comments', comments: 'comments',
+    save: 'saves', saves: 'saves', share: 'shares', shares: 'shares',
+  };
+  const configKey = typeAliases[normalizedType] || (normalizedType as keyof typeof ENGAGEMENT_CONFIG);
+  const config = ENGAGEMENT_CONFIG[configKey] || ENGAGEMENT_CONFIG.views;
   const Icon = config.icon;
 
   const sortedRuns = [...runs].sort((a, b) => a.run_number - b.run_number);
