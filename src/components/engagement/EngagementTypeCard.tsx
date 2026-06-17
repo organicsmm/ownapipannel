@@ -119,7 +119,7 @@ export function EngagementTypeCard({
   const variancePercent = config.variancePercent ?? DEFAULT_ORGANIC_SETTINGS.variancePercent;
   const peakHoursEnabled = config.peakHoursEnabled ?? DEFAULT_ORGANIC_SETTINGS.peakHoursEnabled;
 
-  // Calculate full schedule with runs
+  // Calculate full schedule with runs (organic, randomized distribution)
   const scheduleData = useMemo(() => {
     if (!config.enabled || config.quantity < providerMin) return null;
     const durationHours = timeLimitHours > 0 ? timeLimitHours : 24;
@@ -127,17 +127,51 @@ export function EngagementTypeCard({
     const startTime = new Date();
     const runCount = Math.min(30, Math.max(3, Math.ceil(config.quantity / Math.max(providerMin * 25, 1))));
     const avgInterval = runCount > 1 ? Math.round(duration / (runCount - 1) / 60000) : 0;
-    const baseRunQty = Math.floor(config.quantity / runCount);
-    const remainder = config.quantity - baseRunQty * runCount;
-    const runs = Array.from({ length: runCount }, (_, idx) => {
-      const scheduledAt = new Date(startTime.getTime() + (runCount === 1 ? 0 : (duration * idx) / (runCount - 1)));
+
+    // Seeded PRNG so preview is stable per (quantity, runCount, variance, peak, duration)
+    let seed = (config.quantity * 2654435761) ^ (runCount * 40503) ^ (variancePercent * 7919) ^ (peakHoursEnabled ? 13 : 0) ^ Math.round(durationHours * 31);
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) | 0;
+      return ((seed >>> 0) % 100000) / 100000;
+    };
+
+    const variance = variancePercent / 100;
+
+    // 1) Build raw weights with random variance and peak-hour boost + jittered times
+    const weights: number[] = [];
+    const times: Date[] = [];
+    for (let idx = 0; idx < runCount; idx++) {
+      const evenT = runCount === 1 ? 0 : (duration * idx) / (runCount - 1);
+      const jitterRange = runCount > 1 ? (duration / (runCount - 1)) * 0.3 : 0;
+      const jitter = idx === 0 || idx === runCount - 1 ? 0 : (rand() - 0.5) * 2 * jitterRange;
+      const scheduledAt = new Date(startTime.getTime() + evenT + jitter);
+      times.push(scheduledAt);
+
+      const r = 1 + (rand() - 0.5) * 2 * variance;
+      const hr = scheduledAt.getHours();
+      const peakBoost = peakHoursEnabled && hr >= 18 && hr <= 23 ? 1.35 : 1;
+      weights.push(Math.max(0.1, r * peakBoost));
+    }
+
+    // 2) Normalize so total quantity is preserved
+    const weightSum = weights.reduce((a, b) => a + b, 0);
+    const rawQtys = weights.map((w) => (w / weightSum) * config.quantity);
+
+    // 3) Round, enforce providerMin, fix drift on last run
+    const qtys = rawQtys.map((q) => Math.max(providerMin, Math.round(q)));
+    const drift = config.quantity - qtys.reduce((a, b) => a + b, 0);
+    if (qtys.length > 0) qtys[qtys.length - 1] = Math.max(providerMin, qtys[qtys.length - 1] + drift);
+
+    const runs = times.map((scheduledAt, idx) => {
+      const hr = scheduledAt.getHours();
       return {
         runNumber: idx + 1,
         scheduledAt,
-        quantity: Math.max(providerMin, baseRunQty + (idx === runCount - 1 ? remainder : 0)),
-        peakMultiplier: peakHoursEnabled && scheduledAt.getHours() >= 18 && scheduledAt.getHours() <= 23 ? 1.2 : 1,
+        quantity: qtys[idx],
+        peakMultiplier: peakHoursEnabled && hr >= 18 && hr <= 23 ? 1.35 : 1,
       };
     });
+
     const finishTime = runs[runs.length - 1]?.scheduledAt ?? new Date();
 
     return {
