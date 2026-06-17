@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, formatDistanceToNow } from "date-fns";
 import {
-  Eye, Heart, MessageCircle, Bookmark, Share2,
+  Eye, Heart, MessageCircle, Bookmark, Share2, Users,
   Clock, Play, CheckCircle2, XCircle, Pencil,
   ChevronDown, ChevronUp, ExternalLink, RefreshCw, Zap, CalendarClock,
   Pause, PlayCircle, Ban
@@ -24,11 +24,16 @@ import {
 
 const ENGAGEMENT_CONFIG = {
   views: { icon: Eye, label: "Views" },
+  reel_views: { icon: Eye, label: "Reel Views" },
+  story_views: { icon: Eye, label: "Story Views" },
   likes: { icon: Heart, label: "Likes" },
   comments: { icon: MessageCircle, label: "Comments" },
   saves: { icon: Bookmark, label: "Saves" },
   shares: { icon: Share2, label: "Shares" },
+  followers: { icon: Users, label: "Followers" },
+  subscribers: { icon: Users, label: "Subscribers" },
 };
+
 
 interface Run {
   id: string;
