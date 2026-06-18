@@ -239,33 +239,88 @@ Deno.serve(async (req) => {
 
     // helper: random int in [lo, hi]
     const ri = (lo: number, hi: number) => Math.floor(lo + Math.random() * (hi - lo + 1));
+    // Organic distributor: ALWAYS splits `total` into ~desiredRuns chunks while
+    // respecting [min, max] per chunk. Auto-expands `max` when needed so a big
+    // total never collapses into a single huge run (the previous algorithm did
+    // exactly that — e.g. 80,000 views with max=400 fell back to [80000]).
     const buildUniqueQuantities = (total: number, min: number, max: number, desiredRuns: number): number[] => {
       if (total <= 0) return [];
-      if (total < min || desiredRuns <= 1) return [total];
-      const hardMax = Math.max(min, max);
-      let n = Math.max(1, Math.min(desiredRuns, Math.floor(total / min), 5000));
-      const minSum = (runs: number) => runs * min + (runs * (runs - 1)) / 2;
-      const maxSum = (runs: number, hi: number) => runs * hi - (runs * (runs - 1)) / 2;
-      while (n > 1 && minSum(n) > total) n--;
-      let hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25), min + n + 5));
-      while (n > 1 && maxSum(n, hi) < total) {
-        if (hi < hardMax) hi = Math.min(hardMax, hi + Math.max(5, Math.ceil((total - maxSum(n, hi)) / n) + 2));
-        else { n--; hi = Math.min(hardMax, Math.max(min + n - 1, Math.ceil((total / n) * 1.25))); }
+      if (total < Math.max(1, min) || desiredRuns <= 1) return [total];
+
+      // How many chunks can we realistically make, given provider min?
+      const cap = Math.max(1, Math.min(desiredRuns, Math.floor(total / Math.max(1, min)), 5000));
+      let n = cap;
+
+      // Expand the per-chunk ceiling so it can actually hold `total` across n runs.
+      // Need: n * effMax >= total  →  effMax >= ceil(total / n) * organic_buffer
+      const needed = Math.ceil(total / n);
+      const effMax = Math.max(max, Math.ceil(needed * 1.8), min + 1);
+      // Effective floor: don't drop below provider min, but also don't be larger
+      // than the per-chunk average (otherwise every chunk = min and we can't reach total).
+      const effMin = Math.max(min, Math.min(effMax - 1, Math.floor(needed * 0.35)));
+
+      // 1) Seed each run with random weight, then normalize to total.
+      const weights: number[] = [];
+      for (let i = 0; i < n; i++) {
+        // Organic-looking weight: log-normalish via (0.55..1.45)
+        weights.push(0.55 + Math.random() * 0.9);
       }
-      const qtys = Array.from({ length: n }, (_, i) => min + i);
-      let left = total - qtys.reduce((s, q) => s + q, 0);
-      while (left > 0) {
-        const candidates = qtys.map((q, i) => ({ i, cap: (i === qtys.length - 1 ? hi : qtys[i + 1] - 1) - q })).filter(x => x.cap > 0);
-        if (candidates.length === 0) {
-          if (hi < hardMax) { hi = Math.min(hardMax, hi + Math.max(1, Math.min(25, left))); continue; }
-          return buildUniqueQuantities(total, min, hardMax, Math.max(1, n - 1));
+      const wSum = weights.reduce((a, b) => a + b, 0);
+      let qtys = weights.map((w) => Math.round((w / wSum) * total));
+
+      // 2) Clamp into [effMin, effMax]
+      qtys = qtys.map((q) => Math.max(effMin, Math.min(effMax, q)));
+
+      // 3) Fix rounding/clamp drift by random walk add/sub across runs.
+      let drift = total - qtys.reduce((a, b) => a + b, 0);
+      let guard = 0;
+      while (drift !== 0 && guard++ < 20000) {
+        const idx = Math.floor(Math.random() * qtys.length);
+        if (drift > 0) {
+          const room = effMax - qtys[idx];
+          if (room <= 0) continue;
+          const step = Math.max(1, Math.min(room, drift, Math.ceil(Math.abs(drift) / Math.max(1, qtys.length))));
+          qtys[idx] += step;
+          drift -= step;
+        } else {
+          const room = qtys[idx] - effMin;
+          if (room <= 0) continue;
+          const step = Math.max(1, Math.min(room, -drift, Math.ceil(Math.abs(drift) / Math.max(1, qtys.length))));
+          qtys[idx] -= step;
+          drift += step;
         }
-        const pick = candidates[ri(0, candidates.length - 1)];
-        const add = Math.min(left, pick.cap, ri(1, Math.max(1, Math.min(pick.cap, 25))));
-        qtys[pick.i] += add;
-        left -= add;
       }
-      return qtys.sort(() => Math.random() - 0.5);
+
+      // 4) If we still have drift (rare), absorb into the largest-room run; never violate provider min.
+      if (drift !== 0) {
+        if (drift > 0) {
+          // give it to the run with most headroom
+          let best = 0;
+          for (let i = 1; i < qtys.length; i++) if (qtys[i] < qtys[best]) best = i;
+          qtys[best] += drift;
+        } else {
+          // remove from the largest run, but never go below `min`
+          let best = 0;
+          for (let i = 1; i < qtys.length; i++) if (qtys[i] > qtys[best]) best = i;
+          qtys[best] = Math.max(min, qtys[best] + drift);
+        }
+      }
+
+      // 5) Avoid identical neighbours (organic = not duplicate-looking).
+      for (let i = 1; i < qtys.length; i++) {
+        if (qtys[i] === qtys[i - 1]) {
+          const swap = (i + 2) % qtys.length;
+          if (swap !== i) { const t = qtys[i]; qtys[i] = qtys[swap]; qtys[swap] = t; }
+        }
+      }
+
+      // 6) Shuffle so order isn't ascending/descending.
+      for (let i = qtys.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = qtys[i]; qtys[i] = qtys[j]; qtys[j] = t;
+      }
+
+      return qtys;
     };
     // helper: turn round numbers into organic ones (e.g. 150 -> 147 / 152 / 161, never trailing zero)
     const organicize = (n: number, min: number, max: number) => {
