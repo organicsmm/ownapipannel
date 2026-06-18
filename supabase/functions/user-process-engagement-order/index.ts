@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 
     // Create items + schedule runs
     const startTime = new Date();
-    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
+    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; runs_override: number; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const r of resolved) {
       const { data: item, error: itemErr } = await supabase
         .from("engagement_order_items")
@@ -219,6 +219,7 @@ Deno.serve(async (req) => {
         time_limit_hours: r.time_limit_hours,
         variance_percent: r.variance_percent,
         peak_hours_enabled: r.peak_hours_enabled,
+        runs_override: r.runs_override,
           provider_min_qty: r.provider_min_qty,
           provider_max_qty: r.provider_max_qty,
       });
