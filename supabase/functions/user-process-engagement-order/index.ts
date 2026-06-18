@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate every requested item
-    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
+    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; runs_override: number; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const it of items) {
       const bi = itemMap.get(it.user_bundle_item_id);
       if (!bi) return new Response(JSON.stringify({ error: `Bundle item ${it.user_bundle_item_id} not found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
