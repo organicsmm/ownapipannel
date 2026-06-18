@@ -115,6 +115,8 @@ export interface EngagementConfig {
   timeLimitCustomMode?: boolean; // UI-only: true when "Custom" button is selected
   variancePercent: number;     // 10-50, default 25
   peakHoursEnabled: boolean;   // default true
+  runsOverride?: number;       // 0/undefined = Auto, >0 = user-chosen run count
+  runsCustomMode?: boolean;    // UI-only: Custom button selected
 }
 
 // Default organic settings for each type
@@ -122,6 +124,7 @@ export const DEFAULT_ORGANIC_SETTINGS = {
   timeLimitHours: 0,        // Auto mode
   variancePercent: 25,      // 25% variance
   peakHoursEnabled: false,  // Peak hours OFF by default
+  runsOverride: 0,          // Auto
 };
 
 // Platform icons and colors - Deep Premium Palettes

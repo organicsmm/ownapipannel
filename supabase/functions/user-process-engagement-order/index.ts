@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
         time_limit_hours?: number;       // 0 = Auto
         variance_percent?: number;        // 10-50
         peak_hours_enabled?: boolean;
+        runs_override?: number;           // 0 = Auto, >0 = user-chosen runs
       }>;
       is_organic_mode?: boolean;
     };
@@ -109,7 +110,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate every requested item
-    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
+    const resolved: Array<{ bi: any; engagement_type: string; quantity: number; price: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; runs_override: number; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const it of items) {
       const bi = itemMap.get(it.user_bundle_item_id);
       if (!bi) return new Response(JSON.stringify({ error: `Bundle item ${it.user_bundle_item_id} not found` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
         time_limit_hours: Math.max(0, Number(it.time_limit_hours || 0)),
         variance_percent: Math.min(50, Math.max(0, Number(it.variance_percent ?? 25))),
         peak_hours_enabled: !!it.peak_hours_enabled,
+        runs_override: Math.max(0, Math.floor(Number(it.runs_override || 0))),
         provider_min_qty: Math.max(1, minQ || 10),
         provider_max_qty: maxQ > 0 ? maxQ : Number.MAX_SAFE_INTEGER,
       });
@@ -191,7 +193,7 @@ Deno.serve(async (req) => {
 
     // Create items + schedule runs
     const startTime = new Date();
-    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; provider_min_qty: number; provider_max_qty: number }> = [];
+    const createdItems: Array<{ itemId: string; bi: any; quantity: number; time_limit_hours: number; variance_percent: number; peak_hours_enabled: boolean; runs_override: number; provider_min_qty: number; provider_max_qty: number }> = [];
     for (const r of resolved) {
       const { data: item, error: itemErr } = await supabase
         .from("engagement_order_items")
@@ -217,6 +219,7 @@ Deno.serve(async (req) => {
         time_limit_hours: r.time_limit_hours,
         variance_percent: r.variance_percent,
         peak_hours_enabled: r.peak_hours_enabled,
+        runs_override: r.runs_override,
           provider_min_qty: r.provider_min_qty,
           provider_max_qty: r.provider_max_qty,
       });
@@ -335,7 +338,7 @@ Deno.serve(async (req) => {
       return Math.max(1, v);
     };
 
-    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled, provider_min_qty, provider_max_qty } of createdItems) {
+    for (const { itemId, bi, quantity, time_limit_hours, variance_percent, peak_hours_enabled, runs_override, provider_min_qty, provider_max_qty } of createdItems) {
       const c = cfg(bi.engagement_type);
       const isViews = String(bi.engagement_type).toLowerCase() === "views";
       const providerMin = Math.max(isViews ? 100 : 10, Number(provider_min_qty || bi.min_qty || 1));
@@ -349,43 +352,41 @@ Deno.serve(async (req) => {
       let targetRuns: number;
       let intervalMinutes: number;
 
-      if (time_limit_hours && time_limit_hours > 0) {
-        const totalMinutes = time_limit_hours * 60;
-        const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
-        // How many runs are actually possible without going below provider minimum
-        const maxSplitByMin = Math.max(1, Math.floor(quantity / Math.max(1, providerMin)));
+      // Absolute upper bound on runs: each run must hit providerMin.
+      const maxSplitByMin = Math.max(1, Math.floor(quantity / Math.max(1, providerMin)));
+
+      if (runs_override && runs_override > 0) {
+        // User explicitly chose how many runs. Clamp to feasible window + min-per-run.
+        const totalMinutes = (time_limit_hours && time_limit_hours > 0 ? time_limit_hours : 24) * 60;
         const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
-        const idealRuns = Math.max(1, Math.floor(totalMinutes / Math.max(MIN_INTERVAL, c.baseInterval / 2)));
-        // Always try to split into at least 2 runs if quantity allows it, so the
-        // chosen timeframe actually spreads delivery — never dump everything instantly.
-        const desired = Math.min(
-          maxSplitByMin,
-          maxRunsByTime,
-          Math.max(runsAtBaseBatch, Math.min(idealRuns, c.maxRuns))
-        );
-        if (runsAtBaseBatch <= idealRuns && maxSplitByMin >= 2) {
-          targetRuns = Math.max(2, Math.max(c.minRuns, Math.min(c.maxRuns, desired)));
-        } else if (runsAtBaseBatch <= idealRuns) {
-          // qty too small to split → single run, but we'll schedule it inside the window below
-          targetRuns = 1;
+        targetRuns = Math.max(1, Math.min(runs_override, maxSplitByMin, maxRunsByTime));
+        const avgRequired = quantity / targetRuns;
+        effectiveMaxBatch = Math.min(providerMax, Math.max(providerMin, Math.ceil(avgRequired * 1.6)));
+        effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
+        intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / Math.max(1, targetRuns));
+
+      } else if (time_limit_hours && time_limit_hours > 0) {
+        const totalMinutes = time_limit_hours * 60;
+        const maxRunsByTime = Math.max(1, Math.floor(totalMinutes / MIN_INTERVAL));
+        // Aim for organic chunk size ~ providerMin * 4 (so each chunk lands in providerMin..providerMin*8 range).
+        const organicTarget = Math.max(c.minRuns, Math.ceil(quantity / Math.max(providerMin * 4, 1)));
+        const desired = Math.min(maxSplitByMin, maxRunsByTime, Math.max(organicTarget, c.minRuns));
+        if (desired >= 2) {
+          targetRuns = Math.max(2, Math.min(c.maxRuns, desired));
         } else {
-          targetRuns = Math.min(c.maxRuns, Math.max(c.minRuns, Math.min(maxRunsByTime, maxSplitByMin)));
-          const avgRequired = quantity / targetRuns;
-          effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
-          effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
+          targetRuns = 1;
         }
+        const avgRequired = quantity / Math.max(1, targetRuns);
+        effectiveMaxBatch = Math.min(providerMax, Math.max(providerMin, Math.ceil(avgRequired * 1.6)));
+        effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
         intervalMinutes = Math.max(MIN_INTERVAL, totalMinutes / Math.max(1, targetRuns));
 
       } else if (is_organic_mode) {
-        const runsAtBaseBatch = Math.ceil(quantity / baseMaxBatch);
-        if (runsAtBaseBatch <= c.maxRuns) {
-          targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, runsAtBaseBatch));
-        } else {
-          targetRuns = c.maxRuns;
-          const avgRequired = quantity / targetRuns;
-          effectiveMaxBatch = Math.min(providerMax, Math.max(baseMaxBatch, Math.ceil(avgRequired * 1.4)));
-          effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
-        }
+        const organicTarget = Math.max(c.minRuns, Math.ceil(quantity / Math.max(providerMin * 4, 1)));
+        targetRuns = Math.max(c.minRuns, Math.min(c.maxRuns, Math.min(maxSplitByMin, organicTarget)));
+        const avgRequired = quantity / Math.max(1, targetRuns);
+        effectiveMaxBatch = Math.min(providerMax, Math.max(providerMin, Math.ceil(avgRequired * 1.6)));
+        effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(avgRequired * 0.6)));
         intervalMinutes = c.baseInterval;
       } else {
         targetRuns = Math.max(1, Math.ceil(quantity / baseMaxBatch));
