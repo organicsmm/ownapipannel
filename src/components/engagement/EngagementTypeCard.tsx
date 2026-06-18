@@ -118,6 +118,11 @@ export function EngagementTypeCard({
   const isCustomMode = config.timeLimitCustomMode ?? false;
   const variancePercent = config.variancePercent ?? DEFAULT_ORGANIC_SETTINGS.variancePercent;
   const peakHoursEnabled = config.peakHoursEnabled ?? DEFAULT_ORGANIC_SETTINGS.peakHoursEnabled;
+  const runsOverride = config.runsOverride ?? 0;
+  const isRunsCustomMode = config.runsCustomMode ?? false;
+
+  // Hard cap: cannot have more runs than (qty / providerMin) — each run must hit provider min.
+  const maxRunsByMin = Math.max(1, Math.floor(config.quantity / Math.max(providerMin, 1)));
 
   // Calculate full schedule with runs (organic, randomized distribution)
   const scheduleData = useMemo(() => {
@@ -125,7 +130,16 @@ export function EngagementTypeCard({
     const durationHours = timeLimitHours > 0 ? timeLimitHours : 24;
     const duration = durationHours * 60 * 60 * 1000;
     const startTime = new Date();
-    const runCount = Math.min(30, Math.max(3, Math.ceil(config.quantity / Math.max(providerMin * 25, 1))));
+
+    // Auto target: aim for chunks around providerMin * 4 (e.g. min 100 → ~400/run, range 100-700)
+    const autoTarget = Math.max(3, Math.ceil(config.quantity / Math.max(providerMin * 4, 1)));
+    const autoRuns = Math.min(maxRunsByMin, Math.min(60, autoTarget));
+
+    // User override wins (clamped to feasible max).
+    const runCount = runsOverride > 0
+      ? Math.max(1, Math.min(maxRunsByMin, runsOverride))
+      : autoRuns;
+
     const avgInterval = runCount > 1 ? Math.round(duration / (runCount - 1) / 60000) : 0;
 
     // Seeded PRNG so preview is stable per (quantity, runCount, variance, peak, duration)
@@ -136,44 +150,39 @@ export function EngagementTypeCard({
     };
 
     const variance = variancePercent / 100;
-
-    // 1) Build raw weights with random variance and peak-hour boost + jittered times
-    // Organic feel: wide spread + occasional spikes + occasional quiet runs,
-    // so two consecutive runs almost never look the same size.
     const weights: number[] = [];
     const times: Date[] = [];
-    // Effective spread — even at 10% variance we still want visible randomness.
     const spread = Math.max(variance, 0.35);
     for (let idx = 0; idx < runCount; idx++) {
-      // Time: spread runs unevenly across the window with strong jitter (±55% of avg gap)
       const evenT = runCount === 1 ? 0 : (duration * idx) / (runCount - 1);
       const jitterRange = runCount > 1 ? (duration / (runCount - 1)) * 0.55 : 0;
       const jitter = idx === 0 || idx === runCount - 1 ? 0 : (rand() - 0.5) * 2 * jitterRange;
       const scheduledAt = new Date(startTime.getTime() + evenT + jitter);
       times.push(scheduledAt);
 
-      // Quantity weight: base ±spread, occasional 1.8x burst, occasional 0.45x lull
       let r = 1 + (rand() - 0.5) * 2 * spread;
       const roll = rand();
-      if (roll < 0.12) r *= 1.6 + rand() * 0.8;   // ~12% burst runs
-      else if (roll > 0.88) r *= 0.45 + rand() * 0.25; // ~12% quiet runs
+      if (roll < 0.12) r *= 1.6 + rand() * 0.8;
+      else if (roll > 0.88) r *= 0.45 + rand() * 0.25;
       const hr = scheduledAt.getHours();
       const peakBoost = peakHoursEnabled && hr >= 18 && hr <= 23 ? 1.35 : 1;
       weights.push(Math.max(0.15, r * peakBoost));
     }
 
-    // 2) Normalize so total quantity is preserved
     const weightSum = weights.reduce((a, b) => a + b, 0);
     const rawQtys = weights.map((w) => (w / weightSum) * config.quantity);
 
-    // 3) Round, enforce providerMin, distribute drift across multiple runs (not just last)
-    const qtys = rawQtys.map((q) => Math.max(providerMin, Math.round(q)));
+    // Round + enforce providerMin. Cap each chunk so no single run dwarfs the rest
+    // (max chunk ~= providerMin * 8 OR 3x avg, whichever is larger, but never > quantity).
+    const avgChunk = config.quantity / runCount;
+    const chunkCeiling = Math.max(providerMin * 8, Math.ceil(avgChunk * 3));
+    const qtys = rawQtys.map((q) => Math.min(chunkCeiling, Math.max(providerMin, Math.round(q))));
     let drift = config.quantity - qtys.reduce((a, b) => a + b, 0);
     let guard = 0;
-    while (drift !== 0 && guard++ < 2000 && qtys.length > 0) {
+    while (drift !== 0 && guard++ < 4000 && qtys.length > 0) {
       const i = Math.floor(rand() * qtys.length);
-      if (drift > 0) { qtys[i] += 1; drift -= 1; }
-      else if (qtys[i] > providerMin) { qtys[i] -= 1; drift += 1; }
+      if (drift > 0 && qtys[i] < chunkCeiling) { qtys[i] += 1; drift -= 1; }
+      else if (drift < 0 && qtys[i] > providerMin) { qtys[i] -= 1; drift += 1; }
     }
 
     const runs = times.map((scheduledAt, idx) => {
@@ -188,13 +197,7 @@ export function EngagementTypeCard({
 
     const finishTime = runs[runs.length - 1]?.scheduledAt ?? new Date();
 
-    return {
-      runs,
-      runCount,
-      avgInterval,
-      finishTime,
-      duration,
-    };
+    return { runs, runCount, avgInterval, finishTime, duration };
   }, [
     config.enabled,
     config.quantity,
@@ -202,6 +205,8 @@ export function EngagementTypeCard({
     variancePercent,
     peakHoursEnabled,
     providerMin,
+    runsOverride,
+    maxRunsByMin,
   ]);
 
   const handleToggle = (enabled: boolean) => {
