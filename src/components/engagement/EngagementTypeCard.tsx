@@ -277,6 +277,16 @@ export function EngagementTypeCard({
     onChange({ ...config, peakHoursEnabled: enabled });
   };
 
+  const handleRunsOverride = (runs: number) => {
+    // runs === -1 → custom mode, runs === 0 → auto
+    if (runs === -1) {
+      onChange({ ...config, runsCustomMode: true });
+    } else {
+      const clamped = runs > 0 ? Math.min(maxRunsByMin, runs) : 0;
+      onChange({ ...config, runsOverride: clamped, runsCustomMode: false });
+    }
+  };
+
   // Validation
   const isBelowMin = config.enabled && config.quantity < providerMin;
   const isAboveMax = config.enabled && config.quantity > providerMax;
