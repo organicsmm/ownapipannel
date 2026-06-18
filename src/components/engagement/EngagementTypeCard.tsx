@@ -659,21 +659,26 @@ export function EngagementTypeCard({
                     </p>
                   </div>
 
-                  {/* Per run range - Compact on mobile */}
-                  {scheduleData && scheduleData.runCount > 0 && (
-                    <div className="flex items-center justify-between text-xs sm:text-sm bg-secondary rounded-xl px-3 sm:px-4 py-2 sm:py-3 border-2 border-border">
-                      <span className="text-muted-foreground font-medium">Per run:</span>
-                      <div className="flex items-center gap-1.5 sm:gap-3">
-                        <span className="text-foreground/60 font-bold font-mono text-xs sm:text-sm">
-                          -{Math.round((config.quantity / scheduleData.runCount) * (variancePercent / 100))}
-                        </span>
-                        <span className="text-muted-foreground text-xs">to</span>
-                        <span className="text-foreground font-bold font-mono text-xs sm:text-sm">
-                          +{Math.round((config.quantity / scheduleData.runCount) * (variancePercent / 100))}
-                        </span>
+                  {/* Per run range - reflect actual scheduled chunks */}
+                  {scheduleData && scheduleData.runCount > 0 && (() => {
+                    const qs = scheduleData.runs.map(r => r.quantity);
+                    const lo = Math.min(...qs);
+                    const hi = Math.max(...qs);
+                    return (
+                      <div className="flex items-center justify-between text-xs sm:text-sm bg-secondary rounded-xl px-3 sm:px-4 py-2 sm:py-3 border-2 border-border">
+                        <span className="text-muted-foreground font-medium">Per run:</span>
+                        <div className="flex items-center gap-1.5 sm:gap-3">
+                          <span className="text-foreground/60 font-bold font-mono text-xs sm:text-sm">
+                            {lo.toLocaleString()}
+                          </span>
+                          <span className="text-muted-foreground text-xs">to</span>
+                          <span className="text-foreground font-bold font-mono text-xs sm:text-sm">
+                            {hi.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* Peak Hours Toggle - compact */}
