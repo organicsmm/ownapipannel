@@ -392,11 +392,22 @@ Deno.serve(async (req) => {
         intervalMinutes = c.baseInterval;
       }
 
+      // Ensure we have enough runs to actually fit `quantity` within providerMax.
+      const minRunsForProviderMax = Math.max(1, Math.ceil(quantity / Math.max(1, providerMax)));
+      if (targetRuns < minRunsForProviderMax) targetRuns = minRunsForProviderMax;
+
       const safetyAvg = quantity / Math.max(1, targetRuns);
-      if (safetyAvg > effectiveMaxBatch) {
-        effectiveMaxBatch = Math.min(providerMax, Math.ceil(safetyAvg * 1.4));
-        effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(safetyAvg * 0.6)));
+      // Per-run ceiling must always be able to hold the average chunk + jitter.
+      // Cap at providerMax so we never ask the provider for more than it allows.
+      const requiredMax = Math.ceil(safetyAvg * 1.6);
+      if (requiredMax > effectiveMaxBatch) {
+        effectiveMaxBatch = Math.min(providerMax, Math.max(effectiveMaxBatch, requiredMax));
       }
+      // If providerMax is the bottleneck, add runs until n * providerMax >= quantity.
+      if (effectiveMaxBatch * targetRuns < quantity) {
+        targetRuns = Math.max(targetRuns, Math.ceil(quantity / Math.max(1, effectiveMaxBatch)));
+      }
+      effectiveMinBatch = Math.max(providerMin, Math.min(effectiveMaxBatch, Math.floor(safetyAvg * 0.5)));
       if (effectiveMinBatch > effectiveMaxBatch) effectiveMinBatch = effectiveMaxBatch;
 
       const minBatch = Math.max(providerMin, effectiveMinBatch);
