@@ -467,6 +467,73 @@ export function EngagementTypeCard({
                   )}
                 </div>
 
+                {/* Number of Runs override */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold flex items-center justify-between text-foreground uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5">
+                      <List className="h-3 w-3 text-foreground" />
+                      Number of Runs
+                    </span>
+                    <span className="text-[9px] text-muted-foreground normal-case tracking-normal font-medium">
+                      Max {maxRunsByMin.toLocaleString()} · min {providerMin}/run
+                    </span>
+                  </Label>
+                  <div className="flex flex-wrap gap-1">
+                    {(() => {
+                      const presets: Array<{ value: number; label: string }> = [
+                        { value: 0, label: 'Auto' },
+                      ];
+                      // Only show presets that fit within feasible runs
+                      for (const v of [10, 25, 50, 100, 200]) {
+                        if (v <= maxRunsByMin) presets.push({ value: v, label: String(v) });
+                      }
+                      presets.push({ value: -1, label: 'Custom' });
+                      return presets.map(p => {
+                        let isSelected = false;
+                        if (p.value === -1) isSelected = isRunsCustomMode;
+                        else if (p.value === 0) isSelected = !isRunsCustomMode && (!runsOverride || runsOverride === 0);
+                        else isSelected = !isRunsCustomMode && runsOverride === p.value;
+                        return (
+                          <Button
+                            key={p.value}
+                            variant={isSelected ? 'default' : 'outline'}
+                            size="sm"
+                            className={cn(
+                              'h-6 text-[10px] px-2 font-bold',
+                              isSelected
+                                ? 'bg-foreground text-background'
+                                : 'bg-secondary text-foreground border border-border hover:bg-muted'
+                            )}
+                            onClick={() => handleRunsOverride(p.value)}
+                          >
+                            {p.label}
+                          </Button>
+                        );
+                      });
+                    })()}
+                  </div>
+                  {isRunsCustomMode && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={runsOverride || ''}
+                        placeholder="e.g. 30"
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                          const clamped = n > 0 ? Math.min(maxRunsByMin, n) : 0;
+                          onChange({ ...config, runsOverride: clamped, runsCustomMode: true });
+                        }}
+                        className="w-20 sm:w-24 h-9 text-sm bg-secondary border-2 border-border text-foreground font-bold"
+                      />
+                      <span className="text-xs text-muted-foreground font-medium">runs</span>
+                    </div>
+                  )}
+                </div>
+
+
+
                 {/* Variance Slider */}
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold flex items-center justify-between text-foreground uppercase tracking-widest">
