@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
         time_limit_hours?: number;       // 0 = Auto
         variance_percent?: number;        // 10-50
         peak_hours_enabled?: boolean;
+        runs_override?: number;           // 0 = Auto, >0 = user-chosen runs
       }>;
       is_organic_mode?: boolean;
     };
