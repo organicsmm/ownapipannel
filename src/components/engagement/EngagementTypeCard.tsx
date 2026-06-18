@@ -138,29 +138,43 @@ export function EngagementTypeCard({
     const variance = variancePercent / 100;
 
     // 1) Build raw weights with random variance and peak-hour boost + jittered times
+    // Organic feel: wide spread + occasional spikes + occasional quiet runs,
+    // so two consecutive runs almost never look the same size.
     const weights: number[] = [];
     const times: Date[] = [];
+    // Effective spread — even at 10% variance we still want visible randomness.
+    const spread = Math.max(variance, 0.35);
     for (let idx = 0; idx < runCount; idx++) {
+      // Time: spread runs unevenly across the window with strong jitter (±55% of avg gap)
       const evenT = runCount === 1 ? 0 : (duration * idx) / (runCount - 1);
-      const jitterRange = runCount > 1 ? (duration / (runCount - 1)) * 0.3 : 0;
+      const jitterRange = runCount > 1 ? (duration / (runCount - 1)) * 0.55 : 0;
       const jitter = idx === 0 || idx === runCount - 1 ? 0 : (rand() - 0.5) * 2 * jitterRange;
       const scheduledAt = new Date(startTime.getTime() + evenT + jitter);
       times.push(scheduledAt);
 
-      const r = 1 + (rand() - 0.5) * 2 * variance;
+      // Quantity weight: base ±spread, occasional 1.8x burst, occasional 0.45x lull
+      let r = 1 + (rand() - 0.5) * 2 * spread;
+      const roll = rand();
+      if (roll < 0.12) r *= 1.6 + rand() * 0.8;   // ~12% burst runs
+      else if (roll > 0.88) r *= 0.45 + rand() * 0.25; // ~12% quiet runs
       const hr = scheduledAt.getHours();
       const peakBoost = peakHoursEnabled && hr >= 18 && hr <= 23 ? 1.35 : 1;
-      weights.push(Math.max(0.1, r * peakBoost));
+      weights.push(Math.max(0.15, r * peakBoost));
     }
 
     // 2) Normalize so total quantity is preserved
     const weightSum = weights.reduce((a, b) => a + b, 0);
     const rawQtys = weights.map((w) => (w / weightSum) * config.quantity);
 
-    // 3) Round, enforce providerMin, fix drift on last run
+    // 3) Round, enforce providerMin, distribute drift across multiple runs (not just last)
     const qtys = rawQtys.map((q) => Math.max(providerMin, Math.round(q)));
-    const drift = config.quantity - qtys.reduce((a, b) => a + b, 0);
-    if (qtys.length > 0) qtys[qtys.length - 1] = Math.max(providerMin, qtys[qtys.length - 1] + drift);
+    let drift = config.quantity - qtys.reduce((a, b) => a + b, 0);
+    let guard = 0;
+    while (drift !== 0 && guard++ < 2000 && qtys.length > 0) {
+      const i = Math.floor(rand() * qtys.length);
+      if (drift > 0) { qtys[i] += 1; drift -= 1; }
+      else if (qtys[i] > providerMin) { qtys[i] -= 1; drift += 1; }
+    }
 
     const runs = times.map((scheduledAt, idx) => {
       const hr = scheduledAt.getHours();
