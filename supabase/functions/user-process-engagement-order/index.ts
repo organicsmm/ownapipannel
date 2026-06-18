@@ -137,6 +137,7 @@ Deno.serve(async (req) => {
         time_limit_hours: Math.max(0, Number(it.time_limit_hours || 0)),
         variance_percent: Math.min(50, Math.max(0, Number(it.variance_percent ?? 25))),
         peak_hours_enabled: !!it.peak_hours_enabled,
+        runs_override: Math.max(0, Math.floor(Number(it.runs_override || 0))),
         provider_min_qty: Math.max(1, minQ || 10),
         provider_max_qty: maxQ > 0 ? maxQ : Number.MAX_SAFE_INTEGER,
       });
