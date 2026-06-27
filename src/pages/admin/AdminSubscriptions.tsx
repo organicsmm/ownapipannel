@@ -676,7 +676,13 @@ export default function AdminSubscriptions() {
               </Card>
             )}
           </TabsContent>
+
+          {/* ZapUPI Auto Payments Tab */}
+          <TabsContent value="zapupi" className="mt-4 space-y-4">
+            <ZapUpiPaymentsList />
+          </TabsContent>
         </Tabs>
+
 
         {/* Request Action Dialog */}
         <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
