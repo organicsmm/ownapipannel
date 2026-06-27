@@ -26,6 +26,35 @@ export default function Services() {
 
   const { services } = useServices();
 
+  useEffect(() => {
+    const id = 'services-itemlist-jsonld';
+    document.getElementById(id)?.remove();
+    if (!services || services.length === 0) return;
+    const items = services.slice(0, 50).map((s, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Service',
+        name: s.name,
+        category: s.category,
+        provider: { '@type': 'Organization', name: 'Boostly Pro' },
+        ...(s.description ? { description: s.description } : {}),
+      },
+    }));
+    const ld = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Boostly Pro Services',
+      itemListElement: items,
+    };
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.id = id;
+    script.text = JSON.stringify(ld);
+    document.head.appendChild(script);
+    return () => { document.getElementById(id)?.remove(); };
+  }, [services]);
+
   const filteredServices = services?.filter(service => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          service.category.toLowerCase().includes(searchQuery.toLowerCase());
