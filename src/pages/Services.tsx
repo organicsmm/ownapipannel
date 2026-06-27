@@ -113,9 +113,9 @@ export default function Services() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <span className="text-xs text-muted-foreground">{service.category}</span>
-                      <h3 className="font-semibold mt-1 group-hover:text-primary transition-colors">
+                      <h2 className="font-semibold text-base mt-1 group-hover:text-primary transition-colors">
                         {service.name}
-                      </h3>
+                      </h2>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs ${quality.color}`}>
                       {quality.label}
