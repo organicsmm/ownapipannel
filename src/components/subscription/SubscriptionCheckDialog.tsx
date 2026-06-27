@@ -186,18 +186,39 @@ export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionChec
               </div>
             )}
 
-            {/* Action Button */}
+            {/* Action Buttons */}
             {!hasPendingRequest && (
-              <Button
-                className="w-full btn-gradient rounded-xl py-5 text-base"
-                onClick={() => {
-                  onOpenChange(false);
-                  setShowRequestDialog(true);
-                }}
-              >
-                Get {selectedPlan === 'monthly' ? 'Monthly' : 'Lifetime'} Plan
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  className="w-full btn-gradient rounded-xl py-5 text-base"
+                  disabled={payingUpi || !plans?.[selectedPlan]}
+                  onClick={payWithUpi}
+                >
+                  {payingUpi ? (
+                    <>Processing…</>
+                  ) : (
+                    <>
+                      Pay with UPI (Instant)
+                      {plans?.[selectedPlan] ? ` — ₹${plans[selectedPlan]}` : ''}
+                      <Zap className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl py-5 text-sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    setShowRequestDialog(true);
+                  }}
+                >
+                  Request Manual Activation
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                <p className="text-[11px] text-center text-muted-foreground">
+                  UPI payment instantly unlocks your plan. Manual takes admin approval.
+                </p>
+              </div>
             )}
 
             {/* Back Link */}
