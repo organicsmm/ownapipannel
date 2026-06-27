@@ -251,22 +251,24 @@ Deno.serve(async (req) => {
       if (total < Math.max(1, min) || desiredRuns <= 1) return [total];
 
       // How many chunks can we realistically make, given provider min?
-      const cap = Math.max(1, Math.min(desiredRuns, Math.floor(total / Math.max(1, min)), 5000));
-      let n = cap;
+      let cap = Math.max(1, Math.min(desiredRuns, Math.floor(total / Math.max(1, min)), 5000));
+      // CRITICAL: ensure each chunk has *real* room to vary above provider min.
+      // If avg == min, every weight below 1.0 gets clamped → every run = min (looks fake).
+      // Force avg >= min * 1.6 by reducing n.
+      const headroom = Math.max(1, Math.floor(total / Math.max(1, Math.ceil(min * 1.6))));
+      let n = Math.max(1, Math.min(cap, headroom));
+      if (n < 2 && cap >= 2) n = Math.min(cap, 2);
 
-      // Expand the per-chunk ceiling so it can actually hold `total` across n runs.
-      // Need: n * effMax >= total  →  effMax >= ceil(total / n) * organic_buffer
       const needed = Math.ceil(total / n);
       const effMax = Math.max(max, Math.ceil(needed * 1.8), min + 1);
-      // Effective floor: don't drop below provider min, but also don't be larger
-      // than the per-chunk average (otherwise every chunk = min and we can't reach total).
+      // Allow chunks to dip well below avg so the spread is organic.
       const effMin = Math.max(min, Math.min(effMax - 1, Math.floor(needed * 0.35)));
 
       // 1) Seed each run with random weight, then normalize to total.
       const weights: number[] = [];
       for (let i = 0; i < n; i++) {
-        // Organic-looking weight: log-normalish via (0.55..1.45)
-        weights.push(0.55 + Math.random() * 0.9);
+        // Wide organic spread (0.35..1.75) so distribution doesn't collapse to the mean.
+        weights.push(0.35 + Math.random() * 1.4);
       }
       const wSum = weights.reduce((a, b) => a + b, 0);
       let qtys = weights.map((w) => Math.round((w / wSum) * total));
@@ -294,27 +296,40 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 4) If we still have drift (rare), absorb into the largest-room run; never violate provider min.
+      // 4) Residual drift absorber.
       if (drift !== 0) {
         if (drift > 0) {
-          // give it to the run with most headroom
           let best = 0;
           for (let i = 1; i < qtys.length; i++) if (qtys[i] < qtys[best]) best = i;
           qtys[best] += drift;
         } else {
-          // remove from the largest run, but never go below `min`
           let best = 0;
           for (let i = 1; i < qtys.length; i++) if (qtys[i] > qtys[best]) best = i;
           qtys[best] = Math.max(min, qtys[best] + drift);
         }
       }
 
-      // 5) Avoid identical neighbours (organic = not duplicate-looking).
-      for (let i = 1; i < qtys.length; i++) {
-        if (qtys[i] === qtys[i - 1]) {
-          const swap = (i + 2) % qtys.length;
-          if (swap !== i) { const t = qtys[i]; qtys[i] = qtys[swap]; qtys[swap] = t; }
+      // 5) Force every run to be unique — no two runs share the same number.
+      const seen = new Set<number>();
+      for (let i = 0; i < qtys.length; i++) {
+        let q = qtys[i];
+        let tries = 0;
+        while (seen.has(q) && tries++ < 40) {
+          // Nudge by ±1..5 swapping a unit with another run to keep total constant.
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          const delta = dir * (1 + Math.floor(Math.random() * 5));
+          const newQ = q + delta;
+          if (newQ < min || newQ > effMax) { q += dir; continue; }
+          // Pull/push the delta from/to another run to preserve total.
+          const j = (i + 1 + Math.floor(Math.random() * Math.max(1, qtys.length - 1))) % qtys.length;
+          if (j === i) continue;
+          const partner = qtys[j] - delta;
+          if (partner < min || partner > effMax) { q += dir; continue; }
+          qtys[j] = partner;
+          q = newQ;
         }
+        qtys[i] = q;
+        seen.add(q);
       }
 
       // 6) Shuffle so order isn't ascending/descending.
@@ -325,6 +340,7 @@ Deno.serve(async (req) => {
 
       return qtys;
     };
+
     // helper: turn round numbers into organic ones (e.g. 150 -> 147 / 152 / 161, never trailing zero)
     const organicize = (n: number, min: number, max: number) => {
       if (n <= min) return Math.max(min, n);
