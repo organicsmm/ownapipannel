@@ -573,7 +573,6 @@ function ProviderRow({
           max={99}
           value={priority}
           onChange={(e) => setPriority(Number(e.target.value) || 1)}
-          onBlur={() => { if ((linked && prioChanged) || (serviceId.trim() && (valChanged || prioChanged))) saveRow(); }}
           disabled={saving}
           className="h-8 px-1 text-center text-xs"
           title="Priority"
@@ -585,21 +584,33 @@ function ProviderRow({
           maxLength={9}
           value={serviceId}
           onChange={(e) => setServiceId(e.target.value.replace(/\D/g, "").slice(0, 9))}
-          onBlur={() => { if (valChanged || (serviceId.trim() && prioChanged)) saveRow(); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (valChanged || prioChanged) saveRow(); } }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (serviceId.trim() && (valChanged || prioChanged)) saveRow(); } }}
           disabled={saving}
           className="h-8 px-2 text-xs"
         />
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-6"
-          onClick={removeRow}
-          disabled={saving || !linked}
-          title="Remove"
-        >
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3 text-destructive" />}
-        </Button>
+        {(!linked || valChanged || prioChanged) ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-6"
+            onClick={saveRow}
+            disabled={saving || !serviceId.trim()}
+            title="Save"
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-6"
+            onClick={removeRow}
+            disabled={saving}
+            title="Remove"
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3 text-destructive" />}
+          </Button>
+        )}
       </div>
     </div>
   );
