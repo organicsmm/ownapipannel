@@ -82,10 +82,10 @@ const Index = () => {
           <div className="text-center mb-20">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase mb-6" style={{ color: `${INK}80` }}>— How it works</p>
             <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.02em]" style={{ color: INK }}>
-              Panel ka pura <span className="italic" style={{ color: ACCENT }}>flow.</span>
+              The full panel <span className="italic" style={{ color: ACCENT }}>flow.</span>
             </h2>
             <p className="mt-6 max-w-2xl mx-auto text-[15px] leading-[1.7] font-light" style={{ color: `${INK}99` }}>
-              Provider API se lekar organic delivery tak — har step transparent. Niche diagram dekho aur samjho kaise tumhara order behind the scenes chalta hai.
+              From provider API to organic delivery — every step is transparent. See the diagram below to understand how your order runs behind the scenes.
             </p>
           </div>
 
@@ -108,7 +108,7 @@ const Index = () => {
             <div className="rounded-2xl p-8 text-center mb-3" style={{ background: `linear-gradient(135deg, ${ACCENT}1A, ${SOFT})`, border: `1px solid ${ACCENT}33` }}>
               <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-3" style={{ color: ACCENT }}>Core Engine</p>
               <h3 className="font-serif text-[28px] mb-2" style={{ color: INK }}>LRU Rotation + Auto Failover</h3>
-              <p className="text-[13px] max-w-lg mx-auto" style={{ color: `${INK}99` }}>Har order ke liye sabse fresh provider chuna jaata hai. Ek down ho jaaye to dusra automatic le leta hai.</p>
+              <p className="text-[13px] max-w-lg mx-auto" style={{ color: `${INK}99` }}>The freshest provider is picked for every order. If one goes down, another takes over automatically.</p>
             </div>
             <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: `${INK}80` }}>Step 2 · Smart routing, no single point of failure</p>
 
@@ -117,8 +117,8 @@ const Index = () => {
             {/* STEP 3 */}
             <div className="grid md:grid-cols-2 gap-4 mb-3">
               {[
-                { tag: 'Service Mapping', h: 'Provider services → Your services', d: 'Admin har provider ki service ko apni catalog se map karta hai. Pricing, quality, speed sab control me.' },
-                { tag: 'Bundle Builder', h: 'Likes + Views + Followers', d: 'Multiple services ko ek bundle me pack karo. User ek hi click me poora growth package le.' },
+                { tag: 'Service Mapping', h: 'Provider services → Your services', d: 'Admin maps each provider service to your catalog. Pricing, quality and speed stay fully in your control.' },
+                { tag: 'Bundle Builder', h: 'Likes + Views + Followers', d: 'Pack multiple services into one bundle. Users grab a complete growth package in a single click.' },
               ].map((c) => (
                 <div key={c.tag} className="rounded-2xl p-6" style={{ background: 'white', border: `1px solid ${INK}1A`, boxShadow: `0 10px 30px -20px ${INK}33` }}>
                   <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: `${INK}80` }}>{c.tag}</p>
@@ -136,12 +136,12 @@ const Index = () => {
               <div className="rounded-2xl p-6" style={{ background: 'white', border: `1px solid ${INK}1A`, boxShadow: `0 10px 30px -20px ${INK}33` }}>
                 <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: `${INK}80` }}>Mode A · Instant</p>
                 <h3 className="font-serif text-[22px] mb-2" style={{ color: INK }}>Engagement Orders</h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>User place karta hai → provider ko forward → fast delivery. Direct, sidha, quick.</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>User places the order → forwarded to provider → fast delivery. Direct, straightforward, quick.</p>
               </div>
               <div className="rounded-2xl p-6" style={{ background: `linear-gradient(135deg, ${ACCENT}1A, ${SOFT})`, border: `1px solid ${ACCENT}40` }}>
                 <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: ACCENT }}>Mode B · Natural</p>
                 <h3 className="font-serif text-[22px] mb-2" style={{ color: INK }}>Organic Delivery</h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>S-curve, ±50% variance, peak-hour weighting. Order chhote chunks me schedule hota hai — algorithm ko lagta hai real audience aa rahi hai.</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>S-curve, ±50% variance, peak-hour weighting. Orders are scheduled in small chunks — the algorithm sees it as a real audience arriving.</p>
               </div>
             </div>
             <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: `${INK}80` }}>Step 4 · User chooses delivery style</p>
