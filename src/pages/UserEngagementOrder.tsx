@@ -294,7 +294,7 @@ function Inner() {
         {activeEngagementTypes.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              Is bundle me koi linked service nahi hai. <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se service ID link karo.
+              This bundle has no linked services. Go to the <a href="/my-bundles" className="underline text-primary">My Bundles</a> page to link a service ID.
             </CardContent>
           </Card>
         ) : (
