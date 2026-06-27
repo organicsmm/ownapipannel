@@ -179,7 +179,7 @@ function Inner() {
       return data;
     },
     onSuccess: (data: any) => {
-      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} provider par bhej diya gaya.` });
+      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} has been sent to the provider.` });
       qc.invalidateQueries({ queryKey: ["engagement-orders"] });
       navigate("/engagement-orders");
     },
@@ -224,13 +224,13 @@ function Inner() {
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
               <Package className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
             </div>
-            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Apna Bundle</Label>
+            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Your Bundle</Label>
           </div>
           {isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
           ) : !bundles || bundles.length === 0 ? (
             <div className="p-4 bg-muted/30 rounded-md text-sm">
-              Pehle <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se ek bundle banao.
+              First create a bundle from the <a href="/my-bundles" className="underline text-primary">My Bundles</a> page.
             </div>
           ) : (
             <Select value={bundleId} onValueChange={setBundleId}>
@@ -294,7 +294,7 @@ function Inner() {
         {activeEngagementTypes.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              Is bundle me koi linked service nahi hai. <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se service ID link karo.
+              This bundle has no linked services. Go to the <a href="/my-bundles" className="underline text-primary">My Bundles</a> page to link a service ID.
             </CardContent>
           </Card>
         ) : (
