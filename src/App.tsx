@@ -121,6 +121,7 @@ const App = () => {
                     <Route path="/order" element={<SubscriptionGuard><Order /></SubscriptionGuard>} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/wallet" element={<Wallet />} />
+                    <Route path="/subscription/return" element={<SubscriptionReturn />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/api-access" element={<ApiAccess />} />
