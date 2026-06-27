@@ -341,13 +341,14 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
  * (mirrored onto user_bundle_items for backwards compat with order flow).
  */
 function EngagementTypeBox({
-  bundleId, type, existing, providers, isFirst,
+  bundleId, type, existing, providers, isFirst, onRemoveType,
 }: {
   bundleId: string;
   type: EngagementType;
   existing: any | undefined;
   providers: any[];
   isFirst: boolean;
+  onRemoveType: () => void;
 }) {
   const qc = useQueryClient();
   const cfg = ENGAGEMENT_CONFIG[type as keyof typeof ENGAGEMENT_CONFIG];
@@ -356,18 +357,6 @@ function EngagementTypeBox({
   const mappingsByProvider = new Map<string, any>(mappings.map(m => [m.user_provider_account_id, m]));
   const linkedCount = mappings.length;
   const primaryProviderId = existing?.user_provider_account_id;
-
-  const removeAll = useMutation({
-    mutationFn: async () => {
-      if (!existing) return;
-      const { error } = await supabase.from("user_bundle_items").delete().eq("id", existing.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["user-bundles"] });
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
 
   return (
     <div className={`rounded-lg border p-3 space-y-3 ${linkedCount > 0 ? "border-emerald-700/40 bg-emerald-900/5" : "border-border bg-muted/10"}`}>
@@ -380,12 +369,17 @@ function EngagementTypeBox({
             </Badge>
           )}
         </div>
-        {linkedCount > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => { if (confirm(`${label} se sabhi providers hata do?`)) removeAll.mutate(); }}>
-            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRemoveType}
+          title={`${label} ko bundle se hata do`}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+        </Button>
       </div>
+
 
       <div className="space-y-2">
         {providers.map((p, idx) => (
