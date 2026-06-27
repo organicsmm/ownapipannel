@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X } from "lucide-react";
+import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X, Crown, GripVertical } from "lucide-react";
 import { PLATFORM_ENGAGEMENT_TYPES, EngagementType, ENGAGEMENT_CONFIG } from "@/lib/engagement-types";
 
 const PLATFORM_TABS: Array<{ id: string; label: string }> = [
@@ -56,7 +56,7 @@ function Inner() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("user_bundles")
-        .select("*, user_bundle_items(*, user_provider_accounts(id, name))")
+        .select("*, user_bundle_items(*, user_provider_accounts(id, name), user_bundle_item_providers(*, user_provider_accounts(id, name)))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -166,14 +166,6 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
   const items: any[] = bundle.user_bundle_items || [];
   const itemsByType = new Map<string, any>(items.map(i => [i.engagement_type, i]));
 
-  // Pick a default provider: from existing items, else first provider
-  const existingProviderId = items.find(i => i.user_provider_account_id)?.user_provider_account_id;
-  const [providerId, setProviderId] = useState<string>(existingProviderId || providers[0]?.id || "");
-
-  useEffect(() => {
-    if (!providerId && providers[0]?.id) setProviderId(providers[0].id);
-  }, [providers, providerId]);
-
   const deleteBundle = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("user_bundles").delete().eq("id", bundle.id).eq("user_id", bundle.user_id);
@@ -256,104 +248,226 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
         </div>
       </div>
 
-      {/* Provider selector */}
-      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-        <Label className="text-xs">Provider Account</Label>
-        {providers.length === 0 ? (
+      {providers.length === 0 ? (
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
           <p className="text-xs text-muted-foreground">
             Koi active provider nahi hai. Pehle <a href="/my-providers" className="underline text-primary">My Providers</a> me add karo.
           </p>
-        ) : (
-          <Select value={providerId} onValueChange={setProviderId}>
-            <SelectTrigger className="h-10">
-              <SelectValue placeholder="Provider chuno" />
-            </SelectTrigger>
-            <SelectContent>
-              {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
-
-      {/* Inline Service ID grid: all engagement types open */}
-      <div className="space-y-2">
-        <Label className="text-xs">Service IDs (har metric ke liye)</Label>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {availableTypes.map((t, idx) => (
-            <ServiceIdBox
-              key={t}
-              bundleId={bundle.id}
-              type={t}
-              existing={itemsByType.get(t)}
-              providerId={providerId}
-              isFirst={idx === 0}
-            />
-          ))}
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
+          <div className="space-y-3">
+            {availableTypes.map((t, idx) => (
+              <EngagementTypeBox
+                key={t}
+                bundleId={bundle.id}
+                type={t}
+                existing={itemsByType.get(t)}
+                providers={providers}
+                isFirst={idx === 0}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
 
-function ServiceIdBox({
-  bundleId, type, existing, providerId, isFirst,
+/**
+ * Per-engagement-type card. Renders one row per provider account, each with
+ * a Priority + Service ID input. Lowest-priority filled row becomes the primary
+ * (mirrored onto user_bundle_items for backwards compat with order flow).
+ */
+function EngagementTypeBox({
+  bundleId, type, existing, providers, isFirst,
 }: {
   bundleId: string;
   type: EngagementType;
   existing: any | undefined;
-  providerId: string;
+  providers: any[];
   isFirst: boolean;
 }) {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const [value, setValue] = useState<string>(existing?.provider_service_id || "");
-  const [saving, setSaving] = useState(false);
   const cfg = ENGAGEMENT_CONFIG[type as keyof typeof ENGAGEMENT_CONFIG];
   const label = cfg?.label || type;
+  const mappings: any[] = existing?.user_bundle_item_providers || [];
+  const mappingsByProvider = new Map<string, any>(mappings.map(m => [m.user_provider_account_id, m]));
+  const linkedCount = mappings.length;
+  const primaryProviderId = existing?.user_provider_account_id;
 
-  useEffect(() => {
-    setValue(existing?.provider_service_id || "");
-  }, [existing?.provider_service_id]);
-
-  const linked = !!existing?.provider_service_id;
-  const hasChange = value.trim() !== (existing?.provider_service_id || "");
-
-  const clear = useMutation({
+  const removeAll = useMutation({
     mutationFn: async () => {
       if (!existing) return;
       const { error } = await supabase.from("user_bundle_items").delete().eq("id", existing.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      setValue("");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const saveNow = async () => {
-    if (!user) return;
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    // Validate: must be digits only, 1-9 chars, > 0
-    if (!/^\d{1,9}$/.test(trimmed)) {
-      toast.error("Service ID sirf numbers ho sakta hai (1-9 digits)");
+  return (
+    <div className={`rounded-lg border p-3 space-y-3 ${linkedCount > 0 ? "border-emerald-700/40 bg-emerald-900/5" : "border-border bg-muted/10"}`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-semibold capitalize">{label}</Label>
+          {linkedCount > 0 && (
+            <Badge variant="outline" className="bg-emerald-900/20 text-emerald-400 border-emerald-700/40 text-[10px]">
+              <CheckCircle2 className="w-3 h-3 mr-1" /> {linkedCount} provider{linkedCount > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </div>
+        {linkedCount > 0 && (
+          <Button size="sm" variant="ghost" onClick={() => { if (confirm(`${label} se sabhi providers hata do?`)) removeAll.mutate(); }}>
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {providers.map((p, idx) => (
+          <ProviderRow
+            key={p.id}
+            bundleId={bundleId}
+            type={type}
+            isFirst={isFirst}
+            existingItem={existing}
+            provider={p}
+            mapping={mappingsByProvider.get(p.id)}
+            defaultPriority={idx + 1}
+            isPrimary={primaryProviderId === p.id}
+          />
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">Priority 1 = pehle try hoga, fail/balance kam ho to 2, phir 3…</p>
+    </div>
+  );
+}
+
+function ProviderRow({
+  bundleId, type, isFirst, existingItem, provider, mapping, defaultPriority, isPrimary,
+}: {
+  bundleId: string;
+  type: EngagementType;
+  isFirst: boolean;
+  existingItem: any | undefined;
+  provider: any;
+  mapping: any | undefined;
+  defaultPriority: number;
+  isPrimary: boolean;
+}) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [serviceId, setServiceId] = useState<string>(mapping?.provider_service_id || "");
+  const [priority, setPriority] = useState<number>(mapping?.priority ?? defaultPriority);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setServiceId(mapping?.provider_service_id || "");
+    setPriority(mapping?.priority ?? defaultPriority);
+  }, [mapping?.provider_service_id, mapping?.priority, defaultPriority]);
+
+  const linked = !!mapping?.provider_service_id;
+  const valChanged = serviceId.trim() !== (mapping?.provider_service_id || "");
+  const prioChanged = Number(priority) !== (mapping?.priority ?? defaultPriority);
+
+  /** Ensure user_bundle_items row exists; returns its id. */
+  const ensureItem = async (): Promise<string> => {
+    if (existingItem?.id) return existingItem.id;
+    const { data, error } = await supabase
+      .from("user_bundle_items")
+      .insert({
+        user_bundle_id: bundleId,
+        engagement_type: type,
+        is_base: isFirst,
+        ratio_percent: 100,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data.id;
+  };
+
+  /** Recompute primary on user_bundle_items from the lowest-priority active mapping. */
+  const syncPrimary = async (itemId: string) => {
+    const { data: rows } = await supabase
+      .from("user_bundle_item_providers")
+      .select("*")
+      .eq("user_bundle_item_id", itemId)
+      .eq("is_active", true)
+      .order("priority", { ascending: true });
+    const top = rows?.[0];
+    if (!top) {
+      await supabase.from("user_bundle_items").update({
+        user_provider_account_id: null,
+        provider_service_id: null,
+        service_name: null,
+        rate: null,
+      }).eq("id", itemId);
       return;
     }
-    const asNum = parseInt(trimmed, 10);
-    if (!Number.isFinite(asNum) || asNum <= 0) {
-      toast.error("Service ID 0 se bada hona chahiye");
-      return;
+    // Fetch service meta for the new primary to keep order flow accurate.
+    try {
+      const { data: svcData } = await supabase.functions.invoke("user-import-services", {
+        body: { providerAccountId: top.user_provider_account_id, service_ids: [top.provider_service_id], fetch_only: true },
+      });
+      const svc = (svcData as any)?.services?.[0];
+      await supabase.from("user_bundle_items").update({
+        user_provider_account_id: top.user_provider_account_id,
+        provider_service_id: top.provider_service_id,
+        service_name: svc?.name ?? null,
+        rate: svc?.rate ?? null,
+        min_qty: svc?.min ?? null,
+        max_qty: svc?.max ?? null,
+      }).eq("id", itemId);
+    } catch {
+      await supabase.from("user_bundle_items").update({
+        user_provider_account_id: top.user_provider_account_id,
+        provider_service_id: top.provider_service_id,
+      }).eq("id", itemId);
     }
-    if (!providerId) {
-      toast.error("Pehle provider account chuno");
+  };
+
+  const removeRow = async () => {
+    if (!mapping?.id) {
+      setServiceId("");
       return;
     }
     setSaving(true);
     try {
+      const { error } = await supabase.from("user_bundle_item_providers").delete().eq("id", mapping.id);
+      if (error) throw error;
+      if (existingItem?.id) await syncPrimary(existingItem.id);
+      toast.success("Provider hata diya");
+      qc.invalidateQueries({ queryKey: ["user-bundles"] });
+    } catch (e: any) {
+      toast.error(e.message || "Remove failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveRow = async () => {
+    if (!user) return;
+    const trimmed = serviceId.trim();
+    // Empty + existing => delete
+    if (!trimmed) {
+      if (mapping?.id) await removeRow();
+      return;
+    }
+    if (!/^\d{1,9}$/.test(trimmed)) {
+      toast.error("Service ID sirf numbers ho sakta hai (1-9 digits)");
+      return;
+    }
+    const prio = Math.max(1, Math.min(99, Number(priority) || 1));
+    setSaving(true);
+    try {
       // Validate via provider
       const { data: svcData, error: svcErr } = await supabase.functions.invoke("user-import-services", {
-        body: { providerAccountId: providerId, service_ids: [trimmed], fetch_only: true },
+        body: { providerAccountId: provider.id, service_ids: [trimmed], fetch_only: true },
       });
       if (svcErr) {
         let realMsg = svcErr.message;
@@ -367,29 +481,24 @@ function ServiceIdBox({
         throw new Error(realMsg);
       }
       const svc = (svcData as any)?.services?.[0];
-      if (!svc) throw new Error(`Service ID "${trimmed}" provider ki list me nahi mili.`);
+      if (!svc) throw new Error(`Service ID "${trimmed}" ${provider.name} ki list me nahi mili.`);
 
-      const payload = {
-        user_bundle_id: bundleId,
-        engagement_type: type,
-        provider_service_id: trimmed,
-        user_provider_account_id: providerId,
-        service_name: svc.name,
-        rate: svc.rate,
-        min_qty: svc.min,
-        max_qty: svc.max,
-        is_base: isFirst,
-        ratio_percent: 100,
-      };
+      const itemId = await ensureItem();
 
-      if (existing?.id) {
-        const { error } = await supabase.from("user_bundle_items").update(payload).eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("user_bundle_items").insert(payload);
-        if (error) throw error;
-      }
-      toast.success(`${label} saved`);
+      const { error: upErr } = await supabase
+        .from("user_bundle_item_providers")
+        .upsert({
+          user_id: user.id,
+          user_bundle_item_id: itemId,
+          user_provider_account_id: provider.id,
+          provider_service_id: trimmed,
+          priority: prio,
+          is_active: true,
+        }, { onConflict: "user_bundle_item_id,user_provider_account_id" });
+      if (upErr) throw upErr;
+
+      await syncPrimary(itemId);
+      toast.success(`${provider.name} saved`);
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     } catch (e: any) {
       toast.error(e.message || "Save failed");
@@ -399,45 +508,50 @@ function ServiceIdBox({
   };
 
   return (
-    <div className={`rounded-lg border p-3 space-y-2 ${linked ? "border-emerald-700/40 bg-emerald-900/10" : "border-border bg-muted/20"}`}>
-      <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold capitalize">{label} Service ID</Label>
-        {linked && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-      </div>
-      <div className="flex gap-2">
-        <Input
-          placeholder="e.g. 13578"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={9}
-          value={value}
-          onChange={(e) => {
-            // Strip anything non-numeric as user types
-            const cleaned = e.target.value.replace(/\D/g, "").slice(0, 9);
-            setValue(cleaned);
-          }}
-          onBlur={() => { if (hasChange && value.trim()) saveNow(); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (hasChange && value.trim()) saveNow(); } }}
-          disabled={saving}
-          className="h-9"
-        />
-        {linked && (
-          <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => clear.mutate()} title="Remove">
-            <X className="w-4 h-4 text-destructive" />
-          </Button>
-        )}
-      </div>
-      {saving ? (
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <Loader2 className="w-3 h-3 animate-spin" /> Importing service…
+    <div className={`grid grid-cols-[60px_1fr_1.4fr_36px] gap-2 items-center rounded-md p-2 ${linked ? "bg-muted/40" : "bg-muted/10"}`}>
+      <Input
+        type="number"
+        min={1}
+        max={99}
+        value={priority}
+        onChange={(e) => setPriority(Number(e.target.value) || 1)}
+        onBlur={() => { if ((linked && prioChanged) || (serviceId.trim() && (valChanged || prioChanged))) saveRow(); }}
+        disabled={saving}
+        className="h-9 text-center"
+        title="Priority (1 = highest)"
+      />
+      <div className="min-w-0 flex items-center gap-1.5">
+        {isPrimary && <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{provider.name}</div>
+          {linked && mapping?.provider_service_id && (
+            <div className="text-[10px] text-muted-foreground truncate">ID #{mapping.provider_service_id}</div>
+          )}
         </div>
-      ) : linked ? (
-        <div className="text-[11px] text-muted-foreground truncate">
-          {existing?.service_name} • ${Number(existing?.rate || 0).toFixed(4)}/1k
-        </div>
-      ) : (
-        <div className="text-[11px] text-muted-foreground">Number daalo, Tab/Enter dabao — auto import.</div>
-      )}
+      </div>
+      <Input
+        placeholder="Service ID e.g. 13578"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        maxLength={9}
+        value={serviceId}
+        onChange={(e) => setServiceId(e.target.value.replace(/\D/g, "").slice(0, 9))}
+        onBlur={() => { if (valChanged || (serviceId.trim() && prioChanged)) saveRow(); }}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (valChanged || prioChanged) saveRow(); } }}
+        disabled={saving}
+        className="h-9"
+      />
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-9 w-9"
+        onClick={removeRow}
+        disabled={saving || !linked}
+        title="Remove provider"
+      >
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5 text-destructive" />}
+      </Button>
     </div>
   );
 }
+
