@@ -162,9 +162,12 @@ function Inner() {
 function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
   const qc = useQueryClient();
   const platformKey = TAB_TO_PLATFORM_KEY[bundle.platform] || "instagram";
-  const availableTypes = PLATFORM_ENGAGEMENT_TYPES[platformKey] || [];
+  const allTypes = PLATFORM_ENGAGEMENT_TYPES[platformKey] || [];
   const items: any[] = bundle.user_bundle_items || [];
   const itemsByType = new Map<string, any>(items.map(i => [i.engagement_type, i]));
+  const hiddenTypes: string[] = Array.isArray(bundle.hidden_engagement_types) ? bundle.hidden_engagement_types : [];
+  const visibleTypes = allTypes.filter(t => !hiddenTypes.includes(t));
+  const removedTypes = allTypes.filter(t => hiddenTypes.includes(t));
 
   const deleteBundle = useMutation({
     mutationFn: async () => {
@@ -184,6 +187,43 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
   });
+
+  const hideType = useMutation({
+    mutationFn: async (t: string) => {
+      // Remove any item rows for this type first (cascade kills mappings).
+      const existing = itemsByType.get(t);
+      if (existing?.id) {
+        await supabase.from("user_bundle_items").delete().eq("id", existing.id);
+      }
+      const next = Array.from(new Set([...(hiddenTypes || []), t]));
+      const { error } = await supabase
+        .from("user_bundles")
+        .update({ hidden_engagement_types: next } as any)
+        .eq("id", bundle.id)
+        .eq("user_id", bundle.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Metric bundle se hata diya");
+      qc.invalidateQueries({ queryKey: ["user-bundles"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const showType = useMutation({
+    mutationFn: async (t: string) => {
+      const next = (hiddenTypes || []).filter(x => x !== t);
+      const { error } = await supabase
+        .from("user_bundles")
+        .update({ hidden_engagement_types: next } as any)
+        .eq("id", bundle.id)
+        .eq("user_id", bundle.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
 
   return (
     <Card className="p-5 space-y-4">
