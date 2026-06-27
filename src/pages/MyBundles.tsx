@@ -297,7 +297,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
       ) : (
         <div className="space-y-3">
           <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
-          <div className="space-y-3">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {visibleTypes.map((t, idx) => (
               <EngagementTypeBox
                 key={t}
