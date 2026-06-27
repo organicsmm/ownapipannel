@@ -1,0 +1,1 @@
+ALTER TABLE public.user_bundles ADD COLUMN IF NOT EXISTS hidden_engagement_types text[] NOT NULL DEFAULT '{}'::text[];
