@@ -1411,6 +1411,7 @@ export type Database = {
           ai_organic_enabled: boolean | null
           created_at: string
           description: string | null
+          hidden_engagement_types: string[]
           icon: string | null
           id: string
           is_active: boolean | null
@@ -1425,6 +1426,7 @@ export type Database = {
           ai_organic_enabled?: boolean | null
           created_at?: string
           description?: string | null
+          hidden_engagement_types?: string[]
           icon?: string | null
           id?: string
           is_active?: boolean | null
@@ -1439,6 +1441,7 @@ export type Database = {
           ai_organic_enabled?: boolean | null
           created_at?: string
           description?: string | null
+          hidden_engagement_types?: string[]
           icon?: string | null
           id?: string
           is_active?: boolean | null

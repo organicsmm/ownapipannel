@@ -162,9 +162,12 @@ function Inner() {
 function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
   const qc = useQueryClient();
   const platformKey = TAB_TO_PLATFORM_KEY[bundle.platform] || "instagram";
-  const availableTypes = PLATFORM_ENGAGEMENT_TYPES[platformKey] || [];
+  const allTypes = PLATFORM_ENGAGEMENT_TYPES[platformKey] || [];
   const items: any[] = bundle.user_bundle_items || [];
   const itemsByType = new Map<string, any>(items.map(i => [i.engagement_type, i]));
+  const hiddenTypes: string[] = Array.isArray(bundle.hidden_engagement_types) ? bundle.hidden_engagement_types : [];
+  const visibleTypes = allTypes.filter(t => !hiddenTypes.includes(t));
+  const removedTypes = allTypes.filter(t => hiddenTypes.includes(t));
 
   const deleteBundle = useMutation({
     mutationFn: async () => {
@@ -184,6 +187,43 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
   });
+
+  const hideType = useMutation({
+    mutationFn: async (t: string) => {
+      // Remove any item rows for this type first (cascade kills mappings).
+      const existing = itemsByType.get(t);
+      if (existing?.id) {
+        await supabase.from("user_bundle_items").delete().eq("id", existing.id);
+      }
+      const next = Array.from(new Set([...(hiddenTypes || []), t]));
+      const { error } = await supabase
+        .from("user_bundles")
+        .update({ hidden_engagement_types: next } as any)
+        .eq("id", bundle.id)
+        .eq("user_id", bundle.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Metric bundle se hata diya");
+      qc.invalidateQueries({ queryKey: ["user-bundles"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const showType = useMutation({
+    mutationFn: async (t: string) => {
+      const next = (hiddenTypes || []).filter(x => x !== t);
+      const { error } = await supabase
+        .from("user_bundles")
+        .update({ hidden_engagement_types: next } as any)
+        .eq("id", bundle.id)
+        .eq("user_id", bundle.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
 
   return (
     <Card className="p-5 space-y-4">
@@ -258,7 +298,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
         <div className="space-y-3">
           <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
           <div className="space-y-3">
-            {availableTypes.map((t, idx) => (
+            {visibleTypes.map((t, idx) => (
               <EngagementTypeBox
                 key={t}
                 bundleId={bundle.id}
@@ -266,9 +306,29 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
                 existing={itemsByType.get(t)}
                 providers={providers}
                 isFirst={idx === 0}
+                onRemoveType={() => {
+                  if (confirm(`${(ENGAGEMENT_CONFIG as any)[t]?.label || t} ko bundle se hata do?`)) hideType.mutate(t);
+                }}
               />
             ))}
           </div>
+
+          {removedTypes.length > 0 && (
+            <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+              <Label className="text-xs text-muted-foreground">Removed metrics (wapas add karne ke liye click karo)</Label>
+              <div className="flex flex-wrap gap-2">
+                {removedTypes.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => showType.mutate(t)}
+                    className="px-3 py-1.5 rounded-full bg-background border border-dashed border-border text-xs font-medium capitalize hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> {(ENGAGEMENT_CONFIG as any)[t]?.label || t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -281,13 +341,14 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
  * (mirrored onto user_bundle_items for backwards compat with order flow).
  */
 function EngagementTypeBox({
-  bundleId, type, existing, providers, isFirst,
+  bundleId, type, existing, providers, isFirst, onRemoveType,
 }: {
   bundleId: string;
   type: EngagementType;
   existing: any | undefined;
   providers: any[];
   isFirst: boolean;
+  onRemoveType: () => void;
 }) {
   const qc = useQueryClient();
   const cfg = ENGAGEMENT_CONFIG[type as keyof typeof ENGAGEMENT_CONFIG];
@@ -296,18 +357,6 @@ function EngagementTypeBox({
   const mappingsByProvider = new Map<string, any>(mappings.map(m => [m.user_provider_account_id, m]));
   const linkedCount = mappings.length;
   const primaryProviderId = existing?.user_provider_account_id;
-
-  const removeAll = useMutation({
-    mutationFn: async () => {
-      if (!existing) return;
-      const { error } = await supabase.from("user_bundle_items").delete().eq("id", existing.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["user-bundles"] });
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
 
   return (
     <div className={`rounded-lg border p-3 space-y-3 ${linkedCount > 0 ? "border-emerald-700/40 bg-emerald-900/5" : "border-border bg-muted/10"}`}>
@@ -320,12 +369,17 @@ function EngagementTypeBox({
             </Badge>
           )}
         </div>
-        {linkedCount > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => { if (confirm(`${label} se sabhi providers hata do?`)) removeAll.mutate(); }}>
-            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRemoveType}
+          title={`${label} ko bundle se hata do`}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+        </Button>
       </div>
+
 
       <div className="space-y-2">
         {providers.map((p, idx) => (
