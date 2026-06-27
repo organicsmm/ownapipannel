@@ -12,7 +12,7 @@ type State = "verifying" | "success" | "failed" | "pending";
 export default function SubscriptionReturn() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const orderId = params.get("order_id");
   const initialStatus = params.get("status");
   const [state, setState] = useState<State>("verifying");
