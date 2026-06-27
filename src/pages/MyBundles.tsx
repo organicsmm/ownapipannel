@@ -298,7 +298,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
         <div className="space-y-3">
           <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
           <div className="space-y-3">
-            {availableTypes.map((t, idx) => (
+            {visibleTypes.map((t, idx) => (
               <EngagementTypeBox
                 key={t}
                 bundleId={bundle.id}
@@ -306,9 +306,29 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
                 existing={itemsByType.get(t)}
                 providers={providers}
                 isFirst={idx === 0}
+                onRemoveType={() => {
+                  if (confirm(`${(ENGAGEMENT_CONFIG as any)[t]?.label || t} ko bundle se hata do?`)) hideType.mutate(t);
+                }}
               />
             ))}
           </div>
+
+          {removedTypes.length > 0 && (
+            <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+              <Label className="text-xs text-muted-foreground">Removed metrics (wapas add karne ke liye click karo)</Label>
+              <div className="flex flex-wrap gap-2">
+                {removedTypes.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => showType.mutate(t)}
+                    className="px-3 py-1.5 rounded-full bg-background border border-dashed border-border text-xs font-medium capitalize hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> {(ENGAGEMENT_CONFIG as any)[t]?.label || t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>
