@@ -230,7 +230,7 @@ function Inner() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
           ) : !bundles || bundles.length === 0 ? (
             <div className="p-4 bg-muted/30 rounded-md text-sm">
-              Pehle <a href="/my-bundles" className="underline text-primary">My Bundles</a> page se ek bundle banao.
+              First create a bundle from the <a href="/my-bundles" className="underline text-primary">My Bundles</a> page.
             </div>
           ) : (
             <Select value={bundleId} onValueChange={setBundleId}>
