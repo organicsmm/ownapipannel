@@ -82,10 +82,10 @@ const Index = () => {
           <div className="text-center mb-20">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase mb-6" style={{ color: `${INK}80` }}>— How it works</p>
             <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.02em]" style={{ color: INK }}>
-              Panel ka pura <span className="italic" style={{ color: ACCENT }}>flow.</span>
+              The full panel <span className="italic" style={{ color: ACCENT }}>flow.</span>
             </h2>
             <p className="mt-6 max-w-2xl mx-auto text-[15px] leading-[1.7] font-light" style={{ color: `${INK}99` }}>
-              Provider API se lekar organic delivery tak — har step transparent. Niche diagram dekho aur samjho kaise tumhara order behind the scenes chalta hai.
+              From provider API to organic delivery — every step is transparent. See the diagram below to understand how your order runs behind the scenes.
             </p>
           </div>
 
