@@ -335,6 +335,16 @@ function ServiceIdBox({
     if (!user) return;
     const trimmed = value.trim();
     if (!trimmed) return;
+    // Validate: must be digits only, 1-9 chars, > 0
+    if (!/^\d{1,9}$/.test(trimmed)) {
+      toast.error("Service ID sirf numbers ho sakta hai (1-9 digits)");
+      return;
+    }
+    const asNum = parseInt(trimmed, 10);
+    if (!Number.isFinite(asNum) || asNum <= 0) {
+      toast.error("Service ID 0 se bada hona chahiye");
+      return;
+    }
     if (!providerId) {
       toast.error("Pehle provider account chuno");
       return;
