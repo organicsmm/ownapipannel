@@ -56,7 +56,7 @@ function Inner() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("user_bundles")
-        .select("*, user_bundle_items(*, user_provider_accounts(id, name))")
+        .select("*, user_bundle_items(*, user_provider_accounts(id, name), user_bundle_item_providers(*, user_provider_accounts(id, name)))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
