@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
@@ -8,7 +8,45 @@ const INK = '#0F1B3D';
 const ACCENT = '#4F7CFF';
 const SOFT = '#E8EEFF';
 
+const HOME_FAQS = [
+  { question: 'What is Boostly Pro?', answer: "Boostly Pro is the world's first AI-organic SMM panel. It delivers real Instagram followers, YouTube subscribers, TikTok views and other social engagement using natural delivery patterns that mimic real human behavior — keeping your accounts 100% safe." },
+  { question: 'Is Boostly Pro safe for my social media accounts?', answer: 'Yes. Boostly Pro uses S-curve patterns, ±50% delivery variance, peak-hour optimisation and night slowdown to look perfectly natural. Over 50,000 orders have been delivered with zero account bans.' },
+  { question: 'Which platforms does Boostly Pro support?', answer: 'Boostly Pro supports Instagram, YouTube, TikTok, Facebook, Twitter / X, Telegram, Spotify and more — covering followers, likes, views, subscribers, comments and shares.' },
+  { question: 'How is Boostly Pro different from regular SMM panels?', answer: 'Regular panels deliver fixed quantities at fixed intervals — easily detected as bots. Boostly Pro uses random variance, jittered timing, peak-hour boosts and night slowdown so deliveries look like real organic users.' },
+  { question: 'Do I need a credit card to start?', answer: "No. Sign-up is free with no credit card required. You only add funds to your wallet when you're ready to place an order." },
+  { question: 'Does Boostly Pro offer an API?', answer: 'Yes. Boostly Pro provides a full reseller API with the standard SMM panel format so you can integrate it into your own panel or workflow.' },
+];
+
+const SOFTWARE_APP_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Boostly Pro',
+  applicationCategory: 'BusinessApplication',
+  applicationSubCategory: 'Social Media Marketing',
+  operatingSystem: 'Web, iOS, Android',
+  url: 'https://boostbotting.site',
+  description: "World's first AI-organic SMM panel for Instagram, YouTube, TikTok, Facebook & more. Natural delivery, zero bans.",
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', description: 'Free signup. Pay-per-order model with wallet top-ups.' },
+  aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.9', ratingCount: '2400', bestRating: '5', worstRating: '1' },
+  featureList: [
+    'AI-organic delivery patterns', 'S-Curve growth simulation', '±50% delivery variance',
+    'Peak hour optimization (6–10 PM IST)', 'Multi-provider auto-rotation', 'Live delivery preview',
+    'Wallet & subscriptions', '24/7 live chat support',
+  ],
+};
+
 const Index = () => {
+  useEffect(() => {
+    const id = 'softwareapp-jsonld';
+    document.getElementById(id)?.remove();
+    const s = document.createElement('script');
+    s.type = 'application/ld+json';
+    s.id = id;
+    s.text = JSON.stringify(SOFTWARE_APP_LD);
+    document.head.appendChild(s);
+    return () => { document.getElementById(id)?.remove(); };
+  }, []);
+
   return (
     <div
       className="min-h-screen w-full font-sans antialiased overflow-x-hidden"
@@ -23,7 +61,9 @@ const Index = () => {
         description="Boostly Pro delivers organic, undetectable engagement for serious creators. Multi-platform growth with AI-organic delivery and zero compromise."
         canonicalPath="/"
         breadcrumbs={[{ name: 'Home', path: '/' }]}
+        faqItems={HOME_FAQS}
       />
+
 
       {/* NAV */}
       <nav className="fixed top-0 inset-x-0 z-50 px-6 lg:px-14 py-5 flex items-center justify-between bg-transparent backdrop-blur-sm">
