@@ -224,7 +224,7 @@ function Inner() {
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
               <Package className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
             </div>
-            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Apna Bundle</Label>
+            <Label className="text-base sm:text-lg font-bold tracking-tight text-foreground">Your Bundle</Label>
           </div>
           {isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
