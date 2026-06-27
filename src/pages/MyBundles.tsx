@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,9 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Package, Brain, Sparkles, Globe, Link2, X } from "lucide-react";
-import { UserProviderRotationDialog } from "@/components/bundles/UserProviderRotationDialog";
-import { PLATFORM_ENGAGEMENT_TYPES, EngagementType } from "@/lib/engagement-types";
+import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X } from "lucide-react";
+import { PLATFORM_ENGAGEMENT_TYPES, EngagementType, ENGAGEMENT_CONFIG } from "@/lib/engagement-types";
 
 const PLATFORM_TABS: Array<{ id: string; label: string }> = [
   { id: "Instagram", label: "Instagram" },
@@ -57,9 +56,25 @@ function Inner() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("user_bundles")
-        .select("*, user_bundle_items(*, user_provider_accounts(id, name), user_bundle_item_providers(id))")
+        .select("*, user_bundle_items(*, user_provider_accounts(id, name))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: providers } = useQuery({
+    queryKey: ["user-providers-active-list", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("user_provider_accounts")
+        .select("id, name, is_active")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data || [];
     },
@@ -96,7 +111,9 @@ function Inner() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-primary" /> My Bundles
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Apne providers se directly service ID linked karke bundles banao — multi-provider rotation aur AI organic ratios ke saath.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Provider select karo aur har engagement type ka Service ID seedha box me daalo — auto import + save ho jayega.
+          </p>
         </div>
         <Button onClick={() => setCreating(!creating)}>
           <Plus className="w-4 h-4 mr-2" /> Create Bundle
@@ -133,7 +150,7 @@ function Inner() {
                 <p className="text-muted-foreground">{p.label} ke liye koi bundle nahi hai. Create Bundle button se shuru karo.</p>
               </Card>
             ) : (
-              platformBundles.map((b: any) => <BundleCard key={b.id} bundle={b} />)
+              platformBundles.map((b: any) => <BundleCard key={b.id} bundle={b} providers={providers || []} />)
             )}
           </TabsContent>
         ))}
@@ -142,12 +159,20 @@ function Inner() {
   );
 }
 
-function BundleCard({ bundle }: { bundle: any }) {
+function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
   const qc = useQueryClient();
   const platformKey = TAB_TO_PLATFORM_KEY[bundle.platform] || "instagram";
   const availableTypes = PLATFORM_ENGAGEMENT_TYPES[platformKey] || [];
   const items: any[] = bundle.user_bundle_items || [];
-  const itemsByType = new Map(items.map(i => [i.engagement_type, i]));
+  const itemsByType = new Map<string, any>(items.map(i => [i.engagement_type, i]));
+
+  // Pick a default provider: from existing items, else first provider
+  const existingProviderId = items.find(i => i.user_provider_account_id)?.user_provider_account_id;
+  const [providerId, setProviderId] = useState<string>(existingProviderId || providers[0]?.id || "");
+
+  useEffect(() => {
+    if (!providerId && providers[0]?.id) setProviderId(providers[0].id);
+  }, [providers, providerId]);
 
   const deleteBundle = useMutation({
     mutationFn: async () => {
@@ -177,7 +202,7 @@ function BundleCard({ bundle }: { bundle: any }) {
           </div>
           <div>
             <h3 className="font-semibold">{bundle.name}</h3>
-            <p className="text-xs text-muted-foreground">{bundle.description || "No description"}</p>
+            <p className="text-xs text-muted-foreground">{bundle.platform}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -194,184 +219,208 @@ function BundleCard({ bundle }: { bundle: any }) {
         </div>
       </div>
 
-      {/* AI Organic Mode */}
-      <div className={`rounded-lg border p-3 flex items-center justify-between ${bundle.ai_organic_enabled ? "border-emerald-700/40 bg-emerald-900/10" : "border-border bg-muted/30"}`}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-md bg-emerald-700/20 flex items-center justify-center">
-            <Brain className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div>
-            <div className="font-medium text-sm flex items-center gap-2">
-              AI Organic Mode <Badge variant={bundle.ai_organic_enabled ? "default" : "outline"}>{bundle.ai_organic_enabled ? "ON" : "OFF"}</Badge>
+      {/* AI toggles */}
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className={`rounded-lg border p-3 flex items-center justify-between ${bundle.ai_organic_enabled ? "border-emerald-700/40 bg-emerald-900/10" : "border-border bg-muted/30"}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-md bg-emerald-700/20 flex items-center justify-center">
+              <Brain className="w-4 h-4 text-emerald-500" />
             </div>
-            <div className="text-xs text-muted-foreground">Har order ke liye unique organic pattern auto-generate hota hai</div>
+            <div>
+              <div className="font-medium text-sm flex items-center gap-2">
+                AI Organic Mode <Badge variant={bundle.ai_organic_enabled ? "default" : "outline"}>{bundle.ai_organic_enabled ? "ON" : "OFF"}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">Unique organic pattern per order</div>
+            </div>
           </div>
+          <Switch
+            checked={!!bundle.ai_organic_enabled}
+            onCheckedChange={(v) => toggleField.mutate({ ai_organic_enabled: v })}
+          />
         </div>
-        <Switch
-          checked={!!bundle.ai_organic_enabled}
-          onCheckedChange={(v) => toggleField.mutate({ ai_organic_enabled: v })}
-        />
+
+        <div className={`rounded-lg border p-3 flex items-center justify-between ${!bundle.use_custom_ratios ? "border-primary/40 bg-primary/5" : "border-border bg-muted/30"}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <div className="font-medium text-sm">AI Organic Ratios</div>
+              <div className="text-xs text-muted-foreground">Auto likes/comments/etc. ratios</div>
+            </div>
+          </div>
+          <Switch
+            checked={!bundle.use_custom_ratios}
+            onCheckedChange={(v) => toggleField.mutate({ use_custom_ratios: !v })}
+          />
+        </div>
       </div>
 
-      {/* AI Organic Ratios (= !use_custom_ratios) */}
-      <div className={`rounded-lg border p-3 flex items-center justify-between ${!bundle.use_custom_ratios ? "border-primary/40 bg-primary/5" : "border-border bg-muted/30"}`}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <div className="font-medium text-sm">AI Organic Ratios</div>
-            <div className="text-xs text-muted-foreground">AI automatically engagement ratios calculate karta hai (likes/comments/etc. of base views)</div>
-          </div>
-        </div>
-        <Switch
-          checked={!bundle.use_custom_ratios}
-          onCheckedChange={(v) => toggleField.mutate({ use_custom_ratios: !v })}
-        />
+      {/* Provider selector */}
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+        <Label className="text-xs">Provider Account</Label>
+        {providers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Koi active provider nahi hai. Pehle <a href="/my-providers" className="underline text-primary">My Providers</a> me add karo.
+          </p>
+        ) : (
+          <Select value={providerId} onValueChange={setProviderId}>
+            <SelectTrigger className="h-10">
+              <SelectValue placeholder="Provider chuno" />
+            </SelectTrigger>
+            <SelectContent>
+              {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {/* Engagement type chips */}
-      <div className="flex flex-wrap gap-2">
-        {availableTypes.map(t => {
-          const has = itemsByType.has(t);
-          return (
-            <AddOrShowChip
+      {/* Inline Service ID grid: all engagement types open */}
+      <div className="space-y-2">
+        <Label className="text-xs">Service IDs (har metric ke liye)</Label>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {availableTypes.map((t, idx) => (
+            <ServiceIdBox
               key={t}
               bundleId={bundle.id}
               type={t}
-              alreadyAdded={has}
-              isFirst={items.length === 0 && t === availableTypes[0]}
+              existing={itemsByType.get(t)}
+              providerId={providerId}
+              isFirst={idx === 0}
             />
-          );
-        })}
-      </div>
-
-      {/* Items list */}
-      <div className="space-y-3">
-        {items.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">Upar se engagement type chuno (Views, Likes, etc.)</p>
-        ) : items.map((it: any, idx: number) => (
-          <ItemRow key={it.id} item={it} isBase={idx === 0} />
-        ))}
+          ))}
+        </div>
       </div>
     </Card>
   );
 }
 
-function AddOrShowChip({ bundleId, type, alreadyAdded, isFirst }: { bundleId: string; type: EngagementType; alreadyAdded: boolean; isFirst: boolean }) {
+function ServiceIdBox({
+  bundleId, type, existing, providerId, isFirst,
+}: {
+  bundleId: string;
+  type: EngagementType;
+  existing: any | undefined;
+  providerId: string;
+  isFirst: boolean;
+}) {
   const qc = useQueryClient();
-  const add = useMutation({
+  const { user } = useAuth();
+  const [value, setValue] = useState<string>(existing?.provider_service_id || "");
+  const [saving, setSaving] = useState(false);
+  const cfg = ENGAGEMENT_CONFIG[type as keyof typeof ENGAGEMENT_CONFIG];
+  const label = cfg?.label || type;
+
+  useEffect(() => {
+    setValue(existing?.provider_service_id || "");
+  }, [existing?.provider_service_id]);
+
+  const linked = !!existing?.provider_service_id;
+  const hasChange = value.trim() !== (existing?.provider_service_id || "");
+
+  const clear = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("user_bundle_items").insert({
-        user_bundle_id: bundleId,
-        engagement_type: type,
-        is_base: isFirst,
-        ratio_percent: 100,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  if (alreadyAdded) {
-    return (
-      <div className="px-3 py-1.5 rounded-full bg-muted text-xs font-medium capitalize border border-border">
-        {type}
-      </div>
-    );
-  }
-  return (
-    <button
-      onClick={() => add.mutate()}
-      disabled={add.isPending}
-      className="px-3 py-1.5 rounded-full bg-background border border-dashed border-border text-xs font-medium capitalize hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
-    >
-      {type} <Plus className="w-3 h-3" />
-    </button>
-  );
-}
-
-function ItemRow({ item, isBase }: { item: any; isBase: boolean }) {
-  const qc = useQueryClient();
-  const [rotateOpen, setRotateOpen] = useState(false);
-  const linked = !!item.provider_service_id && !!item.user_provider_account_id;
-  const providerCount = (item.user_bundle_item_providers || []).length;
-
-  const unlink = useMutation({
-    mutationFn: async () => {
-      await supabase.from("user_bundle_item_providers").delete().eq("user_bundle_item_id", item.id);
-      const { error } = await supabase
-        .from("user_bundle_items")
-        .update({ user_provider_account_id: null, provider_service_id: null, service_name: null, rate: null })
-        .eq("id", item.id);
+      if (!existing) return;
+      const { error } = await supabase.from("user_bundle_items").delete().eq("id", existing.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Unlinked");
+      setValue("");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     },
+    onError: (e: any) => toast.error(e.message),
   });
 
-  const removeItem = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("user_bundle_items").delete().eq("id", item.id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["user-bundles"] }),
-  });
+  const saveNow = async () => {
+    if (!user) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (!providerId) {
+      toast.error("Pehle provider account chuno");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Validate via provider
+      const { data: svcData, error: svcErr } = await supabase.functions.invoke("user-import-services", {
+        body: { providerAccountId: providerId, service_ids: [trimmed], fetch_only: true },
+      });
+      if (svcErr) {
+        let realMsg = svcErr.message;
+        try {
+          const ctx: any = (svcErr as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            if (body?.error) realMsg = body.error;
+          }
+        } catch {}
+        throw new Error(realMsg);
+      }
+      const svc = (svcData as any)?.services?.[0];
+      if (!svc) throw new Error(`Service ID "${trimmed}" provider ki list me nahi mili.`);
+
+      const payload = {
+        user_bundle_id: bundleId,
+        engagement_type: type,
+        provider_service_id: trimmed,
+        user_provider_account_id: providerId,
+        service_name: svc.name,
+        rate: svc.rate,
+        min_qty: svc.min,
+        max_qty: svc.max,
+        is_base: isFirst,
+        ratio_percent: 100,
+      };
+
+      if (existing?.id) {
+        const { error } = await supabase.from("user_bundle_items").update(payload).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("user_bundle_items").insert(payload);
+        if (error) throw error;
+      }
+      toast.success(`${label} saved`);
+      qc.invalidateQueries({ queryKey: ["user-bundles"] });
+    } catch (e: any) {
+      toast.error(e.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="border border-border rounded-lg p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Badge className="capitalize">{item.engagement_type}</Badge>
-          {isBase && <Badge variant="outline" className="text-xs">Base</Badge>}
-        </div>
-        <Button size="icon" variant="ghost" onClick={() => removeItem.mutate()}>
-          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-        </Button>
+    <div className={`rounded-lg border p-3 space-y-2 ${linked ? "border-emerald-700/40 bg-emerald-900/10" : "border-border bg-muted/20"}`}>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-semibold capitalize">{label} Service ID</Label>
+        {linked && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
       </div>
-
-      {linked ? (
-        <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/30 rounded-md p-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium truncate">{item.service_name || `Service #${item.provider_service_id}`}</div>
-            <div className="text-xs text-muted-foreground">
-              #{item.provider_service_id} • ${Number(item.rate || 0).toFixed(4)}/1k • {item.user_provider_accounts?.name || "provider"}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-emerald-900/20 text-emerald-400 border-emerald-700/40">
-              <Link2 className="w-3 h-3 mr-1" /> Linked
-            </Badge>
-            <Button size="sm" variant="outline" onClick={() => unlink.mutate()}>
-              <X className="w-3 h-3 mr-1" /> Unlink
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setRotateOpen(true)}>
-              <Globe className="w-3 h-3 mr-1" /> Providers {providerCount > 1 ? <span className="ml-1 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px]">{providerCount}</span> : null}
-            </Button>
-          </div>
+      <div className="flex gap-2">
+        <Input
+          placeholder="e.g. 13578"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => { if (hasChange && value.trim()) saveNow(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (hasChange && value.trim()) saveNow(); } }}
+          disabled={saving}
+          className="h-9"
+        />
+        {linked && (
+          <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => clear.mutate()} title="Remove">
+            <X className="w-4 h-4 text-destructive" />
+          </Button>
+        )}
+      </div>
+      {saving ? (
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" /> Importing service…
+        </div>
+      ) : linked ? (
+        <div className="text-[11px] text-muted-foreground truncate">
+          {existing?.service_name} • ${Number(existing?.rate || 0).toFixed(4)}/1k
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/30 rounded-md p-2">
-          <div className="text-xs text-muted-foreground">
-            Provider account + Service ID add karne ke liye <b>Provider</b> button dabao.
-          </div>
-          <Button size="sm" onClick={() => setRotateOpen(true)}>
-            <Globe className="w-3 h-3 mr-1" /> Provider
-          </Button>
-        </div>
+        <div className="text-[11px] text-muted-foreground">Number daalo, Tab/Enter dabao — auto import.</div>
       )}
-
-
-      <UserProviderRotationDialog
-        open={rotateOpen}
-        onOpenChange={setRotateOpen}
-        itemId={item.id}
-        engagementType={item.engagement_type}
-        serviceName={item.service_name}
-      />
     </div>
   );
 }
