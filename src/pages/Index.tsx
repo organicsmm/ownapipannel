@@ -136,12 +136,12 @@ const Index = () => {
               <div className="rounded-2xl p-6" style={{ background: 'white', border: `1px solid ${INK}1A`, boxShadow: `0 10px 30px -20px ${INK}33` }}>
                 <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: `${INK}80` }}>Mode A · Instant</p>
                 <h3 className="font-serif text-[22px] mb-2" style={{ color: INK }}>Engagement Orders</h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>User place karta hai → provider ko forward → fast delivery. Direct, sidha, quick.</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>User places the order → forwarded to provider → fast delivery. Direct, straightforward, quick.</p>
               </div>
               <div className="rounded-2xl p-6" style={{ background: `linear-gradient(135deg, ${ACCENT}1A, ${SOFT})`, border: `1px solid ${ACCENT}40` }}>
                 <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: ACCENT }}>Mode B · Natural</p>
                 <h3 className="font-serif text-[22px] mb-2" style={{ color: INK }}>Organic Delivery</h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>S-curve, ±50% variance, peak-hour weighting. Order chhote chunks me schedule hota hai — algorithm ko lagta hai real audience aa rahi hai.</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: `${INK}99` }}>S-curve, ±50% variance, peak-hour weighting. Orders are scheduled in small chunks — the algorithm sees it as a real audience arriving.</p>
               </div>
             </div>
             <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: `${INK}80` }}>Step 4 · User chooses delivery style</p>
