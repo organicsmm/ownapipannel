@@ -407,6 +407,10 @@ export default function AdminSubscriptions() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="zapupi" className="gap-1">
+              <Zap className="h-4 w-4" />
+              Auto Payments
+            </TabsTrigger>
           </TabsList>
 
           {/* Subscribers Tab */}
