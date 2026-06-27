@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
 import { Link } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import {
@@ -28,6 +32,39 @@ interface SubscriptionCheckDialogProps {
 
 export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionCheckDialogProps) {
   const { hasPendingRequest } = useSubscription();
+  const [payingUpi, setPayingUpi] = useState(false);
+
+  const { data: plans } = useQuery({
+    queryKey: ['subscription-plans-public'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('subscription_plans')
+        .select('plan_type, price_inr')
+        .eq('is_active', true);
+      const map: Record<string, number> = {};
+      (data || []).forEach((p: any) => { map[p.plan_type] = Number(p.price_inr); });
+      return map;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const payWithUpi = async () => {
+    try {
+      setPayingUpi(true);
+      const { data, error } = await supabase.functions.invoke(
+        'zapupi-create-subscription-order',
+        { body: { plan_type: selectedPlan } }
+      );
+      if (error) throw new Error(error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const url = (data as any)?.payment_url;
+      if (!url) throw new Error('No payment URL returned');
+      window.location.href = url;
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to start UPI payment');
+      setPayingUpi(false);
+    }
+  };
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'lifetime'>('monthly');
 
@@ -149,18 +186,39 @@ export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionChec
               </div>
             )}
 
-            {/* Action Button */}
+            {/* Action Buttons */}
             {!hasPendingRequest && (
-              <Button
-                className="w-full btn-gradient rounded-xl py-5 text-base"
-                onClick={() => {
-                  onOpenChange(false);
-                  setShowRequestDialog(true);
-                }}
-              >
-                Get {selectedPlan === 'monthly' ? 'Monthly' : 'Lifetime'} Plan
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  className="w-full btn-gradient rounded-xl py-5 text-base"
+                  disabled={payingUpi || !plans?.[selectedPlan]}
+                  onClick={payWithUpi}
+                >
+                  {payingUpi ? (
+                    <>Processing…</>
+                  ) : (
+                    <>
+                      Pay with UPI (Instant)
+                      {plans?.[selectedPlan] ? ` — ₹${plans[selectedPlan]}` : ''}
+                      <Zap className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl py-5 text-sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    setShowRequestDialog(true);
+                  }}
+                >
+                  Request Manual Activation
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                <p className="text-[11px] text-center text-muted-foreground">
+                  UPI payment instantly unlocks your plan. Manual takes admin approval.
+                </p>
+              </div>
             )}
 
             {/* Back Link */}

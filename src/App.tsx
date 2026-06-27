@@ -30,6 +30,7 @@ const Intelligence = lazy(() => import("./pages/Intelligence"));
 const MyProviders = lazy(() => import("./pages/MyProviders"));
 const MyBundles = lazy(() => import("./pages/MyBundles"));
 const MassOrder = lazy(() => import("./pages/MassOrder"));
+const SubscriptionReturn = lazy(() => import("./pages/SubscriptionReturn"));
 
 // Engagement pages — heaviest user-facing screens, always lazy
 const EngagementOrder = lazy(() => import("./pages/UserEngagementOrder"));
@@ -120,6 +121,7 @@ const App = () => {
                     <Route path="/order" element={<SubscriptionGuard><Order /></SubscriptionGuard>} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/wallet" element={<Wallet />} />
+                    <Route path="/subscription/return" element={<SubscriptionReturn />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/api-access" element={<ApiAccess />} />

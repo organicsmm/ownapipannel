@@ -47,6 +47,8 @@ import {
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
+import { ZapUpiPaymentsList } from '@/components/admin/ZapUpiPaymentsList';
+
 
 interface SubscriptionRequest {
   id: string;
@@ -407,6 +409,10 @@ export default function AdminSubscriptions() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="zapupi" className="gap-1">
+              <Zap className="h-4 w-4" />
+              Auto Payments
+            </TabsTrigger>
           </TabsList>
 
           {/* Subscribers Tab */}
@@ -672,7 +678,13 @@ export default function AdminSubscriptions() {
               </Card>
             )}
           </TabsContent>
+
+          {/* ZapUPI Auto Payments Tab */}
+          <TabsContent value="zapupi" className="mt-4 space-y-4">
+            <ZapUpiPaymentsList />
+          </TabsContent>
         </Tabs>
+
 
         {/* Request Action Dialog */}
         <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>

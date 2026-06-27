@@ -1059,6 +1059,36 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          duration_days: number | null
+          id: string
+          is_active: boolean
+          plan_type: string
+          price_inr: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_days?: number | null
+          id?: string
+          is_active?: boolean
+          plan_type: string
+          price_inr: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_days?: number | null
+          id?: string
+          is_active?: boolean
+          plan_type?: string
+          price_inr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscription_requests: {
         Row: {
           admin_notes: string | null
@@ -1111,6 +1141,7 @@ export type Database = {
         Row: {
           activated_at: string | null
           activated_by: string | null
+          activation_source: string
           created_at: string | null
           expires_at: string | null
           id: string
@@ -1122,6 +1153,7 @@ export type Database = {
         Insert: {
           activated_at?: string | null
           activated_by?: string | null
+          activation_source?: string
           created_at?: string | null
           expires_at?: string | null
           id?: string
@@ -1133,6 +1165,7 @@ export type Database = {
         Update: {
           activated_at?: string | null
           activated_by?: string | null
+          activation_source?: string
           created_at?: string | null
           expires_at?: string | null
           id?: string
@@ -1588,6 +1621,54 @@ export type Database = {
         }
         Relationships: []
       }
+      zapupi_subscription_payments: {
+        Row: {
+          activated: boolean
+          amount_inr: number
+          created_at: string
+          gateway_response: Json | null
+          id: string
+          order_id: string
+          payment_url: string | null
+          plan_type: string
+          status: string
+          txn_id: string | null
+          updated_at: string
+          user_id: string
+          utr: string | null
+        }
+        Insert: {
+          activated?: boolean
+          amount_inr: number
+          created_at?: string
+          gateway_response?: Json | null
+          id?: string
+          order_id: string
+          payment_url?: string | null
+          plan_type: string
+          status?: string
+          txn_id?: string | null
+          updated_at?: string
+          user_id: string
+          utr?: string | null
+        }
+        Update: {
+          activated?: boolean
+          amount_inr?: number
+          created_at?: string
+          gateway_response?: Json | null
+          id?: string
+          order_id?: string
+          payment_url?: string | null
+          plan_type?: string
+          status?: string
+          txn_id?: string | null
+          updated_at?: string
+          user_id?: string
+          utr?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       providers_public: {
@@ -1619,6 +1700,15 @@ export type Database = {
       }
     }
     Functions: {
+      activate_subscription_zapupi: {
+        Args: {
+          p_gateway_response: Json
+          p_order_id: string
+          p_txn_id: string
+          p_utr: string
+        }
+        Returns: Json
+      }
       admin_activate_subscription_by_email: {
         Args: { _admin_id?: string; _email: string; _plan_type: string }
         Returns: {
