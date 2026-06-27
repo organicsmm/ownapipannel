@@ -32,6 +32,39 @@ interface SubscriptionCheckDialogProps {
 
 export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionCheckDialogProps) {
   const { hasPendingRequest } = useSubscription();
+  const [payingUpi, setPayingUpi] = useState(false);
+
+  const { data: plans } = useQuery({
+    queryKey: ['subscription-plans-public'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('subscription_plans')
+        .select('plan_type, price_inr')
+        .eq('is_active', true);
+      const map: Record<string, number> = {};
+      (data || []).forEach((p: any) => { map[p.plan_type] = Number(p.price_inr); });
+      return map;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const payWithUpi = async () => {
+    try {
+      setPayingUpi(true);
+      const { data, error } = await supabase.functions.invoke(
+        'zapupi-create-subscription-order',
+        { body: { plan_type: selectedPlan } }
+      );
+      if (error) throw new Error(error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const url = (data as any)?.payment_url;
+      if (!url) throw new Error('No payment URL returned');
+      window.location.href = url;
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to start UPI payment');
+      setPayingUpi(false);
+    }
+  };
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'lifetime'>('monthly');
 
