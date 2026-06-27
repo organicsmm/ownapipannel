@@ -179,7 +179,7 @@ function Inner() {
       return data;
     },
     onSuccess: (data: any) => {
-      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} provider par bhej diya gaya.` });
+      toast({ title: "🚀 Order placed!", description: `Order #${data.order_number} has been sent to the provider.` });
       qc.invalidateQueries({ queryKey: ["engagement-orders"] });
       navigate("/engagement-orders");
     },
