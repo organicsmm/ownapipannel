@@ -1,5 +1,5 @@
 # Boostly Pro — robots.txt
-# Site:    https://boostlypro.online
+# Site:    https://boostbotting.site
 # Updated: 2026-05-05
 
 # ───────────────────────────── Default rule ─────────────────────────────
@@ -98,5 +98,5 @@ User-agent: DotBot
 Disallow: /
 
 # ───────────────────────────── Sitemap & host ─────────────────────────────
-Sitemap: https://boostlypro.online/sitemap.xml
-Host: https://boostlypro.online
+Sitemap: https://boostbotting.site/sitemap.xml
+Host: https://boostbotting.site

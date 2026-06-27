@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,35 @@ export default function Services() {
   const { formatPrice } = useCurrency();
 
   const { services } = useServices();
+
+  useEffect(() => {
+    const id = 'services-itemlist-jsonld';
+    document.getElementById(id)?.remove();
+    if (!services || services.length === 0) return;
+    const items = services.slice(0, 50).map((s, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Service',
+        name: s.name,
+        category: s.category,
+        provider: { '@type': 'Organization', name: 'Boostly Pro' },
+        ...(s.description ? { description: s.description } : {}),
+      },
+    }));
+    const ld = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Boostly Pro Services',
+      itemListElement: items,
+    };
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.id = id;
+    script.text = JSON.stringify(ld);
+    document.head.appendChild(script);
+    return () => { document.getElementById(id)?.remove(); };
+  }, [services]);
 
   const filteredServices = services?.filter(service => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,9 +142,9 @@ export default function Services() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <span className="text-xs text-muted-foreground">{service.category}</span>
-                      <h3 className="font-semibold mt-1 group-hover:text-primary transition-colors">
+                      <h2 className="font-semibold text-base mt-1 group-hover:text-primary transition-colors">
                         {service.name}
-                      </h3>
+                      </h2>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs ${quality.color}`}>
                       {quality.label}

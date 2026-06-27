@@ -69,8 +69,11 @@ export default function Dashboard() {
               :good_{new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
             </p>
             <h1 className="font-serif text-3xl sm:text-4xl leading-[1] tracking-tight text-foreground">
-              {profile?.full_name || 'User'}<span className="text-primary italic">.</span>
+              Dashboard<span className="text-primary italic">.</span>
             </h1>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground mt-2">
+              Welcome back, {profile?.full_name || 'User'}
+            </p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => navigate('/engagement-order')}
