@@ -297,7 +297,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
       ) : (
         <div className="space-y-3">
           <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
-          <div className="space-y-3">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {visibleTypes.map((t, idx) => (
               <EngagementTypeBox
                 key={t}
@@ -370,18 +370,17 @@ function EngagementTypeBox({
           )}
         </div>
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={onRemoveType}
           title={`${label} ko bundle se hata do`}
-          className="text-destructive hover:text-destructive"
+          className="h-7 w-7 text-destructive hover:text-destructive"
         >
-          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+          <Trash2 className="w-3.5 h-3.5" />
         </Button>
       </div>
 
-
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {providers.map((p, idx) => (
           <ProviderRow
             key={p.id}
@@ -396,7 +395,7 @@ function EngagementTypeBox({
           />
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground">Priority 1 = pehle try hoga, fail/balance kam ho to 2, phir 3…</p>
+      <p className="text-[10px] text-muted-foreground leading-tight">Priority 1 = pehle try, fail ho to 2…</p>
     </div>
   );
 }
@@ -562,49 +561,46 @@ function ProviderRow({
   };
 
   return (
-    <div className={`grid grid-cols-[60px_1fr_1.4fr_36px] gap-2 items-center rounded-md p-2 ${linked ? "bg-muted/40" : "bg-muted/10"}`}>
-      <Input
-        type="number"
-        min={1}
-        max={99}
-        value={priority}
-        onChange={(e) => setPriority(Number(e.target.value) || 1)}
-        onBlur={() => { if ((linked && prioChanged) || (serviceId.trim() && (valChanged || prioChanged))) saveRow(); }}
-        disabled={saving}
-        className="h-9 text-center"
-        title="Priority (1 = highest)"
-      />
-      <div className="min-w-0 flex items-center gap-1.5">
-        {isPrimary && <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-        <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{provider.name}</div>
-          {linked && mapping?.provider_service_id && (
-            <div className="text-[10px] text-muted-foreground truncate">ID #{mapping.provider_service_id}</div>
-          )}
-        </div>
+    <div className={`rounded-md p-1.5 space-y-1 ${linked ? "bg-muted/40" : "bg-muted/10"}`}>
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        {isPrimary && <Crown className="w-3 h-3 text-amber-500 shrink-0" />}
+        <span className="truncate font-medium text-foreground">{provider.name}</span>
       </div>
-      <Input
-        placeholder="Service ID e.g. 13578"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        maxLength={9}
-        value={serviceId}
-        onChange={(e) => setServiceId(e.target.value.replace(/\D/g, "").slice(0, 9))}
-        onBlur={() => { if (valChanged || (serviceId.trim() && prioChanged)) saveRow(); }}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (valChanged || prioChanged) saveRow(); } }}
-        disabled={saving}
-        className="h-9"
-      />
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-9 w-9"
-        onClick={removeRow}
-        disabled={saving || !linked}
-        title="Remove provider"
-      >
-        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5 text-destructive" />}
-      </Button>
+      <div className="grid grid-cols-[42px_1fr_24px] gap-1 items-center">
+        <Input
+          type="number"
+          min={1}
+          max={99}
+          value={priority}
+          onChange={(e) => setPriority(Number(e.target.value) || 1)}
+          onBlur={() => { if ((linked && prioChanged) || (serviceId.trim() && (valChanged || prioChanged))) saveRow(); }}
+          disabled={saving}
+          className="h-8 px-1 text-center text-xs"
+          title="Priority"
+        />
+        <Input
+          placeholder="Service ID"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={9}
+          value={serviceId}
+          onChange={(e) => setServiceId(e.target.value.replace(/\D/g, "").slice(0, 9))}
+          onBlur={() => { if (valChanged || (serviceId.trim() && prioChanged)) saveRow(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (valChanged || prioChanged) saveRow(); } }}
+          disabled={saving}
+          className="h-8 px-2 text-xs"
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-6"
+          onClick={removeRow}
+          disabled={saving || !linked}
+          title="Remove"
+        >
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3 text-destructive" />}
+        </Button>
+      </div>
     </div>
   );
 }
