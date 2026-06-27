@@ -108,7 +108,7 @@ const Index = () => {
             <div className="rounded-2xl p-8 text-center mb-3" style={{ background: `linear-gradient(135deg, ${ACCENT}1A, ${SOFT})`, border: `1px solid ${ACCENT}33` }}>
               <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-3" style={{ color: ACCENT }}>Core Engine</p>
               <h3 className="font-serif text-[28px] mb-2" style={{ color: INK }}>LRU Rotation + Auto Failover</h3>
-              <p className="text-[13px] max-w-lg mx-auto" style={{ color: `${INK}99` }}>Har order ke liye sabse fresh provider chuna jaata hai. Ek down ho jaaye to dusra automatic le leta hai.</p>
+              <p className="text-[13px] max-w-lg mx-auto" style={{ color: `${INK}99` }}>The freshest provider is picked for every order. If one goes down, another takes over automatically.</p>
             </div>
             <p className="text-center font-mono text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: `${INK}80` }}>Step 2 · Smart routing, no single point of failure</p>
 
