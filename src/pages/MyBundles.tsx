@@ -335,6 +335,16 @@ function ServiceIdBox({
     if (!user) return;
     const trimmed = value.trim();
     if (!trimmed) return;
+    // Validate: must be digits only, 1-9 chars, > 0
+    if (!/^\d{1,9}$/.test(trimmed)) {
+      toast.error("Service ID sirf numbers ho sakta hai (1-9 digits)");
+      return;
+    }
+    const asNum = parseInt(trimmed, 10);
+    if (!Number.isFinite(asNum) || asNum <= 0) {
+      toast.error("Service ID 0 se bada hona chahiye");
+      return;
+    }
     if (!providerId) {
       toast.error("Pehle provider account chuno");
       return;
@@ -397,8 +407,15 @@ function ServiceIdBox({
       <div className="flex gap-2">
         <Input
           placeholder="e.g. 13578"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={9}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            // Strip anything non-numeric as user types
+            const cleaned = e.target.value.replace(/\D/g, "").slice(0, 9);
+            setValue(cleaned);
+          }}
           onBlur={() => { if (hasChange && value.trim()) saveNow(); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (hasChange && value.trim()) saveNow(); } }}
           disabled={saving}
