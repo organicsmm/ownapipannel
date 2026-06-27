@@ -197,20 +197,20 @@ function Inner() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground">
-                Engagement Order Banao
+                Create Engagement Order
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                Apne saved bundle se ek hi link par multiple services (views, likes, comments, followers…)
-                ek saath organic pattern me deliver karwao. Niche steps follow karo:
+                Deliver multiple services (views, likes, comments, followers…) on a single link
+                with an organic pattern, all from your saved bundle. Follow the steps below:
               </p>
               <ol className="mt-3 space-y-1.5 text-xs sm:text-sm text-foreground/90 list-decimal list-inside">
-                <li><span className="font-semibold">Bundle select</span> karo — jisme tumne apne provider services link kiye hain.</li>
-                <li><span className="font-semibold">Video / Post ka link</span> daalo jis par engagement chahiye.</li>
-                <li><span className="font-semibold">Base quantity</span> set karo (jaise views = 10,000). Baaki ratio auto adjust hoga.</li>
-                <li>Har engagement type ki <span className="font-semibold">timing &amp; variance</span> customize karo, fir <span className="font-semibold">Place Order</span> dabao.</li>
+                <li><span className="font-semibold">Select a bundle</span> — one where you have linked your provider services.</li>
+                <li>Paste the <span className="font-semibold">video / post link</span> you want engagement on.</li>
+                <li>Set the <span className="font-semibold">base quantity</span> (e.g. views = 10,000). The rest of the ratios auto-adjust.</li>
+                <li>Customize <span className="font-semibold">timing &amp; variance</span> for each engagement type, then hit <span className="font-semibold">Place Order</span>.</li>
               </ol>
               <p className="text-[11px] sm:text-xs text-muted-foreground mt-3">
-                💡 Tip: Pehli baar use kar rahe ho to <a href="/my-bundles" className="underline text-primary font-medium">My Bundles</a> page se ek bundle banao aur provider services link karo.
+                💡 Tip: First time here? Go to <a href="/my-bundles" className="underline text-primary font-medium">My Bundles</a> to create a bundle and link your provider services.
               </p>
             </div>
           </div>
