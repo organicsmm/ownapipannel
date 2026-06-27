@@ -57,11 +57,12 @@ const Index = () => {
             Boostly Pro — Private Circle
           </p>
           <h1 className="font-serif text-[clamp(3rem,9vw,7rem)] leading-[0.95] tracking-[-0.02em]" style={{ color: INK }}>
+            <span className="sr-only">Boostly Pro — Premium Social Growth Engine. </span>
             Built Different.
           </h1>
-          <h1 className="font-serif italic text-[clamp(3rem,9vw,7rem)] leading-[0.95] tracking-[-0.02em] mt-2" style={{ color: ACCENT }}>
+          <p className="font-serif italic text-[clamp(3rem,9vw,7rem)] leading-[0.95] tracking-[-0.02em] mt-2" style={{ color: ACCENT }}>
             Paid Different.
-          </h1>
+          </p>
           <p className="mt-10 text-[17px] font-light" style={{ color: `${INK}B3` }}>Quiet money. Loud results.</p>
           <Link
             to="/auth"
