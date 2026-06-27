@@ -30,6 +30,7 @@ const Intelligence = lazy(() => import("./pages/Intelligence"));
 const MyProviders = lazy(() => import("./pages/MyProviders"));
 const MyBundles = lazy(() => import("./pages/MyBundles"));
 const MassOrder = lazy(() => import("./pages/MassOrder"));
+const SubscriptionReturn = lazy(() => import("./pages/SubscriptionReturn"));
 
 // Engagement pages — heaviest user-facing screens, always lazy
 const EngagementOrder = lazy(() => import("./pages/UserEngagementOrder"));
