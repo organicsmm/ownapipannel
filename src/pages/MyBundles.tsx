@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X } from "lucide-react";
+import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X, Crown, GripVertical } from "lucide-react";
 import { PLATFORM_ENGAGEMENT_TYPES, EngagementType, ENGAGEMENT_CONFIG } from "@/lib/engagement-types";
 
 const PLATFORM_TABS: Array<{ id: string; label: string }> = [
