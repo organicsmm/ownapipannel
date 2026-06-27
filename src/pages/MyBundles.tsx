@@ -407,8 +407,15 @@ function ServiceIdBox({
       <div className="flex gap-2">
         <Input
           placeholder="e.g. 13578"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={9}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            // Strip anything non-numeric as user types
+            const cleaned = e.target.value.replace(/\D/g, "").slice(0, 9);
+            setValue(cleaned);
+          }}
           onBlur={() => { if (hasChange && value.trim()) saveNow(); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (hasChange && value.trim()) saveNow(); } }}
           disabled={saving}
