@@ -117,8 +117,8 @@ const Index = () => {
             {/* STEP 3 */}
             <div className="grid md:grid-cols-2 gap-4 mb-3">
               {[
-                { tag: 'Service Mapping', h: 'Provider services → Your services', d: 'Admin har provider ki service ko apni catalog se map karta hai. Pricing, quality, speed sab control me.' },
-                { tag: 'Bundle Builder', h: 'Likes + Views + Followers', d: 'Multiple services ko ek bundle me pack karo. User ek hi click me poora growth package le.' },
+                { tag: 'Service Mapping', h: 'Provider services → Your services', d: 'Admin maps each provider service to your catalog. Pricing, quality and speed stay fully in your control.' },
+                { tag: 'Bundle Builder', h: 'Likes + Views + Followers', d: 'Pack multiple services into one bundle. Users grab a complete growth package in a single click.' },
               ].map((c) => (
                 <div key={c.tag} className="rounded-2xl p-6" style={{ background: 'white', border: `1px solid ${INK}1A`, boxShadow: `0 10px 30px -20px ${INK}33` }}>
                   <p className="font-mono text-[9px] tracking-[0.25em] uppercase mb-2" style={{ color: `${INK}80` }}>{c.tag}</p>
