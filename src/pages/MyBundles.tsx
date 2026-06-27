@@ -370,18 +370,17 @@ function EngagementTypeBox({
           )}
         </div>
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={onRemoveType}
           title={`${label} ko bundle se hata do`}
-          className="text-destructive hover:text-destructive"
+          className="h-7 w-7 text-destructive hover:text-destructive"
         >
-          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+          <Trash2 className="w-3.5 h-3.5" />
         </Button>
       </div>
 
-
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {providers.map((p, idx) => (
           <ProviderRow
             key={p.id}
@@ -396,7 +395,7 @@ function EngagementTypeBox({
           />
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground">Priority 1 = pehle try hoga, fail/balance kam ho to 2, phir 3…</p>
+      <p className="text-[10px] text-muted-foreground leading-tight">Priority 1 = pehle try, fail ho to 2…</p>
     </div>
   );
 }
