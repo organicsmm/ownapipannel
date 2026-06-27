@@ -176,7 +176,7 @@ async function pollStartedRuns(limit = 20) {
         last_status_check: new Date().toISOString(),
       };
 
-      if (TERMINAL_OK.includes(providerStatus) || (remainsNum === 0 && !TERMINAL_BAD.includes(providerStatus))) {
+      if (TERMINAL_OK.includes(providerStatus)) {
         await supabase.from("organic_run_schedule").update({
           ...tracking,
           status: "completed",
