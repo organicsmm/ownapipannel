@@ -72,16 +72,16 @@ function isValidUrl(s: string) {
 
 // Map common type aliases (singular/plural/short forms) → canonical EngagementType
 const TYPE_ALIASES: Record<string, EngagementType> = {
-  like: "likes", likes: "likes",
-  view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
-  share: "shares", shares: "shares",
-  comment: "comments", comments: "comments",
-  follower: "followers", followers: "followers", follow: "followers", follows: "followers",
-  save: "saves", saves: "saves",
-  repost: "reposts", reposts: "reposts",
-  retweet: "retweets", retweets: "retweets",
-  subscriber: "subscribers", subscribers: "subscribers", sub: "subscribers", subs: "subscribers",
-  watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
+  l: "likes", lk: "likes", like: "likes", likes: "likes",
+  v: "views", vw: "views", view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
+  sh: "shares", share: "shares", shares: "shares",
+  c: "comments", cm: "comments", comment: "comments", comments: "comments",
+  f: "followers", fl: "followers", follower: "followers", followers: "followers", follow: "followers", follows: "followers",
+  sv: "saves", save: "saves", saves: "saves",
+  rp: "reposts", repost: "reposts", reposts: "reposts",
+  rt: "retweets", retweet: "retweets", retweets: "retweets",
+  sub: "subscribers", subs: "subscribers", subscriber: "subscribers", subscribers: "subscribers",
+  wh: "watch_hours", watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
 };
 
 export interface ParsedLink {
