@@ -72,16 +72,16 @@ function isValidUrl(s: string) {
 
 // Map common type aliases (singular/plural/short forms) → canonical EngagementType
 const TYPE_ALIASES: Record<string, EngagementType> = {
-  like: "likes", likes: "likes",
-  view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
-  share: "shares", shares: "shares",
-  comment: "comments", comments: "comments",
-  follower: "followers", followers: "followers", follow: "followers", follows: "followers",
-  save: "saves", saves: "saves",
-  repost: "reposts", reposts: "reposts",
-  retweet: "retweets", retweets: "retweets",
-  subscriber: "subscribers", subscribers: "subscribers", sub: "subscribers", subs: "subscribers",
-  watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
+  l: "likes", lk: "likes", like: "likes", likes: "likes",
+  v: "views", vw: "views", view: "views", views: "views", reelview: "views", reelviews: "views", storyview: "views", storyviews: "views",
+  sh: "shares", share: "shares", shares: "shares",
+  c: "comments", cm: "comments", comment: "comments", comments: "comments",
+  f: "followers", fl: "followers", follower: "followers", followers: "followers", follow: "followers", follows: "followers",
+  sv: "saves", save: "saves", saves: "saves",
+  rp: "reposts", repost: "reposts", reposts: "reposts",
+  rt: "retweets", retweet: "retweets", retweets: "retweets",
+  sub: "subscribers", subs: "subscribers", subscriber: "subscribers", subscribers: "subscribers",
+  wh: "watch_hours", watchhour: "watch_hours", watchhours: "watch_hours", watch_hours: "watch_hours",
 };
 
 export interface ParsedLink {
@@ -391,19 +391,30 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   // Build rows from textarea
   useEffect(() => {
-    const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const rawLines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    // Parse each line through the smart parser so pasted format like
+    // "URL | likes:1000 | comments:50" auto-fills overrides without file upload.
+    const parsedByUrl = new Map<string, ParsedLink>();
     const unique: string[] = [];
     const seen = new Set<string>();
-    for (const l of lines) { if (!seen.has(l)) { seen.add(l); unique.push(l); } }
+    for (const rawLine of rawLines) {
+      const parsedArr = parseLinksFromText(rawLine);
+      const parsed = parsedArr[0];
+      const key = parsed?.url ?? rawLine;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(key);
+      if (parsed && (parsed.baseQty != null || parsed.perTypeQty)) {
+        parsedByUrl.set(key, parsed);
+      }
+    }
 
     setRows((prev) => {
       const prevByLink = new Map(prev.map(r => [r.link, r]));
       const activeSet = new Set<EngagementType>(activeTypes);
       return unique.map((l) => {
         const existing = prevByLink.get(l);
-        // Seed values from parsed CSV/TXT upload — applied only for BRAND-NEW rows
-        // (not existing ones the user may have already edited).
-        const seed = existing ? undefined : uploadedConfigs.get(l);
+        const seed = existing ? undefined : (uploadedConfigs.get(l) ?? parsedByUrl.get(l));
         const enabled: Record<string, boolean> = {};
         const overrides: Partial<Record<EngagementType, number>> = {};
         if (existing?.qtyOverrides) {
@@ -522,13 +533,20 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   const invalidLines = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    return lines.filter(l => !isValidUrl(l));
+    return lines.filter(l => {
+      const p = parseLinksFromText(l)[0];
+      return !p || !isValidUrl(p.url);
+    });
   }, [linksText]);
 
   const duplicates = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     const counts: Record<string, number> = {};
-    lines.forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    lines.forEach(l => {
+      const p = parseLinksFromText(l)[0];
+      const key = p?.url ?? l;
+      counts[key] = (counts[key] || 0) + 1;
+    });
     return Object.entries(counts).filter(([, c]) => c > 1).map(([l]) => l);
   }, [linksText]);
 
@@ -557,7 +575,10 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     const row = rows.find(r => r.id === id);
     if (!row) return;
     setRows(prev => prev.filter(r => r.id !== id));
-    setLinksText(prev => prev.split(/\r?\n/).filter(l => l.trim() !== row.link).join("\n"));
+    setLinksText(prev => prev.split(/\r?\n/).filter(l => {
+      const p = parseLinksFromText(l)[0];
+      return (p?.url ?? l.trim()) !== row.link;
+    }).join("\n"));
   }, [rows]);
 
   const updateRow = useCallback((id: string, patch: Partial<OrderRow>) => {
