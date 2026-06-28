@@ -414,9 +414,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const activeSet = new Set<EngagementType>(activeTypes);
       return unique.map((l) => {
         const existing = prevByLink.get(l);
-        // Seed values from parsed CSV/TXT upload — applied only for BRAND-NEW rows
-        // (not existing ones the user may have already edited).
-        const seed = existing ? undefined : uploadedConfigs.get(l);
+        const seed = existing ? undefined : (uploadedConfigs.get(l) ?? parsedByUrl.get(l));
         const enabled: Record<string, boolean> = {};
         const overrides: Partial<Record<EngagementType, number>> = {};
         if (existing?.qtyOverrides) {
