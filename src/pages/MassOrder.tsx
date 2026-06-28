@@ -575,7 +575,10 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     const row = rows.find(r => r.id === id);
     if (!row) return;
     setRows(prev => prev.filter(r => r.id !== id));
-    setLinksText(prev => prev.split(/\r?\n/).filter(l => l.trim() !== row.link).join("\n"));
+    setLinksText(prev => prev.split(/\r?\n/).filter(l => {
+      const p = parseLinksFromText(l)[0];
+      return (p?.url ?? l.trim()) !== row.link;
+    }).join("\n"));
   }, [rows]);
 
   const updateRow = useCallback((id: string, patch: Partial<OrderRow>) => {
