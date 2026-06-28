@@ -533,13 +533,20 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   const invalidLines = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    return lines.filter(l => !isValidUrl(l));
+    return lines.filter(l => {
+      const p = parseLinksFromText(l)[0];
+      return !p || !isValidUrl(p.url);
+    });
   }, [linksText]);
 
   const duplicates = useMemo(() => {
     const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     const counts: Record<string, number> = {};
-    lines.forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    lines.forEach(l => {
+      const p = parseLinksFromText(l)[0];
+      const key = p?.url ?? l;
+      counts[key] = (counts[key] || 0) + 1;
+    });
     return Object.entries(counts).filter(([, c]) => c > 1).map(([l]) => l);
   }, [linksText]);
 
