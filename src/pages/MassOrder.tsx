@@ -391,10 +391,23 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
 
   // Build rows from textarea
   useEffect(() => {
-    const lines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const rawLines = linksText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    // Parse each line through the smart parser so pasted format like
+    // "URL | likes:1000 | comments:50" auto-fills overrides without file upload.
+    const parsedByUrl = new Map<string, ParsedLink>();
     const unique: string[] = [];
     const seen = new Set<string>();
-    for (const l of lines) { if (!seen.has(l)) { seen.add(l); unique.push(l); } }
+    for (const rawLine of rawLines) {
+      const parsedArr = parseLinksFromText(rawLine);
+      const parsed = parsedArr[0];
+      const key = parsed?.url ?? rawLine;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(key);
+      if (parsed && (parsed.baseQty != null || parsed.perTypeQty)) {
+        parsedByUrl.set(key, parsed);
+      }
+    }
 
     setRows((prev) => {
       const prevByLink = new Map(prev.map(r => [r.link, r]));
