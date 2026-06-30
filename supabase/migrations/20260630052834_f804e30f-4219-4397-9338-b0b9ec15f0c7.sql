@@ -1,0 +1,1 @@
+UPDATE public.subscription_plans SET price_inr = 22000 WHERE plan_type = 'lifetime';
