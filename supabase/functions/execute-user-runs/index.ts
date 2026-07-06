@@ -636,7 +636,7 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
         processed++;
-      } else if (temporaryBlocked && !hardProviderError) {
+      } else if (temporaryBlocked) {
         await deferBusyRunMinutes(run.id, lastErr || "Provider temporarily unavailable for this run quantity; deferred safely");
         deferredBusy++;
         skipped++;
