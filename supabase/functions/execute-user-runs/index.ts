@@ -27,7 +27,11 @@ function getProviderError(result: any): string | null {
 }
 
 function isTemporaryProviderBlock(message: string): boolean {
-  return /less than min|minimal|min quantity|minimum|below|busy|already active|active order|wait until|wait|try again|temporar|duplicate|same link/i.test(message);
+  return /less than min|minimal|min quantity|minimum|below|busy|already active|active order|wait until|wait|try again|temporar|duplicate|same link|not enough funds|not enough balance|insufficient funds|insufficient balance|no funds|no balance|low balance|balance/i.test(message);
+}
+
+function isRecoverableProviderBlock(message: string): boolean {
+  return /busy|already active|active order|wait until|wait|try again|temporar|duplicate|same link|not enough funds|not enough balance|insufficient funds|insufficient balance|no funds|no balance|low balance|balance/i.test(message);
 }
 
 function deferBusyRunMinutes(runId: string, message: string, minMinutes = 4, spreadMinutes = 6) {
@@ -475,6 +479,24 @@ Deno.serve(async (req) => {
       if (triedProviders.size > 0) {
         const remaining = candidates.filter((c) => !triedProviders.has(String(c.provider.id)));
         if (remaining.length === 0) {
+          const previousMessage = String((run as any).error_message || "");
+          const previousTriedResponse = JSON.stringify((run as any).provider_response || {});
+          if (isRecoverableProviderBlock(`${previousMessage} ${previousTriedResponse}`)) {
+            await supabase.from("organic_run_schedule").update({
+              status: "pending",
+              scheduled_at: new Date(Date.now() + (4 + Math.random() * 6) * 60 * 1000).toISOString(),
+              provider_account_id: null,
+              provider_account_name: null,
+              provider_order_id: null,
+              provider_status: null,
+              provider_response: null,
+              error_message: "All providers were temporarily blocked/balance-low; pending for automatic retry after top-up",
+              last_status_check: new Date().toISOString(),
+              completed_at: null,
+            }).eq("id", run.id);
+            deferredBusy++;
+            skipped++; continue;
+          }
           await supabase.from("organic_run_schedule").update({
             status: "failed",
             completed_at: new Date().toISOString(),
@@ -614,7 +636,7 @@ Deno.serve(async (req) => {
           last_status_check: new Date().toISOString(),
         }).eq("id", run.id);
         processed++;
-      } else if (temporaryBlocked && !hardProviderError) {
+      } else if (temporaryBlocked) {
         await deferBusyRunMinutes(run.id, lastErr || "Provider temporarily unavailable for this run quantity; deferred safely");
         deferredBusy++;
         skipped++;
