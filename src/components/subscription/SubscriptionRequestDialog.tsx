@@ -18,6 +18,7 @@ import {
   Loader2,
   Zap,
   Crown,
+  Calendar,
   CheckCircle2,
   User,
   Mail,
