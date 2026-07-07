@@ -146,7 +146,8 @@ function Inner() {
         {PLATFORM_TABS.map(p => (
           <TabsContent key={p.id} value={p.id} className="space-y-4 mt-4">
             {creating && tab === p.id && (
-              <Card className="p-5 space-y-3">
+              <Card ref={builderRef} className="p-5 space-y-3">
+
                 <div>
                   <Label>Bundle Name</Label>
                   <Input placeholder={`e.g. My ${p.label} Bundle`} value={bundleName} onChange={(e) => setBundleName(e.target.value)} />
