@@ -21,7 +21,7 @@ import Dashboard from "./pages/Dashboard";
 // (millions of runs, bundles, admin tools) never blocks anyone else's UI.
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
-const Services = lazy(() => import("./pages/Services"));
+
 const Order = lazy(() => import("./pages/Order"));
 const Orders = lazy(() => import("./pages/Orders"));
 
@@ -121,7 +121,7 @@ const App = () => {
                     <Route path="*" element={<NotFound />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/services" element={<Services />} />
+                    
                     <Route path="/order" element={<Order />} />
                     <Route path="/orders" element={<Orders />} />
                     

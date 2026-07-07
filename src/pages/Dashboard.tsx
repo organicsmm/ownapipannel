@@ -165,23 +165,19 @@ export default function Dashboard() {
 
 
         {/* Quick actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            { icon: Sparkles, label: 'Full Engagement', desc: 'Views + Likes + Comments', path: '/engagement-order' },
-            { icon: Package, label: 'All Services', desc: 'Browse catalog', path: '/services' },
-          ].map((a, i) => (
-            <Link key={i} to={a.path} className="group flex items-center gap-3.5 p-4 rounded-md bg-card border border-border hover:border-primary/40 hover:bg-secondary/30 transition-all">
-              <div className="w-10 h-10 rounded-md border border-border bg-background flex items-center justify-center text-primary shrink-0">
-                <a.icon className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-foreground">{a.label}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{a.desc}</p>
-              </div>
-              <ArrowUpRight className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
-            </Link>
-          ))}
+        <div className="grid grid-cols-1 gap-3">
+          <Link to="/engagement-order" className="group flex items-center gap-3.5 p-4 rounded-md bg-card border border-border hover:border-primary/40 hover:bg-secondary/30 transition-all">
+            <div className="w-10 h-10 rounded-md border border-border bg-background flex items-center justify-center text-primary shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-foreground">Full Engagement</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Views + Likes + Comments</p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
+          </Link>
         </div>
+
       </div>
     </DashboardLayout>
   );
