@@ -526,6 +526,14 @@ export default function AdminUsers() {
         </Badge>
       );
     }
+    if (sub.plan_type === 'yearly') {
+      return (
+        <Badge className="text-[10px] h-5 bg-emerald-500/20 text-emerald-500 border-emerald-500/30">
+          <Calendar className="h-3 w-3 mr-1" />
+          Yearly
+        </Badge>
+      );
+    }
     return (
       <Badge className="text-[10px] h-5 bg-primary/20 text-primary border-primary/30">
         <Zap className="h-3 w-3 mr-1" />
