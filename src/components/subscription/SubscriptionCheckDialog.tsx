@@ -6,22 +6,21 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Zap, Crown, Star, CheckCircle2, Sparkles, Bitcoin } from 'lucide-react';
+import { Lock, Zap, Crown, Star, CheckCircle2, Bitcoin } from 'lucide-react';
 
 interface SubscriptionCheckDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type Plan = 'monthly' | 'yearly' | 'yearly_plus' | 'lifetime';
+type Plan = 'monthly' | 'yearly' | 'lifetime';
 
 const PLAN_META: Record<Plan, {
   label: string; price: number; suffix: string; icon: any; color: string; features: string[]; badge?: string;
 }> = {
-  monthly:     { label: 'Monthly',     price: 35,  suffix: '/month',   icon: Zap,    color: 'primary', features: ['30 days access', 'Full platform', 'Cancel anytime'] },
-  yearly:      { label: 'Yearly',      price: 100, suffix: '/year',    icon: Star,   color: 'primary', features: ['365 days access', 'Save vs monthly', 'All features'], badge: 'Popular' },
-  yearly_plus: { label: 'Yearly Plus', price: 200, suffix: '/year',    icon: Sparkles, color: 'primary', features: ['365 days premium', 'Priority support', 'Everything included'] },
-  lifetime:    { label: 'Lifetime',    price: 500, suffix: 'one-time', icon: Crown,  color: 'amber',   features: ['Forever access', 'All future updates', 'Best value'], badge: 'Best' },
+  monthly:  { label: 'Monthly',  price: 29,  suffix: '/month',   icon: Zap,   color: 'primary', features: ['30 days access', 'Full platform', 'Cancel anytime'] },
+  yearly:   { label: 'Yearly',   price: 249, suffix: '/year',    icon: Star,  color: 'primary', features: ['365 days access', 'Save vs monthly', 'All features'], badge: 'Popular' },
+  lifetime: { label: 'Lifetime', price: 499, suffix: 'one-time', icon: Crown, color: 'amber',   features: ['Forever access', 'All future updates', 'Best value'], badge: 'Best' },
 };
 
 export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionCheckDialogProps) {
