@@ -669,7 +669,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const scheduleError = scheduledAt && !scheduledDate
     ? "Invalid date/time"
     : (scheduledDate && scheduledDate.getTime() < Date.now() - 30_000
-        : "Scheduled time is in the past"
+        ? "Scheduled time is in the past"
         : null);
   const isScheduledMode = !!scheduledDate && !scheduleError && scheduledDate.getTime() > Date.now();
 
