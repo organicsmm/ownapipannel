@@ -810,6 +810,39 @@ export type Database = {
         }
         Relationships: []
       }
+      oxapay_webhook_events: {
+        Row: {
+          activation_result: Json | null
+          created_at: string
+          id: string
+          order_id: string
+          payload: Json | null
+          processed_at: string | null
+          signature_prefix: string
+          status: string
+        }
+        Insert: {
+          activation_result?: Json | null
+          created_at?: string
+          id?: string
+          order_id: string
+          payload?: Json | null
+          processed_at?: string | null
+          signature_prefix: string
+          status: string
+        }
+        Update: {
+          activation_result?: Json | null
+          created_at?: string
+          id?: string
+          order_id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          signature_prefix?: string
+          status?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           created_at: string | null
