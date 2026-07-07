@@ -35,7 +35,7 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && user) navigate('/engagement-order');
+    if (!isLoading && user) navigate('/dashboard');
   }, [user, isLoading, navigate]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -69,7 +69,7 @@ export default function Auth() {
           else setError('Login failed.');
           setIsSubmitting(false); return;
         }
-        navigate('/engagement-order', { replace: true });
+        navigate('/dashboard', { replace: true });
       } else {
         const v = signupSchema.safeParse({ email, password, fullName });
         if (!v.success) { setError(v.error.errors[0].message); setIsSubmitting(false); return; }
