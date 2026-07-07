@@ -133,7 +133,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                 </div>
                 <h3 className="font-semibold mb-1">Lifetime Plan</h3>
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-3xl font-bold">$100</span>
+                  <span className="text-3xl font-bold">$499</span>
                   <span className="text-muted-foreground">one-time</span>
                 </div>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
