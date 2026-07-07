@@ -161,6 +161,7 @@ const App = () => {
                     <Route path="/cookies" element={<CookiePolicy />} />
                   </Routes>
                 </Suspense>
+                </GlobalSubscriptionGuard>
               </BrowserRouter>
             </AppErrorBoundary>
           </TooltipProvider>
