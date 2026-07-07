@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Wallet, ShoppingCart, TrendingUp, Activity, Sparkles, Package, ChevronRight, Zap, Eye, Heart, MessageCircle, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageMeta } from '@/components/seo/PageMeta';
+import { SubscriptionTimeline } from '@/components/subscription/SubscriptionTimeline';
 
 export default function Dashboard() {
   const { user, wallet, profile } = useAuth();
