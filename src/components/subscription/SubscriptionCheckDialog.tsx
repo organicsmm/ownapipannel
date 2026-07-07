@@ -22,7 +22,7 @@ type PlanMeta = {
 };
 
 const PLAN_META: Record<Plan, PlanMeta> = {
-  monthly:  { label: 'Monthly',  price: 1,   suffix: '/mo',      features: ['30 days access', 'Full platform', 'Cancel anytime'] },
+  monthly:  { label: 'Monthly',  price: 29,  suffix: '/mo',      features: ['30 days access', 'Full platform', 'Cancel anytime'] },
   yearly:   { label: 'Yearly',   price: 249, suffix: '/year',    features: ['365 days access', 'Save vs monthly', 'All features unlocked'], badge: 'Most Popular' },
   lifetime: { label: 'Lifetime', price: 499, suffix: 'one-time', features: ['Forever access', 'All future updates', 'Best value'], badge: 'Best' },
 };

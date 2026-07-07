@@ -253,7 +253,7 @@ const Index = () => {
               </div>
               <h3 className="font-serif text-2xl mb-3" style={{ color: INK }}>Monthly Access</h3>
               <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-serif text-5xl" style={{ color: INK }}>$1</span>
+                <span className="font-serif text-5xl" style={{ color: INK }}>$29</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: `${INK}80` }}>/ month</span>
               </div>
               <ul className="space-y-3 mb-8">

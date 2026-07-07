@@ -15,7 +15,7 @@ type Plan = "monthly" | "yearly" | "lifetime";
 // FROZEN server-side pricing. Never accept amounts from client.
 // Must match public.activate_subscription_oxapay expected amounts.
 const PLANS: Record<Plan, { amount: number; label: string }> = {
-  monthly:  { amount: 1,   label: "Monthly Plan" }, // TEST MODE: temporarily $1
+  monthly:  { amount: 29,  label: "Monthly Plan" },
   yearly:   { amount: 249, label: "Yearly Plan" },
   lifetime: { amount: 499, label: "Lifetime Plan" },
 };
