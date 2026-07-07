@@ -92,8 +92,7 @@ export default function Dashboard() {
         {/* Subscription activation timeline */}
         <SubscriptionTimeline />
 
-        {/* Unlock Pro CTA (only shown to non-subscribers) */}
-        <UnlockProCard />
+        {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
 
         {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
         <FirstProviderCTA />
