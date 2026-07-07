@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Authenticated users read platform settings" ON public.platform_settings;
