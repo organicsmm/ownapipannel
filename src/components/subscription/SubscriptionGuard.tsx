@@ -26,7 +26,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
   const { hasActiveSubscription, hasPendingRequest, isLoading } = useSubscription();
   const { isAdmin } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'lifetime'>('monthly');
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly' | 'lifetime'>('monthly');
 
   // If loading, show nothing to prevent flash
   if (isLoading) {
