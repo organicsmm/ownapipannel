@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Wallet, ShoppingCart, TrendingUp, Activity, Sparkles, Package, ChevronRight, Zap, Eye, Heart, MessageCircle, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageMeta } from '@/components/seo/PageMeta';
+import { SubscriptionTimeline } from '@/components/subscription/SubscriptionTimeline';
 
 export default function Dashboard() {
   const { user, wallet, profile } = useAuth();
@@ -87,8 +88,12 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Subscription activation timeline */}
+        <SubscriptionTimeline />
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+
           {[
             { icon: Wallet, label: 'Balance', value: formatPrice(wallet?.balance || 0), sub: 'Available funds' },
             { icon: ShoppingCart, label: 'Total Orders', value: stats?.totalOrders || 0, sub: `${stats?.completedOrders || 0} completed` },
