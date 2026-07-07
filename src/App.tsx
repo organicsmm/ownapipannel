@@ -112,6 +112,8 @@ const App = () => {
             <AppErrorBoundary>
               <BrowserRouter>
                 <ScrollToTop />
+                <OxapaySubscriptionPoller />
+                <GlobalSubscriptionGuard>
                 <Suspense fallback={<RouteFallback />}>
                   <Routes>
                     {/* User pages */}
