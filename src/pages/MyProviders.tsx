@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { supabase } from "@/integrations/supabase/client";
