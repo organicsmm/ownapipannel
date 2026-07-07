@@ -491,6 +491,7 @@ export default function AdminUsers() {
   const totalBalance = users?.reduce((sum, u) => sum + (u.wallet?.balance || 0), 0) || 0;
   const normalCount = users?.filter((u) => !u.subscription || u.subscription.status !== 'active').length || 0;
   const monthlyCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly').length || 0;
+  const yearlyCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'yearly').length || 0;
   const lifetimeCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'lifetime').length || 0;
 
   // Wait for auth to load before checking admin status
