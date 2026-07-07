@@ -59,7 +59,7 @@ interface SubscriptionRequest {
   full_name: string;
   email: string;
   phone: string;
-  plan_type: 'monthly' | 'lifetime';
+  plan_type: 'monthly' | 'yearly' | 'lifetime';
   message: string | null;
   status: 'pending' | 'approved' | 'rejected';
   reviewed_at: string | null;
@@ -70,7 +70,7 @@ interface SubscriptionRequest {
 interface Subscription {
   id: string;
   user_id: string;
-  plan_type: 'none' | 'monthly' | 'lifetime';
+  plan_type: 'none' | 'monthly' | 'yearly' | 'lifetime';
   status: 'inactive' | 'active' | 'expired' | 'cancelled';
   activated_at: string | null;
   expires_at: string | null;
