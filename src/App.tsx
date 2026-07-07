@@ -33,6 +33,7 @@ const MyProviders = lazy(() => import("./pages/MyProviders"));
 const MyBundles = lazy(() => import("./pages/MyBundles"));
 const MassOrder = lazy(() => import("./pages/MassOrder"));
 const SubscriptionReturn = lazy(() => import("./pages/SubscriptionReturn"));
+const SecurityTest = lazy(() => import("./pages/SecurityTest"));
 
 // Engagement pages — heaviest user-facing screens, always lazy
 const EngagementOrder = lazy(() => import("./pages/UserEngagementOrder"));
@@ -127,6 +128,7 @@ const App = () => {
                     <Route path="/wallet" element={<Wallet />} />
                     <Route path="/subscription/return" element={<SubscriptionReturn />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/security-test" element={<SecurityTest />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/api-access" element={<ApiAccess />} />
                     <Route path="/intelligence" element={<Intelligence />} />
