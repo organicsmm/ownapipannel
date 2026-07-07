@@ -47,7 +47,12 @@ serve(async (req) => {
     if (!deposit) return json({ error: "Order not found" }, 404);
 
     if (deposit.credited) {
-      return json({ credited: true, status: "credited" });
+      return json({
+        credited: true,
+        status: "credited",
+        plan_type: deposit.plan_type,
+        amount_usd: Number(deposit.amount_usd),
+      });
     }
     if (!deposit.track_id) {
       return json({ credited: false, status: deposit.status });
@@ -74,7 +79,13 @@ serve(async (req) => {
         console.error("sync activation error", rpcErr.message);
         return json({ credited: false, status: "activation_failed", detail: rpcErr.message }, 500);
       }
-      return json({ credited: true, status: "credited", detail: rpcData });
+      return json({
+        credited: true,
+        status: "credited",
+        plan_type: deposit.plan_type,
+        amount_usd: Number(deposit.amount_usd),
+        detail: rpcData,
+      });
     }
 
     return json({ credited: false, status: payStatus || "pending" });
