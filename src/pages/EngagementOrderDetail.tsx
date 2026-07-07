@@ -135,13 +135,13 @@ export default function EngagementOrderDetail() {
     );
     
     if (hasActiveRuns) {
-      setRefetchInterval(5000); // 5s for orders with active runs
+      setRefetchInterval(8000); // 8s for orders with active runs
     } else if (isActive) {
-      setRefetchInterval(10000); // 10s for pending/processing
+      setRefetchInterval(15000); // 15s for pending/processing
     } else if (order.status === 'completed') {
       setRefetchInterval(false); // Stop polling for completed orders
     } else {
-      setRefetchInterval(15000); // 15s for other states
+      setRefetchInterval(20000); // 20s for other states
     }
   }, [order?.status, order?.items?.length]);
 
