@@ -95,7 +95,7 @@ export default function AdminSubscriptions() {
 
   // Add subscriber state
   const [addEmail, setAddEmail] = useState('');
-  const [addPlanType, setAddPlanType] = useState<'monthly' | 'lifetime'>('monthly');
+  const [addPlanType, setAddPlanType] = useState<'monthly' | 'yearly' | 'lifetime'>('monthly');
   const [removeDialog, setRemoveDialog] = useState<{ userId: string; email: string } | null>(null);
 
   // Fetch active subscribers with profile info
