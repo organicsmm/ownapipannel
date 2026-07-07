@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, Wallet, AppRole } from '@/lib/supabase';
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchUserData]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     console.log('--- useAuth: signIn started ---');
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -166,9 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('--- useAuth: signIn catch ---', error);
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     console.log('--- useAuth: signUp started (direct bypass) ---');
     try {
       const { data, error } = await supabase.functions.invoke('auto-verify-signup', {
@@ -186,13 +186,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       console.log('--- useAuth: signUp api success, now logging in ---');
-      
-      // Auto-verify created user, now simply log them in
+
       const signInRes = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
-      
+
       if (signInRes.error) {
         console.error('--- useAuth: signIn after custom signup error ---', signInRes.error);
         return { error: signInRes.error };
@@ -204,9 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('--- useAuth: signUp catch ---', error);
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
       setProfile(null);
@@ -214,14 +213,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(null);
     } catch (error) {
       console.error('Sign out error:', error);
-      // Still clear local state even if sign out fails
       setProfile(null);
       setWallet(null);
       setRole(null);
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       const { data } = await supabase
         .from('profiles')
@@ -230,9 +228,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       if (data) setProfile(data as unknown as Profile);
     }
-  };
+  }, [user]);
 
-  const refreshWallet = async () => {
+  const refreshWallet = useCallback(async () => {
     if (user) {
       const { data } = await supabase
         .from('wallets')
@@ -241,9 +239,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       if (data) setWallet(data as Wallet);
     }
-  };
+  }, [user]);
 
-  const value = {
+  // Memoize context value so consumers don't re-render unless real values change.
+  // Without this, every wallet realtime update re-renders the entire app tree.
+  const value = useMemo(() => ({
     user,
     session,
     profile,
@@ -256,7 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     refreshProfile,
     refreshWallet,
-  };
+  }), [user, session, profile, wallet, role, isLoading, signIn, signUp, signOut, refreshProfile, refreshWallet]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
