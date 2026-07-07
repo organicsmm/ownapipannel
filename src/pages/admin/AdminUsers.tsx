@@ -76,7 +76,7 @@ interface UserProfile {
   orderCounts?: OrderCounts;
 }
 
-type UserTab = 'all' | 'normal' | 'monthly' | 'lifetime';
+type UserTab = 'all' | 'normal' | 'monthly' | 'yearly' | 'lifetime';
 
 export default function AdminUsers() {
   const { user, isAdmin, isLoading: authLoading } = useAuth();
