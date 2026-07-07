@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Admins read platform settings" ON public.platform_settings;
+CREATE POLICY "Admins read platform settings" ON public.platform_settings FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
