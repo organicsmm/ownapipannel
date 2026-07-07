@@ -180,7 +180,7 @@ export function ImportServicesDialog({ open, onOpenChange, onImportSuccess }: Im
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              💡 Import ke baad har service ka final per-1K price <strong>Admin → Services</strong> me set/edit karo.
+              💡 After import, set/edit each service's final per-1K price in <strong>Admin → Services</strong>.
             </p>
           </div>
 

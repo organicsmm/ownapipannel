@@ -223,7 +223,7 @@ function useScheduledBatchProcessor() {
 
           toast({
             title: "⏰ Scheduled batch started",
-            description: `${batch.name || "Batch"} — ${rowsArr.length} order(s) submit ho rahe hain`,
+            description: `${batch.name || "Batch"} — submitting ${rowsArr.length} order(s)`,
           });
 
           let ok = 0, fail = 0;
@@ -623,7 +623,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       const text = await file.text();
       const parsed = parseLinksFromText(text);
       if (parsed.length === 0) {
-        toast({ title: "No URLs found", description: "File me koi valid link nahi mila", variant: "destructive" });
+        toast({ title: "No URLs found", description: "No valid links were found in the file", variant: "destructive" });
         return;
       }
       // Merge with existing textarea links (de-dupe by URL)
@@ -649,7 +649,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       toast({
         title: `${parsed.length} link(s) loaded`,
         description: withConfig > 0
-          ? `${withConfig} link(s) ke saath custom quantity bhi mili • Total unique: ${merged.length}`
+          ? `${withConfig} link(s) included custom quantities • Total unique: ${merged.length}`
           : `Total unique: ${merged.length}`,
       });
     } catch (err: any) {
@@ -669,7 +669,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   const scheduleError = scheduledAt && !scheduledDate
     ? "Invalid date/time"
     : (scheduledDate && scheduledDate.getTime() < Date.now() - 30_000
-        ? "Schedule time past me hai"
+        : "Scheduled time is in the past"
         : null);
   const isScheduledMode = !!scheduledDate && !scheduleError && scheduledDate.getTime() > Date.now();
 
@@ -714,14 +714,14 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
     }
     if (invalidTimeframeRowCount > 0) {
       toast({
-        title: `${invalidTimeframeRowCount} link(s) ka timeframe galat hai`,
-        description: TIMEFRAME_ERR + ". Edit karke fix karo.",
+        title: `${invalidTimeframeRowCount} link(s) have an invalid timeframe`,
+        description: TIMEFRAME_ERR + ". Please edit and fix.",
         variant: "destructive",
       });
       return;
     }
     if (scheduleError) {
-      toast({ title: "Schedule galat hai", description: scheduleError, variant: "destructive" });
+      toast({ title: "Invalid schedule", description: scheduleError, variant: "destructive" });
       return;
     }
     if (!canSubmit) return;
@@ -1008,7 +1008,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
           )}
           {bundle && activeTypes.length === 0 && (
             <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Is bundle me koi linked service nahi hai.
+              <AlertCircle className="w-4 h-4" /> This bundle has no linked services.
             </div>
           )}
 

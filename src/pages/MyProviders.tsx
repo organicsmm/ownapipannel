@@ -137,7 +137,7 @@ function MyProvidersInner() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">My Provider Accounts</h1>
-          <p className="text-sm text-muted-foreground mt-1">Apne SMM provider ke API keys add karo. Tumhare orders inhi se chalenge.</p>
+          <p className="text-sm text-muted-foreground mt-1">Add your SMM provider API keys. Your orders will run through these.</p>
         </div>
         <Button onClick={handleToggleForm}>
           <Plus className="w-4 h-4 mr-2" /> Add Provider
@@ -205,7 +205,7 @@ function MyProvidersInner() {
       ) : (
         <Card className="p-12 text-center">
           <KeyRound className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">Abhi koi provider nahi hai. Add Provider button se shuru karo.</p>
+          <p className="text-muted-foreground">No providers yet. Click Add Provider to get started.</p>
         </Card>
       )}
 
