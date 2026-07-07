@@ -715,7 +715,7 @@ export default function AdminSubscriptions() {
                   <p className="font-medium">{selectedRequest.full_name}</p>
                   <p className="text-sm text-muted-foreground">{selectedRequest.email}</p>
                   <Badge className="mt-2">
-                    {selectedRequest.plan_type === 'lifetime' ? '$99 Lifetime' : '$35/month'}
+                    {selectedRequest.plan_type === 'lifetime' ? '$499 Lifetime' : '$29/month'}
                   </Badge>
                 </div>
                 <div className="space-y-2">

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown, Calendar } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
 
@@ -235,14 +235,14 @@ const Index = () => {
           <div className="text-center mb-16">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase mb-6" style={{ color: `${INK}80` }}>— Membership</p>
             <h2 className="font-serif text-[clamp(2.5rem,6vw,5rem)] leading-[0.95] tracking-[-0.02em]" style={{ color: INK }}>
-              Two ways to <span className="italic" style={{ color: ACCENT }}>begin.</span>
+              Three ways to <span className="italic" style={{ color: ACCENT }}>begin.</span>
             </h2>
             <p className="mt-6 max-w-xl mx-auto text-[15px] leading-[1.7] font-light" style={{ color: `${INK}99` }}>
               Single membership — full platform access. No tiers, no upsells, no hidden gates.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
             {/* Monthly */}
             <div className="rounded-2xl p-8 lg:p-10 transition-all" style={{ background: 'white', border: `1px solid ${INK}1A`, boxShadow: `0 20px 60px -30px ${INK}40` }}>
               <div className="flex items-center gap-3 mb-6">
@@ -253,7 +253,7 @@ const Index = () => {
               </div>
               <h3 className="font-serif text-2xl mb-3" style={{ color: INK }}>Monthly Access</h3>
               <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-serif text-5xl" style={{ color: INK }}>$35</span>
+                <span className="font-serif text-5xl" style={{ color: INK }}>$29</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: `${INK}80` }}>/ month</span>
               </div>
               <ul className="space-y-3 mb-8">
@@ -265,6 +265,31 @@ const Index = () => {
               </ul>
               <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-full font-mono text-[11px] uppercase tracking-[0.2em] transition-all" style={{ border: `1px solid ${INK}33`, color: INK }}>
                 Start Monthly <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* Yearly */}
+            <div className="rounded-2xl p-8 lg:p-10 transition-all" style={{ background: 'white', border: `1px solid ${ACCENT}55`, boxShadow: `0 20px 60px -30px ${ACCENT}66` }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: SOFT, border: `1px solid ${ACCENT}33` }}>
+                  <Calendar className="w-4 h-4" style={{ color: ACCENT }} />
+                </div>
+                <p className="font-mono text-[10px] tracking-[0.25em] uppercase" style={{ color: `${INK}80` }}>Yearly</p>
+              </div>
+              <h3 className="font-serif text-2xl mb-3" style={{ color: INK }}>Yearly Access</h3>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="font-serif text-5xl" style={{ color: INK }}>$249</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: `${INK}80` }}>/ year</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Everything in monthly', 'Save vs monthly billing', '12 months uninterrupted', 'Priority queue'].map((t) => (
+                  <li key={t} className="flex gap-3 text-[13px] font-light" style={{ color: `${INK}CC` }}>
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: ACCENT }} />{t}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/auth" className="flex items-center justify-center gap-2 w-full h-11 rounded-full font-mono text-[11px] uppercase tracking-[0.2em] transition-all" style={{ border: `1px solid ${INK}33`, color: INK }}>
+                Start Yearly <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
@@ -281,11 +306,11 @@ const Index = () => {
               </div>
               <h3 className="font-serif text-2xl mb-3 text-white">Lifetime Access</h3>
               <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-serif text-5xl text-white">$250</span>
+                <span className="font-serif text-5xl text-white">$499</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/60">/ once</span>
               </div>
               <ul className="space-y-3 mb-8">
-                {['Everything in monthly', 'Pay once, use forever', 'All future updates included', 'Priority support'].map((t) => (
+                {['Everything in yearly', 'Pay once, use forever', 'All future updates included', 'Priority support'].map((t) => (
                   <li key={t} className="flex gap-3 text-[13px] font-light text-white/85">
                     <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#9FB6FF' }} />{t}
                   </li>
