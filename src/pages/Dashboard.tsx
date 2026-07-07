@@ -182,10 +182,9 @@ export default function Dashboard() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { icon: Sparkles, label: 'Full Engagement', desc: 'Views + Likes + Comments', path: '/engagement-order' },
-            { icon: Wallet, label: 'Add Funds', desc: 'Deposit to wallet', path: '/wallet' },
             { icon: Package, label: 'All Services', desc: 'Browse catalog', path: '/services' },
           ].map((a, i) => (
             <Link key={i} to={a.path} className="group flex items-center gap-3.5 p-4 rounded-md bg-card border border-border hover:border-primary/40 hover:bg-secondary/30 transition-all">
