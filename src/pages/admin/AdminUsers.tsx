@@ -706,7 +706,7 @@ export default function AdminUsers() {
                   {/* Subscription Status */}
                   <div className="mt-3 p-2.5 rounded-lg bg-muted/50 flex items-center justify-between">
                     {getSubscriptionBadge(u.subscription)}
-                    {u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly' && u.subscription?.expires_at && (
+                    {u.subscription?.status === 'active' && (u.subscription?.plan_type === 'monthly' || u.subscription?.plan_type === 'yearly') && u.subscription?.expires_at && (
                       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatDistanceToNow(new Date(u.subscription.expires_at), { addSuffix: true })}
