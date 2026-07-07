@@ -46,7 +46,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 interface Subscription {
   id: string;
   user_id: string;
-  plan_type: 'none' | 'monthly' | 'lifetime';
+  plan_type: 'none' | 'monthly' | 'yearly' | 'lifetime';
   status: 'inactive' | 'active' | 'expired' | 'cancelled';
   activated_at: string | null;
   expires_at: string | null;
