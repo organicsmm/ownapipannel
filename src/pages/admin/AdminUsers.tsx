@@ -472,6 +472,10 @@ export default function AdminUsers() {
         return filtered.filter(
           (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly'
         );
+      case 'yearly':
+        return filtered.filter(
+          (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'yearly'
+        );
       case 'lifetime':
         return filtered.filter(
           (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'lifetime'
