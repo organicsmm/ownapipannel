@@ -217,25 +217,36 @@ Request ID: ${requestData.id}`;
     },
   });
 
-  const planDetails = planType === 'monthly'
-    ? {
-      price: '$29',
-      period: '/month',
-      icon: Zap,
-      color: 'primary',
-      gradient: 'from-primary/20 to-primary/5',
-      features: ['Global Markup Control', 'Full platform access', 'All organic features', 'Cancel anytime']
-    }
-    : {
-      price: '$499',
-      period: ' lifetime',
-      icon: Crown,
-      color: 'warning',
-      gradient: 'from-warning/20 to-warning/5',
-      features: ['Full platform access', 'All organic features', 'Priority support', 'Forever access']
-    };
+  const planDetails =
+    planType === 'monthly'
+      ? {
+        price: '$29',
+        period: '/month',
+        title: 'Monthly',
+        icon: Zap,
+        gradient: 'from-primary/20 to-primary/5',
+        features: ['Global Markup Control', 'Full platform access', 'All organic features', 'Cancel anytime'],
+      }
+      : planType === 'yearly'
+      ? {
+        price: '$249',
+        period: '/year',
+        title: 'Yearly',
+        icon: Calendar,
+        gradient: 'from-primary/20 to-primary/5',
+        features: ['Everything in monthly', '12 months uninterrupted', 'Save vs monthly billing', 'Priority queue'],
+      }
+      : {
+        price: '$499',
+        period: ' lifetime',
+        title: 'Lifetime',
+        icon: Crown,
+        gradient: 'from-warning/20 to-warning/5',
+        features: ['Full platform access', 'All organic features', 'Priority support', 'Forever access'],
+      };
 
   const PlanIcon = planDetails.icon;
+  const isLifetime = planType === 'lifetime';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
