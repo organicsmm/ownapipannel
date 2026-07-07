@@ -91,7 +91,7 @@ export default function EngagementOrderDetail() {
   const [editingRun, setEditingRun] = useState<EditRunData | null>(null);
 
   // Dynamic refetch interval - balanced for performance
-  const [refetchInterval, setRefetchInterval] = useState<number | false>(5000);
+  const [refetchInterval, setRefetchInterval] = useState<number | false>(8000);
 
   const { data: order, isLoading, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['engagement-order-detail', orderNumber],

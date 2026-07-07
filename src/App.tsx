@@ -68,12 +68,16 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
+      // Pause all polling loops when the tab is hidden — huge network + battery win.
+      refetchIntervalInBackground: false,
       retry: 2,
       retryDelay: (i) => Math.min(1000 * 2 ** i, 10000),
+      networkMode: 'online',
     },
     mutations: {
       retry: 1,
       retryDelay: 1000,
+      networkMode: 'online',
     },
   },
 });
