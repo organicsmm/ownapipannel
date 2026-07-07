@@ -214,7 +214,7 @@ Request ID: ${requestData.id}`;
 
   const planDetails = planType === 'monthly'
     ? {
-      price: '$35',
+      price: '$29',
       period: '/month',
       icon: Zap,
       color: 'primary',
@@ -222,7 +222,7 @@ Request ID: ${requestData.id}`;
       features: ['Global Markup Control', 'Full platform access', 'All organic features', 'Cancel anytime']
     }
     : {
-      price: '$99',
+      price: '$499',
       period: ' lifetime',
       icon: Crown,
       color: 'warning',
