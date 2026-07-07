@@ -133,9 +133,10 @@ const App = () => {
                     <Route path="/api-access" element={<ApiAccess />} />
                     <Route path="/intelligence" element={<Intelligence />} />
 
-                    {/* My Provider (per-user API system) */}
-                    <Route path="/my-providers" element={<MyProviders />} />
-                    <Route path="/my-bundles" element={<MyBundles />} />
+                    {/* My Provider (per-user API system) — requires subscription */}
+                    <Route path="/my-providers" element={<SubscriptionGuard><MyProviders /></SubscriptionGuard>} />
+                    <Route path="/my-bundles" element={<SubscriptionGuard><MyBundles /></SubscriptionGuard>} />
+
 
                     {/* Engagement */}
                     <Route path="/engagement-order" element={<SubscriptionGuard><EngagementOrder /></SubscriptionGuard>} />

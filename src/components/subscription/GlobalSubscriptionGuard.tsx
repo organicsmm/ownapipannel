@@ -1,57 +1,32 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useSubscription } from '@/hooks/useSubscription';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { MaintenancePage } from '@/components/MaintenanceMode';
-import { SubscriptionCheckDialog } from './SubscriptionCheckDialog';
 
 interface Props { children: React.ReactNode }
 
-// Routes that never require a subscription
-const ALLOWED_ROUTES = [
-  '/', '/auth', '/settings', '/subscription/return', '/security-test',
-  '/terms', '/privacy', '/refund', '/cookies',
-];
-
-const isAllowed = (path: string) =>
-  ALLOWED_ROUTES.some((r) => path === r || path.startsWith(r + '/')) ||
-  path.startsWith('/admin');
-
+/**
+ * Global guard is now only responsible for maintenance-mode blocking.
+ * Subscription gating is handled per-route via <SubscriptionGuard>, so users
+ * without a subscription can still sign in and browse Dashboard / Orders /
+ * Support / Settings freely. Pro features (Providers, Bundles, Engagement,
+ * Mass Order, single Order) remain wrapped individually.
+ */
 export function GlobalSubscriptionGuard({ children }: Props) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
-  const { hasActiveSubscription, isLoading: subLoading } = useSubscription();
+  const { isAdmin } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
-  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const allowedPath = useMemo(() => isAllowed(location.pathname), [location.pathname]);
-
-  const needsSubscription =
-    !!user && !isAdmin && !authLoading && !subLoading &&
-    !hasActiveSubscription && !allowedPath;
-
-  useEffect(() => {
-    setDialogOpen(needsSubscription);
-  }, [needsSubscription]);
-
-  if (isMaintenanceMode && !isAdmin && !location.pathname.startsWith('/admin') && !allowedPath) {
+  if (
+    isMaintenanceMode &&
+    !isAdmin &&
+    !location.pathname.startsWith('/admin') &&
+    location.pathname !== '/' &&
+    location.pathname !== '/auth'
+  ) {
     return <MaintenancePage />;
   }
 
-  const handleOpenChange = (open: boolean) => {
-    setDialogOpen(open);
-    // Send user back to the landing page if they dismiss on a guarded route.
-    if (!open && needsSubscription) {
-      navigate('/', { replace: true });
-    }
-  };
-
-  return (
-    <>
-      {children}
-      <SubscriptionCheckDialog open={dialogOpen} onOpenChange={handleOpenChange} />
-    </>
-  );
+  return <>{children}</>;
 }
+
