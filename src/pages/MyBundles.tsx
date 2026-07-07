@@ -46,9 +46,26 @@ export default function MyBundles() {
 function Inner() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<string>("Instagram");
   const [creating, setCreating] = useState(false);
   const [bundleName, setBundleName] = useState("");
+  const builderRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-open the bundle builder when arriving with ?new=1 (from Dashboard CTA).
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setCreating(true);
+      setTimeout(
+        () => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        80
+      );
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles", user?.id],
