@@ -96,6 +96,9 @@ export default function Dashboard() {
         {/* Unlock Pro CTA (only shown to non-subscribers) */}
         <UnlockProCard />
 
+        {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
+        <FirstProviderCTA />
+
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
