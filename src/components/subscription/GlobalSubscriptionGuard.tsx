@@ -20,6 +20,7 @@ const isAllowed = (path: string) =>
 
 export function GlobalSubscriptionGuard({ children }: Props) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAdmin, isLoading: authLoading } = useAuth();
   const { hasActiveSubscription, isLoading: subLoading } = useSubscription();
   const { isMaintenanceMode } = useMaintenanceMode();
@@ -39,13 +40,19 @@ export function GlobalSubscriptionGuard({ children }: Props) {
     return <MaintenancePage />;
   }
 
+  const handleOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    // If user closes on a guarded page, send them somewhere they're allowed
+    // (wallet is the closest safe landing that still shows subscription CTA).
+    if (!open && needsSubscription) {
+      navigate('/wallet', { replace: true });
+    }
+  };
+
   return (
     <>
       {children}
-      <SubscriptionCheckDialog
-        open={dialogOpen}
-        onOpenChange={(o) => { if (!o && needsSubscription) return; setDialogOpen(o); }}
-      />
+      <SubscriptionCheckDialog open={dialogOpen} onOpenChange={handleOpenChange} />
     </>
   );
 }
