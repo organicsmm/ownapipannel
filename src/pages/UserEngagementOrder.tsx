@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,9 @@ type EngagementConfigs = Record<string, EngagementConfig>;
 
 const LiveGrowthChart = lazy(() => import("@/components/engagement/LiveGrowthChart").then(m => ({ default: m.LiveGrowthChart })));
 const DeliveryPreview = lazy(() => import("@/components/engagement/DeliveryPreview").then(m => ({ default: m.DeliveryPreview })));
+const SubscriptionCheckDialog = lazy(() =>
+  import("@/components/subscription/SubscriptionCheckDialog").then(m => ({ default: m.SubscriptionCheckDialog }))
+);
 
 const PREFERRED_ORDER: Record<string, number> = {
   views: 1, likes: 2, comments: 3, shares: 4, reposts: 5, saves: 6, followers: 7, subscribers: 8, retweets: 9, watch_hours: 10,
@@ -41,7 +45,8 @@ export default function UserEngagementOrder() {
 }
 
 function Inner() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { hasActiveSubscription, isLoading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -53,6 +58,7 @@ function Inner() {
   const [engagements, setEngagements] = useState<EngagementConfigs>({});
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [showPreviews, setShowPreviews] = useState(false);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
 
   const { data: bundles, isLoading } = useQuery({
     queryKey: ["user-bundles-with-items", user?.id],
@@ -185,6 +191,18 @@ function Inner() {
     },
     onError: (e: Error) => toast({ title: "Order failed", description: e.message, variant: "destructive" }),
   });
+
+  const handlePlaceOrder = () => {
+    if (!isAdmin && subscriptionLoading) {
+      toast({ title: "Checking subscription..." });
+      return;
+    }
+    if (!isAdmin && !hasActiveSubscription) {
+      setShowSubscriptionDialog(true);
+      return;
+    }
+    place.mutate();
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-6 lg:px-8 space-y-3 sm:space-y-6 pb-8">
@@ -345,7 +363,7 @@ function Inner() {
         <CardContent className="p-4 sm:p-6 flex justify-center">
           <Button
             size="lg"
-            onClick={() => place.mutate()}
+            onClick={handlePlaceOrder}
             disabled={!bundle || !link.trim() || place.isPending || totalQty === 0}
             className="w-full sm:w-auto h-12 sm:h-14 px-8 sm:px-12 text-base sm:text-lg font-bold rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
           >
@@ -357,6 +375,15 @@ function Inner() {
           </Button>
         </CardContent>
       </Card>
+
+      {showSubscriptionDialog && (
+        <Suspense fallback={null}>
+          <SubscriptionCheckDialog
+            open={showSubscriptionDialog}
+            onOpenChange={setShowSubscriptionDialog}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

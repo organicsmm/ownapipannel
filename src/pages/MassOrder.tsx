@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,10 @@ const TIMEFRAMES = [
   { value: 336, label: "7-14 days" },
   { value: 0, label: "Auto (smart)" },
 ];
+
+const SubscriptionCheckDialog = lazy(() =>
+  import("@/components/subscription/SubscriptionCheckDialog").then((m) => ({ default: m.SubscriptionCheckDialog }))
+);
 
 interface OrderRow {
   id: string;
@@ -318,7 +323,8 @@ function useScheduledBatchProcessor() {
    ============================================================ */
 
 function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { hasActiveSubscription, isLoading: subscriptionLoading } = useSubscription();
   const { toast } = useToast();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -340,6 +346,7 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
   // saved as `status='scheduled'` with a payload; a background poller picks it up.
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; ok: number; fail: number; total: number } | null>(null);
 
@@ -718,6 +725,16 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       return;
     }
     if (!canSubmit) return;
+
+    if (!isAdmin && subscriptionLoading) {
+      toast({ title: "Checking subscription..." });
+      return;
+    }
+
+    if (!isAdmin && !hasActiveSubscription) {
+      setShowSubscriptionDialog(true);
+      return;
+    }
 
     // -------- SCHEDULED BRANCH --------
     if (isScheduledMode) {
@@ -1366,6 +1383,15 @@ function CreateMassOrder({ onSubmitted }: { onSubmitted: () => void }) {
       </Card>
 
 
+
+      {showSubscriptionDialog && (
+        <Suspense fallback={null}>
+          <SubscriptionCheckDialog
+            open={showSubscriptionDialog}
+            onOpenChange={setShowSubscriptionDialog}
+          />
+        </Suspense>
+      )}
 
       {/* Edit dialog */}
       <Dialog open={!!editingRow} onOpenChange={(o) => !o && setEditingId(null)}>

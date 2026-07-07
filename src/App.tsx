@@ -53,7 +53,6 @@ const AdminProviderAccounts = lazy(() => import("./pages/admin/AdminProviderAcco
 const AdminServiceProviderMapping = lazy(() => import("./pages/admin/AdminServiceProviderMapping"));
 const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
 
-import { SubscriptionGuard } from "./components/subscription/SubscriptionGuard";
 import { LockedFeaturePreview } from "./components/subscription/LockedFeaturePreview";
 
 // Legal — lazy
@@ -124,7 +123,7 @@ const App = () => {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/services" element={<Services />} />
-                    <Route path="/order" element={<SubscriptionGuard><Order /></SubscriptionGuard>} />
+                    <Route path="/order" element={<Order />} />
                     <Route path="/orders" element={<Orders />} />
                     
                     <Route path="/subscription/return" element={<SubscriptionReturn />} />
@@ -141,8 +140,8 @@ const App = () => {
 
 
                     {/* Engagement */}
-                    <Route path="/engagement-order" element={<SubscriptionGuard><EngagementOrder /></SubscriptionGuard>} />
-                    <Route path="/mass-order" element={<SubscriptionGuard><MassOrder /></SubscriptionGuard>} />
+                    <Route path="/engagement-order" element={<EngagementOrder />} />
+                    <Route path="/mass-order" element={<MassOrder />} />
                     <Route path="/engagement-orders" element={<EngagementOrders />} />
                     <Route path="/engagement-orders/:orderNumber" element={<EngagementOrderDetail />} />
 

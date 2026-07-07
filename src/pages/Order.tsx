@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { OrganicTimelinePreview } from '@/components/organic/OrganicTimelinePreview';
 import { useServices } from '@/hooks/useServices';
@@ -49,6 +50,10 @@ import {
 
 type DeliveryMode = 'direct' | 'uniform' | 'organic';
 
+const SubscriptionCheckDialog = lazy(() =>
+  import('@/components/subscription/SubscriptionCheckDialog').then((m) => ({ default: m.SubscriptionCheckDialog }))
+);
+
 interface OrganicPreviewRun {
   runNumber: number;
   scheduledAt: Date;
@@ -69,6 +74,7 @@ export default function Order() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, profile, wallet, refreshWallet, isAdmin } = useAuth();
+  const { hasActiveSubscription, isLoading: subscriptionLoading } = useSubscription();
   const { formatPrice } = useCurrency();
 
   const preselectedService = searchParams.get('service');
@@ -103,6 +109,7 @@ export default function Order() {
   const [timeLimitValue, setTimeLimitValue] = useState<number>(6);
   const [timeLimitUnit, setTimeLimitUnit] = useState<string>('hours');
   const [error, setError] = useState<string>('');
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
 
   const { services } = useServices();
 
@@ -500,6 +507,16 @@ export default function Order() {
     // Admin bypasses all checks - free access
     if (isAdmin) {
       placeOrderMutation.mutate();
+      return;
+    }
+
+    if (subscriptionLoading) {
+      toast.info('Checking subscription...');
+      return;
+    }
+
+    if (!hasActiveSubscription) {
+      setShowSubscriptionDialog(true);
       return;
     }
 
@@ -1303,6 +1320,14 @@ export default function Order() {
             )}
           </div>
         </div>
+        {showSubscriptionDialog && (
+          <Suspense fallback={null}>
+            <SubscriptionCheckDialog
+              open={showSubscriptionDialog}
+              onOpenChange={setShowSubscriptionDialog}
+            />
+          </Suspense>
+        )}
       </div>
 
     </DashboardLayout>
