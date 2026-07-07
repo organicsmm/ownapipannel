@@ -443,7 +443,7 @@ export default function AdminSubscriptions() {
                       type="email"
                     />
                   </div>
-                  <Select value={addPlanType} onValueChange={(v: 'monthly' | 'lifetime') => setAddPlanType(v)}>
+                  <Select value={addPlanType} onValueChange={(v: 'monthly' | 'yearly' | 'lifetime') => setAddPlanType(v)}>
                     <SelectTrigger className="w-full sm:w-44 h-11 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
@@ -452,6 +452,12 @@ export default function AdminSubscriptions() {
                         <span className="flex items-center gap-2">
                           <Zap className="h-4 w-4 text-blue-500" />
                           Monthly (30 days)
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="yearly">
+                        <span className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-emerald-500" />
+                          Yearly (365 days)
                         </span>
                       </SelectItem>
                       <SelectItem value="lifetime">
