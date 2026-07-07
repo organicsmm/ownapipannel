@@ -18,6 +18,7 @@ import {
   Loader2,
   Zap,
   Crown,
+  Calendar,
   CheckCircle2,
   User,
   Mail,
@@ -54,7 +55,7 @@ const requestSchema = z.object({
 interface SubscriptionRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  planType: 'monthly' | 'lifetime';
+  planType: 'monthly' | 'yearly' | 'lifetime';
 }
 
 export function SubscriptionRequestDialog({
@@ -153,7 +154,11 @@ export function SubscriptionRequestDialog({
       }
 
       // Step 3: Send subscription request as a formatted chat message
-      const planName = planType === 'monthly' ? 'Monthly Plan ($29/month)' : 'Lifetime Plan ($499)';
+      const planName = planType === 'monthly'
+        ? 'Monthly Plan ($29/month)'
+        : planType === 'yearly'
+          ? 'Yearly Plan ($249/year)'
+          : 'Lifetime Plan ($499)';
       const messageContent = `📋 SUBSCRIPTION REQUEST
 
 🎯 Plan: ${planName}
@@ -212,25 +217,36 @@ Request ID: ${requestData.id}`;
     },
   });
 
-  const planDetails = planType === 'monthly'
-    ? {
-      price: '$29',
-      period: '/month',
-      icon: Zap,
-      color: 'primary',
-      gradient: 'from-primary/20 to-primary/5',
-      features: ['Global Markup Control', 'Full platform access', 'All organic features', 'Cancel anytime']
-    }
-    : {
-      price: '$499',
-      period: ' lifetime',
-      icon: Crown,
-      color: 'warning',
-      gradient: 'from-warning/20 to-warning/5',
-      features: ['Full platform access', 'All organic features', 'Priority support', 'Forever access']
-    };
+  const planDetails =
+    planType === 'monthly'
+      ? {
+        price: '$29',
+        period: '/month',
+        title: 'Monthly',
+        icon: Zap,
+        gradient: 'from-primary/20 to-primary/5',
+        features: ['Global Markup Control', 'Full platform access', 'All organic features', 'Cancel anytime'],
+      }
+      : planType === 'yearly'
+      ? {
+        price: '$249',
+        period: '/year',
+        title: 'Yearly',
+        icon: Calendar,
+        gradient: 'from-primary/20 to-primary/5',
+        features: ['Everything in monthly', '12 months uninterrupted', 'Save vs monthly billing', 'Priority queue'],
+      }
+      : {
+        price: '$499',
+        period: ' lifetime',
+        title: 'Lifetime',
+        icon: Crown,
+        gradient: 'from-warning/20 to-warning/5',
+        features: ['Full platform access', 'All organic features', 'Priority support', 'Forever access'],
+      };
 
   const PlanIcon = planDetails.icon;
+  const isLifetime = planType === 'lifetime';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -238,12 +254,12 @@ Request ID: ${requestData.id}`;
         {/* Header with Gradient */}
         <div className={cn(
           "relative px-6 pt-8 pb-6 bg-gradient-to-br",
-          planType === 'monthly' ? 'from-primary/10 via-primary/5 to-transparent' : 'from-warning/10 via-warning/5 to-transparent'
+          isLifetime ? 'from-warning/10 via-warning/5 to-transparent' : 'from-primary/10 via-primary/5 to-transparent'
         )}>
           <div className="absolute top-4 right-4">
             <Sparkles className={cn(
               "h-5 w-5",
-              planType === 'monthly' ? 'text-primary/40' : 'text-warning/40'
+              isLifetime ? 'text-warning/40' : 'text-primary/40'
             )} />
           </div>
 
@@ -251,15 +267,15 @@ Request ID: ${requestData.id}`;
             <div className="flex items-center gap-3">
               <div className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center",
-                planType === 'monthly'
-                  ? 'bg-gradient-to-br from-primary to-primary/70'
-                  : 'bg-gradient-to-br from-warning to-warning/70'
+                isLifetime
+                  ? 'bg-gradient-to-br from-warning to-warning/70'
+                  : 'bg-gradient-to-br from-primary to-primary/70'
               )}>
                 <PlanIcon className="h-6 w-6 text-white" />
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold">
-                  {planType === 'monthly' ? 'Monthly' : 'Lifetime'} Plan
+                  {planDetails.title} Plan
                 </DialogTitle>
                 <DialogDescription className="text-sm">
                   Fill your details to get started
@@ -272,7 +288,7 @@ Request ID: ${requestData.id}`;
           <div className="mt-4 flex items-baseline gap-1">
             <span className={cn(
               "text-4xl font-bold",
-              planType === 'monthly' ? 'text-primary' : 'text-warning'
+              isLifetime ? 'text-warning' : 'text-primary'
             )}>
               {planDetails.price}
             </span>
@@ -285,7 +301,7 @@ Request ID: ${requestData.id}`;
               <div key={i} className="flex items-center gap-2">
                 <CheckCircle2 className={cn(
                   "h-4 w-4 shrink-0",
-                  planType === 'monthly' ? 'text-primary' : 'text-warning'
+                  isLifetime ? 'text-warning' : 'text-primary'
                 )} />
                 <span className="text-xs text-muted-foreground">{feature}</span>
               </div>
