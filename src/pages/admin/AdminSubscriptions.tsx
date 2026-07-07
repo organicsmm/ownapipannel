@@ -415,6 +415,10 @@ export default function AdminSubscriptions() {
               <Zap className="h-4 w-4" />
               Auto Payments
             </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1">
+              <History className="h-4 w-4" />
+              Audit Log
+            </TabsTrigger>
           </TabsList>
 
           {/* Subscribers Tab */}
