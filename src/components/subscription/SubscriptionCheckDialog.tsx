@@ -114,11 +114,12 @@ export function SubscriptionCheckDialog({ open, onOpenChange }: SubscriptionChec
                       </p>
                     </div>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="font-serif text-3xl sm:text-4xl tracking-tight text-foreground">
+                      <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                         ${meta.price}
                       </span>
                       <span className="text-sm text-muted-foreground">{meta.suffix}</span>
                     </div>
+
                   </div>
 
                   <ul className="space-y-3 sm:space-y-4">
