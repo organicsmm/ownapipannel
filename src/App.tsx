@@ -10,6 +10,8 @@ import { CurrencyProvider } from "@/hooks/useCurrency";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { toast } from "sonner";
 import { AppErrorBoundary } from "@/components/app/AppErrorBoundary";
+import { OxapaySubscriptionPoller } from "@/components/subscription/OxapaySubscriptionPoller";
+import { GlobalSubscriptionGuard } from "@/components/subscription/GlobalSubscriptionGuard";
 
 // Eager — dashboard so logged-in app first paint stays instant
 import NotFound from "./pages/NotFound";
