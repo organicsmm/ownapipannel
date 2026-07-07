@@ -54,6 +54,7 @@ const AdminServiceProviderMapping = lazy(() => import("./pages/admin/AdminServic
 const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
 
 import { SubscriptionGuard } from "./components/subscription/SubscriptionGuard";
+import { LockedFeaturePreview } from "./components/subscription/LockedFeaturePreview";
 
 // Legal — lazy
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
