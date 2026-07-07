@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageMeta } from '@/components/seo/PageMeta';
 import { SubscriptionTimeline } from '@/components/subscription/SubscriptionTimeline';
 import { FirstProviderCTA } from '@/components/subscription/FirstProviderCTA';
+import { UnlockProCard } from '@/components/subscription/UnlockProCard';
 
 export default function Dashboard() {
   const { user, wallet, profile } = useAuth();
@@ -93,6 +94,8 @@ export default function Dashboard() {
         <SubscriptionTimeline />
 
         {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
+        {/* Unlock Pro subscription card */}
+        <UnlockProCard />
 
         {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
         <FirstProviderCTA />
