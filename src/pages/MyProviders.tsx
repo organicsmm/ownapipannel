@@ -25,9 +25,25 @@ export default function MyProviders() {
 function MyProvidersInner() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", api_url: "", api_key: "" });
   const [checking, setChecking] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-open the form when the user lands with ?new=1 (e.g. from Dashboard CTA)
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setShowForm(true);
+      // Scroll the form into view once it renders.
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      // Clean the URL so a refresh doesn't reopen the form unexpectedly.
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const { data: accounts, isLoading } = useQuery({
     queryKey: ["user-providers", user?.id],
