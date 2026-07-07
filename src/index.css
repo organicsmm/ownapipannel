@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=DM+Sans:opsz,wght@9..40,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -67,7 +67,7 @@ html { font-size: 16px; }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     font-weight: 400;
     letter-spacing: -0.005em;
     -webkit-font-smoothing: antialiased;
@@ -76,17 +76,20 @@ html { font-size: 16px; }
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 500;
-    letter-spacing: -0.03em;
+    font-family: 'Fraunces', 'Instrument Serif', Georgia, serif;
+    font-weight: 700;
+    font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 144;
+    letter-spacing: -0.025em;
     color: hsl(var(--foreground));
   }
 
   .font-serif {
-    font-family: 'Instrument Serif', Georgia, serif;
-    font-weight: 400;
+    font-family: 'Fraunces', 'Instrument Serif', Georgia, serif;
+    font-weight: 900;
+    font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 144;
     letter-spacing: -0.02em;
   }
+
 
   .font-mono { font-family: 'JetBrains Mono', monospace; }
 
