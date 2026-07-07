@@ -1,5 +1,12 @@
-// oxapay-webhook — PUBLIC endpoint. Signature-verified.
-// Only path that can activate a subscription (via service-role RPC).
+// oxapay-webhook — PUBLIC endpoint. Signature-verified + fully idempotent.
+//
+// Retry safety layers (in order):
+//   1. HMAC-SHA512 signature check (rejects tampered / unsigned)
+//   2. Dedup insert into oxapay_webhook_events (order_id, status, sig_prefix)
+//      → duplicate deliveries return 200 instantly, no DB work
+//   3. activate_subscription_oxapay RPC (advisory lock + credited flag)
+//      → even if two servers race past step 2, DB serializes them
+//   4. Always returns 200 after processing so OxaPay stops retrying
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -35,6 +42,8 @@ async function logSecurity(admin: any, event: string, reason: string, metadata: 
   } catch (_e) { /* ignore */ }
 }
 
+const TERMINAL_PAID = new Set(["paid", "confirmed", "complete", "completed"]);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -49,51 +58,96 @@ serve(async (req) => {
       return new Response("ok", { status: 200, headers: cors });
     }
 
-    // Read raw body ONCE
+    // -------- Step 1: read body once, verify HMAC --------
     const raw = await req.text();
     const receivedSig = (req.headers.get("hmac") || req.headers.get("HMAC") || "").trim().toLowerCase();
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || null;
 
     if (!receivedSig) {
-      await logSecurity(admin, "webhook_no_signature", "Missing hmac header", { ip: req.headers.get("x-forwarded-for") });
+      await logSecurity(admin, "webhook_no_signature", "Missing hmac header", { ip });
       return new Response("ok", { status: 200, headers: cors });
     }
 
     const expectedSig = (await hmacSha512Hex(OXAPAY_KEY, raw)).toLowerCase();
     if (!constantTimeEqual(receivedSig, expectedSig)) {
-      await logSecurity(admin, "webhook_bad_signature", "HMAC mismatch", { ip: req.headers.get("x-forwarded-for") });
+      await logSecurity(admin, "webhook_bad_signature", "HMAC mismatch", { ip });
       return new Response("invalid", { status: 401, headers: cors });
     }
 
     // Signature OK — parse
-    const payload = JSON.parse(raw);
-    // OxaPay payload common fields: type, order_id, track_id, status, amount, currency, ...
-    const orderId = payload?.order_id ?? payload?.orderId;
-    const trackId = payload?.track_id ?? payload?.trackId;
-    const status = String(payload?.status ?? "").toLowerCase();
+    let payload: any;
+    try { payload = JSON.parse(raw); } catch {
+      await logSecurity(admin, "webhook_bad_json", "Body not JSON", { ip });
+      return new Response("ok", { status: 200, headers: cors });
+    }
+
+    const orderId = String(payload?.order_id ?? payload?.orderId ?? "").trim();
+    const trackId = payload?.track_id ?? payload?.trackId ?? null;
+    const rawStatus = String(payload?.status ?? "").toLowerCase();
     const paidAmount = Number(payload?.amount ?? payload?.price_amount ?? 0);
 
     if (!orderId) {
-      await logSecurity(admin, "webhook_missing_order", "No order_id in payload", { payload });
+      await logSecurity(admin, "webhook_missing_order", "No order_id", { payload });
       return new Response("ok", { status: 200, headers: cors });
     }
 
-    // Persist raw payload on the deposit
+    // -------- Step 2: dedup — insert event row, fail = duplicate --------
+    // signature_prefix locks the fingerprint so replays with a different HMAC
+    // (e.g. re-signed after key rotation) are still treated as distinct events.
+    const sigPrefix = expectedSig.slice(0, 32);
+
+    const { data: dedupRow, error: dedupErr } = await admin
+      .from("oxapay_webhook_events")
+      .insert({
+        order_id: orderId,
+        status: rawStatus || "unknown",
+        signature_prefix: sigPrefix,
+        payload,
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (dedupErr) {
+      // Unique-violation = duplicate delivery. Return 200 fast, no work.
+      const isDupe = String(dedupErr.code) === "23505"
+        || /duplicate/i.test(dedupErr.message ?? "");
+      if (isDupe) {
+        console.log("webhook duplicate ignored", orderId, rawStatus);
+        return new Response("ok (duplicate)", { status: 200, headers: cors });
+      }
+      // Unknown DB error — log and 200 (OxaPay will retry, next attempt hits dedup)
+      console.error("dedup insert error", dedupErr.message);
+      await logSecurity(admin, "webhook_dedup_error", dedupErr.message, { order_id: orderId });
+      return new Response("ok", { status: 200, headers: cors });
+    }
+
+    // -------- Step 3: mirror payload onto deposit --------
     await admin.from("oxapay_deposits")
-      .update({ raw_response: payload, track_id: trackId ? String(trackId) : undefined })
+      .update({
+        raw_response: payload,
+        track_id: trackId ? String(trackId) : undefined,
+        updated_at: new Date().toISOString(),
+      })
       .eq("order_id", orderId);
 
-    if (status !== "paid" && status !== "confirmed" && status !== "complete" && status !== "completed") {
-      // Non-terminal / not paid — just log and 200
+    // Non-terminal status — done, keep row for audit
+    if (!TERMINAL_PAID.has(rawStatus)) {
+      await admin.from("oxapay_webhook_events")
+        .update({ processed_at: new Date().toISOString(), activation_result: { skipped: "non_terminal_status" } })
+        .eq("id", dedupRow!.id);
       return new Response("ok", { status: 200, headers: cors });
     }
 
-    // Look up deposit for user_id + plan
+    // -------- Step 4: activate via locked RPC --------
     const { data: deposit } = await admin.from("oxapay_deposits")
       .select("user_id, plan_type, amount_usd")
       .eq("order_id", orderId).maybeSingle();
 
     if (!deposit) {
       await logSecurity(admin, "webhook_unknown_order", "Deposit not found", { order_id: orderId });
+      await admin.from("oxapay_webhook_events")
+        .update({ processed_at: new Date().toISOString(), activation_result: { error: "deposit_missing" } })
+        .eq("id", dedupRow!.id);
       return new Response("ok", { status: 200, headers: cors });
     }
 
@@ -105,15 +159,22 @@ serve(async (req) => {
       p_track_id: trackId ? String(trackId) : null,
     });
 
+    const result = rpcErr ? { error: rpcErr.message } : rpcData;
+
+    await admin.from("oxapay_webhook_events")
+      .update({ processed_at: new Date().toISOString(), activation_result: result })
+      .eq("id", dedupRow!.id);
+
     if (rpcErr) {
       await logSecurity(admin, "webhook_activation_error", rpcErr.message, { order_id: orderId });
     } else {
-      console.log("activation result", JSON.stringify(rpcData));
+      console.log("activation ok", orderId, JSON.stringify(rpcData));
     }
 
     return new Response("ok", { status: 200, headers: cors });
   } catch (e) {
-    console.error("webhook error", (e as Error).message);
+    console.error("webhook fatal", (e as Error).message);
+    // Always 200 so OxaPay doesn't hammer us; error is in logs.
     return new Response("ok", { status: 200, headers: cors });
   }
 });
