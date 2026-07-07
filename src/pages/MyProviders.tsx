@@ -120,7 +120,8 @@ function MyProvidersInner() {
       </div>
 
       {showForm && (
-        <Card className="p-6 space-y-4">
+        <Card ref={formRef} className="p-6 space-y-4">
+
           <div>
             <Label>Display Name</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. My SMM Panel" />
