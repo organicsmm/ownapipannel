@@ -102,7 +102,7 @@ export function FirstProviderCTA() {
             </p>
           </div>
           <Link
-            to="/my-bundles"
+            to="/my-bundles?new=1"
             className="group h-11 px-5 rounded-md bg-primary text-primary-foreground font-mono text-[11px] uppercase tracking-[0.18em] flex items-center justify-center gap-2 hover:shadow-[0_15px_40px_-15px_hsl(var(--primary)/0.7)] transition-all shrink-0"
           >
             <Plus className="w-3.5 h-3.5" /> new bundle
