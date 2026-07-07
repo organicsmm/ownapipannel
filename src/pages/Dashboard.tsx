@@ -94,6 +94,8 @@ export default function Dashboard() {
         <SubscriptionTimeline />
 
         {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
+        {/* Unlock Pro subscription card */}
+        <UnlockProCard />
 
         {/* First-provider / first-bundle onboarding CTA (subscribed users) */}
         <FirstProviderCTA />
