@@ -154,7 +154,11 @@ export function SubscriptionRequestDialog({
       }
 
       // Step 3: Send subscription request as a formatted chat message
-      const planName = planType === 'monthly' ? 'Monthly Plan ($29/month)' : 'Lifetime Plan ($499)';
+      const planName = planType === 'monthly'
+        ? 'Monthly Plan ($29/month)'
+        : planType === 'yearly'
+          ? 'Yearly Plan ($249/year)'
+          : 'Lifetime Plan ($499)';
       const messageContent = `📋 SUBSCRIPTION REQUEST
 
 🎯 Plan: ${planName}
