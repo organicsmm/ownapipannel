@@ -1,0 +1,1 @@
+INSERT INTO public.platform_settings (maintenance_mode, global_markup_percent) VALUES (false, 0);
