@@ -690,6 +690,10 @@ export default function AdminSubscriptions() {
           <TabsContent value="zapupi" className="mt-4 space-y-4">
             <ZapUpiPaymentsList />
           </TabsContent>
+
+          <TabsContent value="audit" className="mt-4 space-y-4">
+            <SubscriptionAuditPanel />
+          </TabsContent>
         </Tabs>
 
 
