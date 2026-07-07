@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,9 +25,25 @@ export default function MyProviders() {
 function MyProvidersInner() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", api_url: "", api_key: "" });
   const [checking, setChecking] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-open the form when the user lands with ?new=1 (e.g. from Dashboard CTA)
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setShowForm(true);
+      // Scroll the form into view once it renders.
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      // Clean the URL so a refresh doesn't reopen the form unexpectedly.
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const { data: accounts, isLoading } = useQuery({
     queryKey: ["user-providers", user?.id],
@@ -103,7 +120,8 @@ function MyProvidersInner() {
       </div>
 
       {showForm && (
-        <Card className="p-6 space-y-4">
+        <Card ref={formRef} className="p-6 space-y-4">
+
           <div>
             <Label>Display Name</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. My SMM Panel" />
