@@ -46,7 +46,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 interface Subscription {
   id: string;
   user_id: string;
-  plan_type: 'none' | 'monthly' | 'lifetime';
+  plan_type: 'none' | 'monthly' | 'yearly' | 'lifetime';
   status: 'inactive' | 'active' | 'expired' | 'cancelled';
   activated_at: string | null;
   expires_at: string | null;
@@ -76,7 +76,7 @@ interface UserProfile {
   orderCounts?: OrderCounts;
 }
 
-type UserTab = 'all' | 'normal' | 'monthly' | 'lifetime';
+type UserTab = 'all' | 'normal' | 'monthly' | 'yearly' | 'lifetime';
 
 export default function AdminUsers() {
   const { user, isAdmin, isLoading: authLoading } = useAuth();
@@ -472,6 +472,10 @@ export default function AdminUsers() {
         return filtered.filter(
           (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly'
         );
+      case 'yearly':
+        return filtered.filter(
+          (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'yearly'
+        );
       case 'lifetime':
         return filtered.filter(
           (u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'lifetime'
@@ -487,6 +491,7 @@ export default function AdminUsers() {
   const totalBalance = users?.reduce((sum, u) => sum + (u.wallet?.balance || 0), 0) || 0;
   const normalCount = users?.filter((u) => !u.subscription || u.subscription.status !== 'active').length || 0;
   const monthlyCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly').length || 0;
+  const yearlyCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'yearly').length || 0;
   const lifetimeCount = users?.filter((u) => u.subscription?.status === 'active' && u.subscription?.plan_type === 'lifetime').length || 0;
 
   // Wait for auth to load before checking admin status
@@ -521,6 +526,14 @@ export default function AdminUsers() {
         </Badge>
       );
     }
+    if (sub.plan_type === 'yearly') {
+      return (
+        <Badge className="text-[10px] h-5 bg-emerald-500/20 text-emerald-500 border-emerald-500/30">
+          <Calendar className="h-3 w-3 mr-1" />
+          Yearly
+        </Badge>
+      );
+    }
     return (
       <Badge className="text-[10px] h-5 bg-primary/20 text-primary border-primary/30">
         <Zap className="h-3 w-3 mr-1" />
@@ -549,7 +562,7 @@ export default function AdminUsers() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -592,6 +605,19 @@ export default function AdminUsers() {
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{yearlyCount}</p>
+                  <p className="text-xs text-muted-foreground">Yearly</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                   <Crown className="h-5 w-5 text-amber-500" />
                 </div>
@@ -619,6 +645,10 @@ export default function AdminUsers() {
               <TabsTrigger value="monthly" className="gap-1">
                 <Zap className="h-3 w-3" />
                 Monthly
+              </TabsTrigger>
+              <TabsTrigger value="yearly" className="gap-1">
+                <Calendar className="h-3 w-3" />
+                Yearly
               </TabsTrigger>
               <TabsTrigger value="lifetime" className="gap-1">
                 <Crown className="h-3 w-3" />
@@ -676,7 +706,7 @@ export default function AdminUsers() {
                   {/* Subscription Status */}
                   <div className="mt-3 p-2.5 rounded-lg bg-muted/50 flex items-center justify-between">
                     {getSubscriptionBadge(u.subscription)}
-                    {u.subscription?.status === 'active' && u.subscription?.plan_type === 'monthly' && u.subscription?.expires_at && (
+                    {u.subscription?.status === 'active' && (u.subscription?.plan_type === 'monthly' || u.subscription?.plan_type === 'yearly') && u.subscription?.expires_at && (
                       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatDistanceToNow(new Date(u.subscription.expires_at), { addSuffix: true })}
