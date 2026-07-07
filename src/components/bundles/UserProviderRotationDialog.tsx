@@ -78,9 +78,9 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
       const enabledRows = Object.values(rows).filter(r => r.enabled);
-      if (enabledRows.length === 0) throw new Error("Kam se kam ek provider tick karo");
+      if (enabledRows.length === 0) throw new Error("Select at least one provider");
       for (const r of enabledRows) {
-        if (!r.provider_service_id.trim()) throw new Error("Sabhi ticked providers ka Service ID enter karo");
+        if (!r.provider_service_id.trim()) throw new Error("Enter a Service ID for every selected provider");
       }
       // Wipe and re-insert (simpler than diff)
       const { error: delErr } = await supabase
@@ -121,10 +121,10 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
           throw new Error(realMsg);
         }
         const svc = (svcData as any)?.services?.[0];
-        if (!svc) throw new Error(`Service ID "${primary.provider_service_id}" provider ki list me nahi mili.`);
+        if (!svc) throw new Error(`Service ID "${primary.provider_service_id}" was not found in the provider's list.`);
         meta = { service_name: svc.name, rate: svc.rate, min_qty: svc.min, max_qty: svc.max };
       } catch (e: any) {
-        throw new Error(`Primary provider ka service validate nahi hua: ${e.message}`);
+        throw new Error(`Could not validate the primary provider's service: ${e.message}`);
       }
 
       const { error: updErr } = await supabase
@@ -164,7 +164,7 @@ export function UserProviderRotationDialog({ open, onOpenChange, itemId, engagem
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !providers || providers.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
-            Koi active provider account nahi hai. Pehle <a href="/my-providers" className="underline text-primary">My Providers</a> me add karo.
+            No active provider accounts. Please add one in <a href="/my-providers" className="underline text-primary">My Providers</a> first.
           </div>
         ) : (
           <div className="space-y-3">

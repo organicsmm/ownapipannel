@@ -130,7 +130,7 @@ export function CategoryPricingCard() {
         <div>
           <h2 className="text-lg font-semibold">Bundle Pricing (per 1K) — INR</h2>
           <p className="text-xs text-muted-foreground">
-            Boxes apne aap bundles se aate hain. Jo ₹ rate yahan set karoge wahi user ko har service par lagega.
+            Boxes are auto-generated from bundles. The ₹ rate you set here applies to users on every service.
           </p>
         </div>
       </div>
@@ -141,7 +141,7 @@ export function CategoryPricingCard() {
         </div>
       ) : !hasAny ? (
         <div className="py-8 text-center text-sm text-muted-foreground">
-          Koi active bundle nahi mila. Pehle Admin → Bundles me bundle banao, fir pricing yahan apne aap aa jayegi.
+          No active bundles found. Create a bundle in Admin → Bundles first, and pricing will appear here automatically.
         </div>
       ) : (
         <div className="space-y-6">

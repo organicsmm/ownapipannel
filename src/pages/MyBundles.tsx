@@ -191,7 +191,7 @@ function Inner() {
             ) : platformBundles.length === 0 ? (
               <Card className="p-12 text-center">
                 <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">{p.label} ke liye koi bundle nahi hai. Create Bundle button se shuru karo.</p>
+                <p className="text-muted-foreground">No bundles for {p.label} yet. Click Create Bundle to get started.</p>
               </Card>
             ) : (
               platformBundles.map((b: any) => <BundleCard key={b.id} bundle={b} providers={providers || []} />)
@@ -257,7 +257,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Metric bundle se hata diya");
+      toast.success("Metric removed from bundle");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -298,7 +298,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
               onCheckedChange={(v) => toggleField.mutate({ is_active: v })}
             />
           </div>
-          <Button size="icon" variant="ghost" onClick={() => { if (confirm("Bundle delete karna hai?")) deleteBundle.mutate(); }}>
+          <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this bundle?")) deleteBundle.mutate(); }}>
             <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
         </div>
@@ -344,12 +344,12 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
       {providers.length === 0 ? (
         <div className="rounded-lg border border-border bg-muted/30 p-3">
           <p className="text-xs text-muted-foreground">
-            Koi active provider nahi hai. Pehle <a href="/my-providers" className="underline text-primary">My Providers</a> me add karo.
+            No active providers. Please add one in <a href="/my-providers" className="underline text-primary">My Providers</a> first.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          <Label className="text-xs">Service IDs (har metric ke liye, har provider ke liye priority-wise)</Label>
+          <Label className="text-xs">Service IDs (per metric, per provider, priority-wise)</Label>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {visibleTypes.map((t, idx) => (
               <EngagementTypeBox
@@ -360,7 +360,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
                 providers={providers}
                 isFirst={idx === 0}
                 onRemoveType={() => {
-                  if (confirm(`${(ENGAGEMENT_CONFIG as any)[t]?.label || t} ko bundle se hata do?`)) hideType.mutate(t);
+                  if (confirm(`Remove ${(ENGAGEMENT_CONFIG as any)[t]?.label || t} from this bundle?`)) hideType.mutate(t);
                 }}
               />
             ))}
@@ -368,7 +368,7 @@ function BundleCard({ bundle, providers }: { bundle: any; providers: any[] }) {
 
           {removedTypes.length > 0 && (
             <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
-              <Label className="text-xs text-muted-foreground">Removed metrics (wapas add karne ke liye click karo)</Label>
+              <Label className="text-xs text-muted-foreground">Removed metrics (click to add back)</Label>
               <div className="flex flex-wrap gap-2">
                 {removedTypes.map(t => (
                   <button
@@ -426,7 +426,7 @@ function EngagementTypeBox({
           size="icon"
           variant="ghost"
           onClick={onRemoveType}
-          title={`${label} ko bundle se hata do`}
+          title={`Remove ${label} from bundle`}
           className="h-7 w-7 text-destructive hover:text-destructive"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -547,7 +547,7 @@ function ProviderRow({
       const { error } = await supabase.from("user_bundle_item_providers").delete().eq("id", mapping.id);
       if (error) throw error;
       if (existingItem?.id) await syncPrimary(existingItem.id);
-      toast.success("Provider hata diya");
+      toast.success("Provider removed");
       qc.invalidateQueries({ queryKey: ["user-bundles"] });
     } catch (e: any) {
       toast.error(e.message || "Remove failed");
@@ -565,7 +565,7 @@ function ProviderRow({
       return;
     }
     if (!/^\d{1,9}$/.test(trimmed)) {
-      toast.error("Service ID sirf numbers ho sakta hai (1-9 digits)");
+      toast.error("Service ID must be numbers only (1-9 digits)");
       return;
     }
     const prio = Math.max(1, Math.min(99, Number(priority) || 1));
@@ -587,7 +587,7 @@ function ProviderRow({
         throw new Error(realMsg);
       }
       const svc = (svcData as any)?.services?.[0];
-      if (!svc) throw new Error(`Service ID "${trimmed}" ${provider.name} ki list me nahi mili.`);
+      if (!svc) throw new Error(`Service ID "${trimmed}" was not found in ${provider.name}'s list.`);
 
       const itemId = await ensureItem();
 
