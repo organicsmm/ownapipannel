@@ -128,6 +128,7 @@ const App = () => {
                     <Route path="/wallet" element={<Wallet />} />
                     <Route path="/subscription/return" element={<SubscriptionReturn />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/security-test" element={<SecurityTest />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/api-access" element={<ApiAccess />} />
                     <Route path="/intelligence" element={<Intelligence />} />
