@@ -10,7 +10,7 @@ interface Props { children: React.ReactNode }
 
 // Routes that never require a subscription
 const ALLOWED_ROUTES = [
-  '/', '/auth', '/wallet', '/settings', '/subscription/return', '/security-test',
+  '/', '/auth', '/settings', '/subscription/return', '/security-test',
   '/terms', '/privacy', '/refund', '/cookies',
 ];
 
@@ -42,10 +42,9 @@ export function GlobalSubscriptionGuard({ children }: Props) {
 
   const handleOpenChange = (open: boolean) => {
     setDialogOpen(open);
-    // If user closes on a guarded page, send them somewhere they're allowed
-    // (wallet is the closest safe landing that still shows subscription CTA).
+    // Send user back to the landing page if they dismiss on a guarded route.
     if (!open && needsSubscription) {
-      navigate('/wallet', { replace: true });
+      navigate('/', { replace: true });
     }
   };
 

@@ -3,7 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
-import { Wallet, ShoppingCart, TrendingUp, Activity, Sparkles, Package, ChevronRight, Zap, Eye, Heart, MessageCircle, BarChart3, ArrowUpRight } from 'lucide-react';
+import { ShoppingCart, TrendingUp, Activity, Sparkles, Package, ChevronRight, Zap, Eye, Heart, MessageCircle, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageMeta } from '@/components/seo/PageMeta';
 import { SubscriptionTimeline } from '@/components/subscription/SubscriptionTimeline';
@@ -92,10 +92,9 @@ export default function Dashboard() {
         <SubscriptionTimeline />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
 
           {[
-            { icon: Wallet, label: 'Balance', value: formatPrice(wallet?.balance || 0), sub: 'Available funds' },
             { icon: ShoppingCart, label: 'Total Orders', value: stats?.totalOrders || 0, sub: `${stats?.completedOrders || 0} completed` },
             { icon: Activity, label: 'Active', value: stats?.activeOrders || 0, sub: 'In progress' },
             { icon: TrendingUp, label: 'Total Spent', value: formatPrice(stats?.totalSpent || 0), sub: 'All time' },
@@ -183,10 +182,9 @@ export default function Dashboard() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { icon: Sparkles, label: 'Full Engagement', desc: 'Views + Likes + Comments', path: '/engagement-order' },
-            { icon: Wallet, label: 'Add Funds', desc: 'Deposit to wallet', path: '/wallet' },
             { icon: Package, label: 'All Services', desc: 'Browse catalog', path: '/services' },
           ].map((a, i) => (
             <Link key={i} to={a.path} className="group flex items-center gap-3.5 p-4 rounded-md bg-card border border-border hover:border-primary/40 hover:bg-secondary/30 transition-all">
