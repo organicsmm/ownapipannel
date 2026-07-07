@@ -80,7 +80,7 @@ export function OxapaySubscriptionPoller() {
             lifetime: 'Lifetime',
           };
           const PLAN_PRICE: Record<string, string> = {
-            monthly: '$1',
+            monthly: '$29',
             yearly: '$249',
             lifetime: '$499',
           };
