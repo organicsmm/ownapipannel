@@ -254,12 +254,12 @@ Request ID: ${requestData.id}`;
         {/* Header with Gradient */}
         <div className={cn(
           "relative px-6 pt-8 pb-6 bg-gradient-to-br",
-          planType === 'monthly' ? 'from-primary/10 via-primary/5 to-transparent' : 'from-warning/10 via-warning/5 to-transparent'
+          isLifetime ? 'from-warning/10 via-warning/5 to-transparent' : 'from-primary/10 via-primary/5 to-transparent'
         )}>
           <div className="absolute top-4 right-4">
             <Sparkles className={cn(
               "h-5 w-5",
-              planType === 'monthly' ? 'text-primary/40' : 'text-warning/40'
+              isLifetime ? 'text-warning/40' : 'text-primary/40'
             )} />
           </div>
 
@@ -267,15 +267,15 @@ Request ID: ${requestData.id}`;
             <div className="flex items-center gap-3">
               <div className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center",
-                planType === 'monthly'
-                  ? 'bg-gradient-to-br from-primary to-primary/70'
-                  : 'bg-gradient-to-br from-warning to-warning/70'
+                isLifetime
+                  ? 'bg-gradient-to-br from-warning to-warning/70'
+                  : 'bg-gradient-to-br from-primary to-primary/70'
               )}>
                 <PlanIcon className="h-6 w-6 text-white" />
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold">
-                  {planType === 'monthly' ? 'Monthly' : 'Lifetime'} Plan
+                  {planDetails.title} Plan
                 </DialogTitle>
                 <DialogDescription className="text-sm">
                   Fill your details to get started
@@ -288,7 +288,7 @@ Request ID: ${requestData.id}`;
           <div className="mt-4 flex items-baseline gap-1">
             <span className={cn(
               "text-4xl font-bold",
-              planType === 'monthly' ? 'text-primary' : 'text-warning'
+              isLifetime ? 'text-warning' : 'text-primary'
             )}>
               {planDetails.price}
             </span>
@@ -301,7 +301,7 @@ Request ID: ${requestData.id}`;
               <div key={i} className="flex items-center gap-2">
                 <CheckCircle2 className={cn(
                   "h-4 w-4 shrink-0",
-                  planType === 'monthly' ? 'text-primary' : 'text-warning'
+                  isLifetime ? 'text-warning' : 'text-primary'
                 )} />
                 <span className="text-xs text-muted-foreground">{feature}</span>
               </div>
