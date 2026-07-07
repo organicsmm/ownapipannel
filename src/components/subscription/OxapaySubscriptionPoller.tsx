@@ -65,6 +65,8 @@ export function OxapaySubscriptionPoller() {
           credited?: boolean;
           status?: string;
           error?: string;
+          plan_type?: 'monthly' | 'yearly' | 'lifetime';
+          amount_usd?: number;
         };
 
         if (payload.error) throw new Error(payload.error);
@@ -72,9 +74,28 @@ export function OxapaySubscriptionPoller() {
         consecutiveErrors = 0;
 
         if (payload.credited) {
-          toast.success('✅ Subscription activated!', {
+          const PLAN_LABEL: Record<string, string> = {
+            monthly: 'Monthly',
+            yearly: 'Yearly',
+            lifetime: 'Lifetime',
+          };
+          const PLAN_PRICE: Record<string, string> = {
+            monthly: '$29',
+            yearly: '$249',
+            lifetime: '$499',
+          };
+          const plan = payload.plan_type ?? '';
+          const label = PLAN_LABEL[plan] ?? 'Subscription';
+          const price = payload.amount_usd
+            ? `$${payload.amount_usd}`
+            : PLAN_PRICE[plan] ?? '';
+          const suffix =
+            plan === 'monthly' ? '/month' : plan === 'yearly' ? '/year' : plan === 'lifetime' ? ' one-time' : '';
+
+          toast.success(`✅ ${label} plan activated!`, {
             id: toastId,
-            description: 'Your access is now active.',
+            description: price ? `${price}${suffix} — your access is now active.` : 'Your access is now active.',
+            duration: 8000,
           });
           await qc.invalidateQueries({ queryKey: ['user-subscription'] });
           clearUrl();
