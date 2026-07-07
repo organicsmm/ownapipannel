@@ -94,13 +94,21 @@ export function OxapaySubscriptionPoller() {
 
           toast.success(`✅ ${label} plan activated!`, {
             id: toastId,
-            description: price ? `${price}${suffix} — your access is now active.` : 'Your access is now active.',
+            description: price
+              ? `${price}${suffix} — redirecting you to set up your providers…`
+              : 'Redirecting you to set up your providers…',
             duration: 8000,
           });
           await qc.invalidateQueries({ queryKey: ['user-subscription'] });
           clearUrl();
           stop();
+          // Auto-redirect into the newly unlocked area so the user can start
+          // adding providers / building bundles right away.
+          setTimeout(() => {
+            navigate('/my-providers', { replace: true });
+          }, 900);
           return;
+
         }
 
         if (payload.status && TERMINAL_FAIL.has(payload.status)) {
