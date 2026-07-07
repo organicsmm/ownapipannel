@@ -74,7 +74,7 @@ export function UnlockProCard() {
                 )}
               </button>
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                :from $29/mo · $249/yr · $499 lifetime
+                :from $1/mo · $249/yr · $499 lifetime
               </p>
             </div>
           </div>
