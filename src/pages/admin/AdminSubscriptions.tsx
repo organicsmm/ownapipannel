@@ -50,6 +50,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ZapUpiPaymentsList } from '@/components/admin/ZapUpiPaymentsList';
+import { SubscriptionAuditPanel } from '@/components/admin/SubscriptionAuditPanel';
 
 
 interface SubscriptionRequest {
