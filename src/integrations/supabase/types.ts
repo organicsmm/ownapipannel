@@ -762,6 +762,54 @@ export type Database = {
           },
         ]
       }
+      oxapay_deposits: {
+        Row: {
+          amount_usd: number
+          created_at: string
+          credited: boolean
+          id: string
+          order_id: string
+          pay_link: string | null
+          plan_type: string
+          purpose: string
+          raw_response: Json | null
+          status: string
+          track_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_usd: number
+          created_at?: string
+          credited?: boolean
+          id?: string
+          order_id: string
+          pay_link?: string | null
+          plan_type: string
+          purpose?: string
+          raw_response?: Json | null
+          status?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_usd?: number
+          created_at?: string
+          credited?: boolean
+          id?: string
+          order_id?: string
+          pay_link?: string | null
+          plan_type?: string
+          purpose?: string
+          raw_response?: Json | null
+          status?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           created_at: string | null
@@ -930,6 +978,36 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      security_audit_log: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1703,6 +1781,16 @@ export type Database = {
       }
     }
     Functions: {
+      activate_subscription_oxapay: {
+        Args: {
+          p_amount_usd: number
+          p_order_id: string
+          p_plan: string
+          p_track_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       activate_subscription_zapupi: {
         Args: {
           p_gateway_response: Json
@@ -1745,6 +1833,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

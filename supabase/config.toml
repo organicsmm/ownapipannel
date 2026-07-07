@@ -1,1 +1,10 @@
 project_id = "aqxniduulgvxetykysog"
+
+[functions.oxapay-webhook]
+verify_jwt = false
+
+[functions.oxapay-create-subscription]
+verify_jwt = false
+
+[functions.oxapay-sync-deposit]
+verify_jwt = false

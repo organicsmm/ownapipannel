@@ -1,34 +1,51 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { MaintenancePage } from '@/components/MaintenanceMode';
+import { SubscriptionCheckDialog } from './SubscriptionCheckDialog';
 
-interface GlobalSubscriptionGuardProps {
-  children: React.ReactNode;
-}
+interface Props { children: React.ReactNode }
 
-// Routes that are completely public (no login needed)
-const PUBLIC_ROUTES = ['/', '/auth'];
+// Routes that never require a subscription
+const ALLOWED_ROUTES = [
+  '/', '/auth', '/wallet', '/settings', '/subscription/return',
+  '/terms', '/privacy', '/refund', '/cookies',
+];
 
-/**
- * ZERO-BLOCKING GLOBAL GUARD
- * NEVER shows a loading spinner - renders children immediately
- * Only blocks rendering for maintenance mode (non-admin users)
- */
-export function GlobalSubscriptionGuard({ children }: GlobalSubscriptionGuardProps) {
+const isAllowed = (path: string) =>
+  ALLOWED_ROUTES.some((r) => path === r || path.startsWith(r + '/')) ||
+  path.startsWith('/admin');
+
+export function GlobalSubscriptionGuard({ children }: Props) {
   const location = useLocation();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { hasActiveSubscription, isLoading: subLoading } = useSubscription();
   const { isMaintenanceMode } = useMaintenanceMode();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const isPublicRoute = useMemo(() => PUBLIC_ROUTES.includes(location.pathname), [location.pathname]);
-  const isAdminRoute = useMemo(() => location.pathname.startsWith('/admin'), [location.pathname]);
-  
-  // Maintenance mode: show maintenance page to non-admin users
-  if (isMaintenanceMode && !isAdmin && !isAdminRoute && !isPublicRoute) {
+  const allowedPath = useMemo(() => isAllowed(location.pathname), [location.pathname]);
+
+  const needsSubscription =
+    !!user && !isAdmin && !authLoading && !subLoading &&
+    !hasActiveSubscription && !allowedPath;
+
+  useEffect(() => {
+    setDialogOpen(needsSubscription);
+  }, [needsSubscription]);
+
+  if (isMaintenanceMode && !isAdmin && !location.pathname.startsWith('/admin') && !allowedPath) {
     return <MaintenancePage />;
   }
 
-  // ALWAYS render children instantly - no loading spinner ever
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SubscriptionCheckDialog
+        open={dialogOpen}
+        onOpenChange={(o) => { if (!o && needsSubscription) return; setDialogOpen(o); }}
+      />
+    </>
+  );
 }
