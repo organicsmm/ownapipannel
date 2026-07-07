@@ -96,7 +96,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                 </div>
                 <h3 className="font-semibold mb-1">Monthly</h3>
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-2xl font-bold">$29</span>
+                  <span className="text-2xl font-bold">$1</span>
                   <span className="text-xs text-muted-foreground">/mo</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-muted-foreground">
