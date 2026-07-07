@@ -76,12 +76,12 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
 
           {/* Pricing Cards */}
           {!hasPendingRequest && (
-            <div className="grid sm:grid-cols-2 gap-4 mb-6">
-              {/* Monthly Plan */}
-              <div 
+            <div className="grid sm:grid-cols-3 gap-4 mb-6">
+              {/* Monthly */}
+              <div
                 className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
-                  selectedPlan === 'monthly' 
-                    ? 'border-primary bg-primary/5' 
+                  selectedPlan === 'monthly'
+                    ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
                 onClick={() => setSelectedPlan('monthly')}
@@ -94,35 +94,69 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                     <CheckCircle2 className="h-5 w-5 text-primary" />
                   )}
                 </div>
-                <h3 className="font-semibold mb-1">Monthly Plan</h3>
+                <h3 className="font-semibold mb-1">Monthly</h3>
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-3xl font-bold">$29</span>
-                  <span className="text-muted-foreground">/month</span>
+                  <span className="text-2xl font-bold">$29</span>
+                  <span className="text-xs text-muted-foreground">/mo</span>
                 </div>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-3 w-3 text-success" />
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
                     Full platform access
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-3 w-3 text-success" />
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
                     Cancel anytime
                   </li>
                 </ul>
               </div>
 
-              {/* Lifetime Plan */}
-              <div 
+              {/* Yearly */}
+              <div
+                className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
+                  selectedPlan === 'yearly'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => setSelectedPlan('yearly')}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-emerald-500" />
+                  </div>
+                  {selectedPlan === 'yearly' && (
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+                <h3 className="font-semibold mb-1">Yearly</h3>
+                <div className="flex items-baseline gap-1 mb-3">
+                  <span className="text-2xl font-bold">$249</span>
+                  <span className="text-xs text-muted-foreground">/yr</span>
+                </div>
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
+                    12 months access
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
+                    Save vs monthly
+                  </li>
+                </ul>
+              </div>
+
+              {/* Lifetime */}
+              <div
                 className={`p-5 rounded-xl border-2 cursor-pointer transition-all relative overflow-hidden ${
-                  selectedPlan === 'lifetime' 
-                    ? 'border-primary bg-primary/5' 
+                  selectedPlan === 'lifetime'
+                    ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
                 onClick={() => setSelectedPlan('lifetime')}
               >
                 <Badge className="absolute top-2 right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
                   <Sparkles className="h-3 w-3 mr-1" />
-                  Best Value
+                  Best
                 </Badge>
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
@@ -132,18 +166,18 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                     <CheckCircle2 className="h-5 w-5 text-primary" />
                   )}
                 </div>
-                <h3 className="font-semibold mb-1">Lifetime Plan</h3>
+                <h3 className="font-semibold mb-1">Lifetime</h3>
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-3xl font-bold">$499</span>
-                  <span className="text-muted-foreground">one-time</span>
+                  <span className="text-2xl font-bold">$499</span>
+                  <span className="text-xs text-muted-foreground">once</span>
                 </div>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-3 w-3 text-success" />
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
                     Forever access
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-3 w-3 text-success" />
+                    <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
                     All future updates
                   </li>
                 </ul>
@@ -153,11 +187,11 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
 
           {/* Action Button */}
           {!hasPendingRequest && (
-            <Button 
+            <Button
               className="w-full btn-gradient rounded-full py-6 text-lg"
               onClick={() => setShowDialog(true)}
             >
-              Get {selectedPlan === 'monthly' ? 'Monthly' : 'Lifetime'} Plan
+              Get {selectedPlan === 'monthly' ? 'Monthly' : selectedPlan === 'yearly' ? 'Yearly' : 'Lifetime'} Plan
               <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
           )}
