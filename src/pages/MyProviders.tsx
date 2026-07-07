@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,21 +12,25 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, RefreshCw, Trash2, KeyRound, Loader2 } from "lucide-react";
 
+const SubscriptionCheckDialog = lazy(() =>
+  import("@/components/subscription/SubscriptionCheckDialog").then((m) => ({ default: m.SubscriptionCheckDialog }))
+);
+
 export default function MyProviders() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <MyProvidersInner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <MyProvidersInner />
+    </DashboardLayout>
   );
 }
 
 function MyProvidersInner() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { hasActiveSubscription, isLoading: subscriptionLoading } = useSubscription();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [form, setForm] = useState({ name: "", api_url: "", api_key: "" });
   const [checking, setChecking] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +67,7 @@ function MyProvidersInner() {
   const addMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
+      if (!isAdmin && !hasActiveSubscription) throw new Error("Subscription required");
       const { error } = await supabase.from("user_provider_accounts").insert({
         user_id: user.id,
         name: form.name.trim(),
@@ -79,6 +84,26 @@ function MyProvidersInner() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const requireSubscription = () => {
+    if (isAdmin || hasActiveSubscription) return true;
+    if (subscriptionLoading) {
+      toast.info("Checking subscription...");
+      return false;
+    }
+    setShowSubscriptionDialog(true);
+    return false;
+  };
+
+  const handleToggleForm = () => {
+    if (!showForm && !requireSubscription()) return;
+    setShowForm(!showForm);
+  };
+
+  const handleSaveProvider = () => {
+    if (!requireSubscription()) return;
+    addMutation.mutate();
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -114,7 +139,7 @@ function MyProvidersInner() {
           <h1 className="text-2xl font-bold text-foreground">My Provider Accounts</h1>
           <p className="text-sm text-muted-foreground mt-1">Apne SMM provider ke API keys add karo. Tumhare orders inhi se chalenge.</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        <Button onClick={handleToggleForm}>
           <Plus className="w-4 h-4 mr-2" /> Add Provider
         </Button>
       </div>
@@ -135,7 +160,7 @@ function MyProvidersInner() {
             <Input type="password" value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="Your API key" />
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => addMutation.mutate()} disabled={!form.name || !form.api_url || !form.api_key || addMutation.isPending}>
+            <Button onClick={handleSaveProvider} disabled={!form.name || !form.api_url || !form.api_key || addMutation.isPending}>
               {addMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Save Provider
             </Button>
@@ -182,6 +207,15 @@ function MyProvidersInner() {
           <KeyRound className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">Abhi koi provider nahi hai. Add Provider button se shuru karo.</p>
         </Card>
+      )}
+
+      {showSubscriptionDialog && (
+        <Suspense fallback={null}>
+          <SubscriptionCheckDialog
+            open={showSubscriptionDialog}
+            onOpenChange={setShowSubscriptionDialog}
+          />
+        </Suspense>
       )}
     </div>
   );
