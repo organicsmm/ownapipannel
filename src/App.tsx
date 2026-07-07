@@ -24,7 +24,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Services = lazy(() => import("./pages/Services"));
 const Order = lazy(() => import("./pages/Order"));
 const Orders = lazy(() => import("./pages/Orders"));
-const Wallet = lazy(() => import("./pages/Wallet"));
+
 const Settings = lazy(() => import("./pages/Settings"));
 const Support = lazy(() => import("./pages/Support"));
 const ApiAccess = lazy(() => import("./pages/ApiAccess"));
