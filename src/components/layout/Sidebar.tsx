@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Package, Wallet, ListOrdered, Settings,
   LifeBuoy, Shield, LogOut, Rocket, Sparkles, X, ChevronDown, Code2, Brain,
-  KeyRound, Layers, Boxes, PackagePlus
+  KeyRound, Layers, Boxes, PackagePlus, Lock
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
