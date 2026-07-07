@@ -215,7 +215,7 @@ export function LockedFeaturePreview({ feature, children }: Props) {
                     Subscribe to unlock {copy.title}
                   </p>
                   <p className="text-[12px] text-muted-foreground mb-4">
-                    Plans start at <span className="text-foreground font-medium">$29/month</span> ·
+                    Plans start at <span className="text-foreground font-medium">$39/month</span> ·
                     yearly $249 · lifetime $499
                   </p>
                   <button
