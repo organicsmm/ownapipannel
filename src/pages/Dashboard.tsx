@@ -92,6 +92,10 @@ export default function Dashboard() {
         {/* Subscription activation timeline */}
         <SubscriptionTimeline />
 
+        {/* Unlock Pro CTA (only shown to non-subscribers) */}
+        <UnlockProCard />
+
+
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
 
