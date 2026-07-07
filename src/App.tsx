@@ -53,7 +53,6 @@ const AdminProviderAccounts = lazy(() => import("./pages/admin/AdminProviderAcco
 const AdminServiceProviderMapping = lazy(() => import("./pages/admin/AdminServiceProviderMapping"));
 const AdminSubscriptions = lazy(() => import("./pages/admin/AdminSubscriptions"));
 
-import { LockedFeaturePreview } from "./components/subscription/LockedFeaturePreview";
 
 // Legal — lazy
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
@@ -133,9 +132,9 @@ const App = () => {
                     <Route path="/api-access" element={<ApiAccess />} />
                     <Route path="/intelligence" element={<Intelligence />} />
 
-                    {/* My Provider (per-user API system) — locked preview for non-subs */}
-                    <Route path="/my-providers" element={<LockedFeaturePreview feature="providers"><MyProviders /></LockedFeaturePreview>} />
-                    <Route path="/my-bundles" element={<LockedFeaturePreview feature="bundles"><MyBundles /></LockedFeaturePreview>} />
+                    {/* My Provider / Bundles — subscription prompt opens only when user tries to add/create */}
+                    <Route path="/my-providers" element={<MyProviders />} />
+                    <Route path="/my-bundles" element={<MyBundles />} />
 
 
 

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Plus, Loader2, Trash2, Package, Brain, Sparkles, CheckCircle2, X, Crown, GripVertical } from "lucide-react";
 import { PLATFORM_ENGAGEMENT_TYPES, EngagementType, ENGAGEMENT_CONFIG } from "@/lib/engagement-types";
+
+const SubscriptionCheckDialog = lazy(() =>
+  import("@/components/subscription/SubscriptionCheckDialog").then((m) => ({ default: m.SubscriptionCheckDialog }))
+);
 
 const PLATFORM_TABS: Array<{ id: string; label: string }> = [
   { id: "Instagram", label: "Instagram" },
@@ -35,20 +39,20 @@ const TAB_TO_PLATFORM_KEY: Record<string, keyof typeof PLATFORM_ENGAGEMENT_TYPES
 
 export default function MyBundles() {
   return (
-    <SubscriptionGuard>
-      <DashboardLayout>
-        <Inner />
-      </DashboardLayout>
-    </SubscriptionGuard>
+    <DashboardLayout>
+      <Inner />
+    </DashboardLayout>
   );
 }
 
 function Inner() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { hasActiveSubscription, isLoading: subscriptionLoading } = useSubscription();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<string>("Instagram");
   const [creating, setCreating] = useState(false);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [bundleName, setBundleName] = useState("");
   const builderRef = useRef<HTMLDivElement | null>(null);
 
@@ -101,6 +105,7 @@ function Inner() {
   const createBundle = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
+      if (!isAdmin && !hasActiveSubscription) throw new Error("Subscription required");
       if (!bundleName.trim()) throw new Error("Bundle name required");
       const { error } = await supabase.from("user_bundles").insert({
         user_id: user.id,
@@ -120,6 +125,26 @@ function Inner() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const requireSubscription = () => {
+    if (isAdmin || hasActiveSubscription) return true;
+    if (subscriptionLoading) {
+      toast.info("Checking subscription...");
+      return false;
+    }
+    setShowSubscriptionDialog(true);
+    return false;
+  };
+
+  const handleToggleCreate = () => {
+    if (!creating && !requireSubscription()) return;
+    setCreating(!creating);
+  };
+
+  const handleCreateBundle = () => {
+    if (!requireSubscription()) return;
+    createBundle.mutate();
+  };
+
   const platformBundles = (bundles || []).filter((b: any) => b.platform === tab);
 
   return (
@@ -133,7 +158,7 @@ function Inner() {
             Provider select karo aur har engagement type ka Service ID seedha box me daalo — auto import + save ho jayega.
           </p>
         </div>
-        <Button onClick={() => setCreating(!creating)}>
+        <Button onClick={handleToggleCreate}>
           <Plus className="w-4 h-4 mr-2" /> Create Bundle
         </Button>
       </div>
@@ -153,7 +178,7 @@ function Inner() {
                   <Input placeholder={`e.g. My ${p.label} Bundle`} value={bundleName} onChange={(e) => setBundleName(e.target.value)} />
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => createBundle.mutate()} disabled={createBundle.isPending || !bundleName.trim()}>
+                  <Button onClick={handleCreateBundle} disabled={createBundle.isPending || !bundleName.trim()}>
                     {createBundle.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Create
                   </Button>
                   <Button variant="ghost" onClick={() => { setCreating(false); setBundleName(""); }}>Cancel</Button>
@@ -174,6 +199,15 @@ function Inner() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {showSubscriptionDialog && (
+        <Suspense fallback={null}>
+          <SubscriptionCheckDialog
+            open={showSubscriptionDialog}
+            onOpenChange={setShowSubscriptionDialog}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
