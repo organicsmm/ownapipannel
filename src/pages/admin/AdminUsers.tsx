@@ -605,6 +605,19 @@ export default function AdminUsers() {
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{yearlyCount}</p>
+                  <p className="text-xs text-muted-foreground">Yearly</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                   <Crown className="h-5 w-5 text-amber-500" />
                 </div>
