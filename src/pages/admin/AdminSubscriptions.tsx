@@ -43,11 +43,14 @@ import {
   Trash2,
   Users,
   AlertCircle,
+  History,
+  ShieldAlert,
 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ZapUpiPaymentsList } from '@/components/admin/ZapUpiPaymentsList';
+import { SubscriptionAuditPanel } from '@/components/admin/SubscriptionAuditPanel';
 
 
 interface SubscriptionRequest {
@@ -413,6 +416,10 @@ export default function AdminSubscriptions() {
               <Zap className="h-4 w-4" />
               Auto Payments
             </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1">
+              <History className="h-4 w-4" />
+              Audit Log
+            </TabsTrigger>
           </TabsList>
 
           {/* Subscribers Tab */}
@@ -682,6 +689,10 @@ export default function AdminSubscriptions() {
           {/* ZapUPI Auto Payments Tab */}
           <TabsContent value="zapupi" className="mt-4 space-y-4">
             <ZapUpiPaymentsList />
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-4 space-y-4">
+            <SubscriptionAuditPanel />
           </TabsContent>
         </Tabs>
 
