@@ -10,7 +10,7 @@ interface Props { children: React.ReactNode }
 
 // Routes that never require a subscription
 const ALLOWED_ROUTES = [
-  '/', '/auth', '/wallet', '/settings', '/subscription/return', '/security-test',
+  '/', '/auth', '/settings', '/subscription/return', '/security-test',
   '/terms', '/privacy', '/refund', '/cookies',
 ];
 
