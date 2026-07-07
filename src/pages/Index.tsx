@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Instagram, Youtube, Music2, Facebook, Twitter, Zap, Crown, Calendar } from 'lucide-react';
 import { PageMeta } from '@/components/seo/PageMeta';
 import logo from '@/assets/logo.png';
 
