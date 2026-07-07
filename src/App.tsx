@@ -134,9 +134,10 @@ const App = () => {
                     <Route path="/api-access" element={<ApiAccess />} />
                     <Route path="/intelligence" element={<Intelligence />} />
 
-                    {/* My Provider (per-user API system) — requires subscription */}
-                    <Route path="/my-providers" element={<SubscriptionGuard><MyProviders /></SubscriptionGuard>} />
-                    <Route path="/my-bundles" element={<SubscriptionGuard><MyBundles /></SubscriptionGuard>} />
+                    {/* My Provider (per-user API system) — locked preview for non-subs */}
+                    <Route path="/my-providers" element={<LockedFeaturePreview feature="providers"><MyProviders /></LockedFeaturePreview>} />
+                    <Route path="/my-bundles" element={<LockedFeaturePreview feature="bundles"><MyBundles /></LockedFeaturePreview>} />
+
 
 
                     {/* Engagement */}
