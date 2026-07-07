@@ -646,6 +646,10 @@ export default function AdminUsers() {
                 <Zap className="h-3 w-3" />
                 Monthly
               </TabsTrigger>
+              <TabsTrigger value="yearly" className="gap-1">
+                <Calendar className="h-3 w-3" />
+                Yearly
+              </TabsTrigger>
               <TabsTrigger value="lifetime" className="gap-1">
                 <Crown className="h-3 w-3" />
                 Lifetime
